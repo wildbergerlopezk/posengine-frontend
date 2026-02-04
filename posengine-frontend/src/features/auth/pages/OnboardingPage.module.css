@@ -1,0 +1,280 @@
+.page {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+  background-color: var(--color-background);
+}
+
+.card {
+  width: 100%;
+  max-width: 40rem;
+  background-color: var(--color-card);
+  border: 1px solid var(--color-border);
+  border-radius: 0.75rem;
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+}
+
+.cardHeader {
+  text-align: center;
+  padding: 1.5rem;
+  padding-bottom: 0.5rem;
+}
+
+.headerIcon {
+  width: 3.5rem;
+  height: 3.5rem;
+  background-color: var(--color-primary);
+  border-radius: 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  margin: 0 auto 1rem;
+}
+
+.cardTitle {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--color-foreground);
+  margin: 0 0 0.25rem 0;
+}
+
+.cardDescription {
+  font-size: 0.875rem;
+  color: var(--color-muted-foreground);
+  margin: 0;
+}
+
+.steps {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem 1.5rem;
+}
+
+.step {
+  display: flex;
+  align-items: center;
+}
+
+.stepNumber {
+  width: 2rem;
+  height: 2rem;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.875rem;
+  font-weight: 500;
+  transition: all 0.2s;
+}
+
+.stepNumberActive {
+  background-color: var(--color-primary);
+  color: white;
+}
+
+.stepNumberInactive {
+  background-color: var(--color-muted);
+  color: var(--color-muted-foreground);
+}
+
+.stepLabel {
+  margin-left: 0.5rem;
+  font-size: 0.875rem;
+  display: none;
+}
+
+@media (min-width: 640px) {
+  .stepLabel {
+    display: inline;
+  }
+}
+
+.stepLabelActive {
+  color: var(--color-foreground);
+  font-weight: 500;
+}
+
+.stepLabelInactive {
+  color: var(--color-muted-foreground);
+}
+
+.stepConnector {
+  width: 3rem;
+  height: 2px;
+  margin: 0 1rem;
+  transition: background-color 0.2s;
+}
+
+@media (min-width: 640px) {
+  .stepConnector {
+    width: 6rem;
+  }
+}
+
+.stepConnectorActive {
+  background-color: var(--color-primary);
+}
+
+.stepConnectorInactive {
+  background-color: var(--color-muted);
+}
+
+.cardContent {
+  padding: 1.5rem;
+}
+
+.formGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.label {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--color-foreground);
+}
+
+.input {
+  width: 100%;
+  height: 2.5rem;
+  padding: 0 0.75rem;
+  border: 1px solid var(--color-border);
+  border-radius: 0.5rem;
+  background-color: var(--color-background);
+  font-size: 0.875rem;
+}
+
+.input:focus {
+  outline: none;
+  border-color: var(--color-primary);
+}
+
+.textarea {
+  width: 100%;
+  padding: 0.75rem;
+  border: 1px solid var(--color-border);
+  border-radius: 0.5rem;
+  background-color: var(--color-background);
+  font-size: 0.875rem;
+  resize: vertical;
+}
+
+.select {
+  width: 100%;
+  height: 2.5rem;
+  padding: 0 0.75rem;
+  border: 1px solid var(--color-border);
+  border-radius: 0.5rem;
+  background-color: var(--color-background);
+  font-size: 0.875rem;
+}
+
+.hint {
+  font-size: 0.75rem;
+  color: var(--color-muted-foreground);
+}
+
+.summaryBox {
+  background-color: var(--color-muted);
+  border-radius: 0.5rem;
+  padding: 1rem;
+  margin-top: 1.5rem;
+}
+
+.summaryTitle {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--color-foreground);
+  margin: 0 0 0.75rem 0;
+}
+
+.summaryList {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.summaryItem {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.875rem;
+}
+
+.summaryLabel {
+  color: var(--color-muted-foreground);
+}
+
+.summaryValue {
+  font-weight: 500;
+  color: var(--color-foreground);
+}
+
+.cardFooter {
+  display: flex;
+  justify-content: space-between;
+  padding: 1.5rem;
+  border-top: 1px solid var(--color-border);
+}
+
+.backButton {
+  height: 2.5rem;
+  padding: 0 1rem;
+  border: 1px solid var(--color-border);
+  border-radius: 0.5rem;
+  background: transparent;
+  font-size: 0.875rem;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.backButton:hover:not(:disabled) {
+  background-color: var(--color-accent);
+}
+
+.backButton:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.nextButton {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  height: 2.5rem;
+  padding: 0 1rem;
+  border: none;
+  border-radius: 0.5rem;
+  background-color: var(--color-primary);
+  color: white;
+  font-size: 0.875rem;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.nextButton:hover:not(:disabled) {
+  background-color: var(--color-primary-hover);
+}
+
+.nextButton:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.spinner {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
