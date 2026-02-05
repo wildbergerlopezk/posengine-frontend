@@ -1,5 +1,4 @@
 "use client"
-
 import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { Building2, Loader2, ArrowRight, Check } from "lucide-react"
