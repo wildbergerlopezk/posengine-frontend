@@ -1,3 +1,7 @@
+/* ================================
+   AUTH LAYOUT STYLES - POSENGINE
+   ================================ */
+
 .layout {
   min-height: 100vh;
   display: flex;
@@ -11,6 +15,9 @@
   padding: 2rem;
 }
 
+/* ============================================
+   BRANDING SECTION - ESTILO FITTRACK
+   ============================================ */
 .brandingSection {
   display: none;
   flex: 1;
@@ -18,8 +25,14 @@
   align-items: center;
   justify-content: center;
   padding: 3rem;
-  background-color: var(--color-sidebar-bg);
-  color: var(--color-sidebar-foreground);
+  background: linear-gradient(135deg, 
+    hsl(220, 25%, 8%) 0%, 
+    hsl(220, 20%, 12%) 50%, 
+    hsl(220, 25%, 10%) 100%
+  );
+  color: white;
+  position: relative;
+  overflow: hidden;
 }
 
 @media (min-width: 1024px) {
@@ -28,57 +41,204 @@
   }
 }
 
-.brandingContent {
-  max-width: 28rem;
-  text-align: center;
+/* Background blur effects - colores FitTrack */
+.brandingSection::before,
+.brandingSection::after {
+  content: '';
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(100px);
+  opacity: 0.15;
+  animation: slowFloat 20s ease-in-out infinite;
+  pointer-events: none;
 }
 
+.brandingSection::before {
+  top: -20%;
+  right: -10%;
+  width: 600px;
+  height: 600px;
+  background: radial-gradient(circle, #0066ff 0%, transparent 70%);
+}
+
+.brandingSection::after {
+  bottom: -20%;
+  left: -10%;
+  width: 500px;
+  height: 500px;
+  background: radial-gradient(circle, #00d9ff 0%, transparent 70%);
+  animation-delay: -10s;
+}
+
+@keyframes slowFloat {
+  0%, 100% {
+    transform: translate(0, 0) rotate(0deg);
+  }
+  33% {
+    transform: translate(30px, -30px) rotate(5deg);
+  }
+  66% {
+    transform: translate(-20px, 20px) rotate(-5deg);
+  }
+}
+
+.brandingContent {
+  max-width: 32rem;
+  text-align: center;
+  position: relative;
+  z-index: 2;
+}
+
+/* Badge - colores FitTrack */
+.brandingBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1.25rem;
+  background: rgba(42, 42, 42, 0.8);
+  color: #00d9ff;
+  font-size: 0.875rem;
+  font-weight: 600;
+  border-radius: 12px;
+  border: 1px solid rgba(0, 102, 255, 0.3);
+  backdrop-filter: blur(15px);
+  margin-bottom: 2rem;
+}
+
+.badgeDot {
+  width: 8px;
+  height: 8px;
+  background: #0066ff;
+  border-radius: 50%;
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.6;
+    transform: scale(1.2);
+  }
+}
+
+/* Ícono con gradiente FitTrack */
 .brandingIcon {
-  width: 4rem;
-  height: 4rem;
-  background-color: var(--color-primary);
-  border-radius: 1rem;
+  width: 5rem;
+  height: 5rem;
+  background: linear-gradient(135deg, #0066ff 0%, #00d9ff 100%);
+  border-radius: 1.25rem;
   display: flex;
   align-items: center;
   justify-content: center;
   margin: 0 auto 2rem;
   color: white;
+  box-shadow: 0 8px 24px rgba(0, 102, 255, 0.4);
 }
 
+/* Título */
 .brandingTitle {
-  font-size: 1.875rem;
-  font-weight: 700;
-  margin: 0 0 1rem 0;
+  font-size: 2.5rem;
+  font-weight: 800;
+  margin: 0 0 1.5rem 0;
   color: white;
+  letter-spacing: -0.02em;
 }
 
+/* Gradiente exacto de FitTrack (cyan a azul) */
+.brandingTitleGradient {
+  background: linear-gradient(135deg, #0066ff 0%, #00d9ff 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  font-weight: 800;
+}
+
+/* Descripción */
 .brandingDescription {
   font-size: 1.125rem;
-  line-height: 1.75;
+  line-height: 1.7;
   color: rgba(255, 255, 255, 0.7);
-  margin: 0;
+  margin: 0 0 3rem 0;
 }
 
+/* Stats Grid con glass effect */
 .statsGrid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 2rem;
   margin-top: 3rem;
+  padding-top: 2rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 .stat {
   text-align: center;
+  padding: 1.5rem 1rem;
+  border-radius: 16px;
+  background: rgba(30, 30, 35, 0.6);
+  backdrop-filter: blur(15px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
 }
 
+.stat:hover {
+  background: rgba(30, 30, 35, 0.8);
+  border-color: rgba(0, 217, 255, 0.4);
+  transform: translateY(-4px) scale(1.02);
+  box-shadow: 0 8px 24px rgba(0, 217, 255, 0.3);
+}
+
+/* Valores con el degradado FitTrack */
 .statValue {
-  font-size: 1.875rem;
+  font-size: 2rem;
   font-weight: 700;
-  color: var(--color-primary);
-  margin: 0;
+  background: linear-gradient(135deg, #0066ff 0%, #00d9ff 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  margin: 0 0 0.5rem 0;
 }
 
 .statLabel {
   font-size: 0.875rem;
   color: rgba(255, 255, 255, 0.6);
   margin: 0;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .brandingTitle {
+    font-size: 2rem;
+  }
+
+  .brandingDescription {
+    font-size: 1rem;
+  }
+
+  .statsGrid {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+
+  .statValue {
+    font-size: 1.5rem;
+  }
+
+  .brandingIcon {
+    width: 4rem;
+    height: 4rem;
+  }
+
+  .brandingSection::before,
+  .brandingSection::after {
+    width: 400px;
+    height: 400px;
+  }
 }
