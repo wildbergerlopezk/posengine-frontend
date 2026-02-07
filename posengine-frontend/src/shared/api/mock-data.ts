@@ -1,22 +1,22 @@
 import type { Product, Category, Sale, DashboardStats } from "../types"
 
 export const mockCategories: Category[] = [
-  { id: "1", tenantId: "t1", name: "Bebidas", createdAt: new Date(), updatedAt: new Date() },
-  { id: "2", tenantId: "t1", name: "Snacks", createdAt: new Date(), updatedAt: new Date() },
-  { id: "3", tenantId: "t1", name: "Lácteos", createdAt: new Date(), updatedAt: new Date() },
-  { id: "4", tenantId: "t1", name: "Panadería", createdAt: new Date(), updatedAt: new Date() },
-  { id: "5", tenantId: "t1", name: "Limpieza", createdAt: new Date(), updatedAt: new Date() },
-  { id: "1-1", tenantId: "t1", name: "Gaseosas", parentId: "1", createdAt: new Date(), updatedAt: new Date() },
-  { id: "1-2", tenantId: "t1", name: "Jugos", parentId: "1", createdAt: new Date(), updatedAt: new Date() },
-  { id: "1-3", tenantId: "t1", name: "Agua", parentId: "1", createdAt: new Date(), updatedAt: new Date() },
-  { id: "2-1", tenantId: "t1", name: "Papas", parentId: "2", createdAt: new Date(), updatedAt: new Date() },
-  { id: "2-2", tenantId: "t1", name: "Galletas", parentId: "2", createdAt: new Date(), updatedAt: new Date() },
+  { id: "1", tenantId: 1, name: "Bebidas", createdAt: new Date(), updatedAt: new Date() },
+  { id: "2", tenantId: 1, name: "Snacks", createdAt: new Date(), updatedAt: new Date() },
+  { id: "3", tenantId: 1, name: "Lácteos", createdAt: new Date(), updatedAt: new Date() },
+  { id: "4", tenantId: 1, name: "Panadería", createdAt: new Date(), updatedAt: new Date() },
+  { id: "5", tenantId: 1, name: "Limpieza", createdAt: new Date(), updatedAt: new Date() },
+  { id: "1-1", tenantId: 1, name: "Gaseosas", parentId: "1", createdAt: new Date(), updatedAt: new Date() },
+  { id: "1-2", tenantId: 1, name: "Jugos", parentId: "1", createdAt: new Date(), updatedAt: new Date() },
+  { id: "1-3", tenantId: 1, name: "Agua", parentId: "1", createdAt: new Date(), updatedAt: new Date() },
+  { id: "2-1", tenantId: 1, name: "Papas", parentId: "2", createdAt: new Date(), updatedAt: new Date() },
+  { id: "2-2", tenantId: 1, name: "Galletas", parentId: "2", createdAt: new Date(), updatedAt: new Date() },
 ]
 
 export const mockProducts: Product[] = [
   {
     id: "1",
-    tenantId: "t1",
+    tenantId: 1,
     name: "Coca-Cola 500ml",
     barcode: "7790895000423",
     categoryId: "1",
@@ -31,7 +31,7 @@ export const mockProducts: Product[] = [
   },
   {
     id: "2",
-    tenantId: "t1",
+    tenantId: 1,
     name: "Pepsi 500ml",
     barcode: "7791813420491",
     categoryId: "1",
@@ -46,7 +46,7 @@ export const mockProducts: Product[] = [
   },
   {
     id: "3",
-    tenantId: "t1",
+    tenantId: 1,
     name: "Agua Mineral 1.5L",
     barcode: "7790315000125",
     categoryId: "1",
@@ -61,7 +61,7 @@ export const mockProducts: Product[] = [
   },
   {
     id: "4",
-    tenantId: "t1",
+    tenantId: 1,
     name: "Papas Lays Classic 150g",
     barcode: "7790310000456",
     categoryId: "2",
@@ -76,7 +76,7 @@ export const mockProducts: Product[] = [
   },
   {
     id: "5",
-    tenantId: "t1",
+    tenantId: 1,
     name: "Galletas Oreo 118g",
     barcode: "7622300315061",
     categoryId: "2",
@@ -91,7 +91,7 @@ export const mockProducts: Product[] = [
   },
   {
     id: "6",
-    tenantId: "t1",
+    tenantId: 1,
     name: "Leche Entera 1L",
     barcode: "7790070000789",
     categoryId: "3",
@@ -105,7 +105,7 @@ export const mockProducts: Product[] = [
   },
   {
     id: "7",
-    tenantId: "t1",
+    tenantId: 1,
     name: "Pan Lactal",
     barcode: "7790080000234",
     categoryId: "4",
@@ -119,7 +119,7 @@ export const mockProducts: Product[] = [
   },
   {
     id: "8",
-    tenantId: "t1",
+    tenantId: 1,
     name: "Jugo de Naranja 1L",
     barcode: "7790090000567",
     categoryId: "1",
@@ -137,7 +137,7 @@ export const mockProducts: Product[] = [
 export const mockSales: Sale[] = [
   {
     id: "s1",
-    tenantId: "t1",
+    tenantId: 1,
     userId: "u1",
     items: [
       { productId: "1", productName: "Coca-Cola 500ml", quantity: 2, unitPrice: 1200, total: 2400 },
@@ -152,7 +152,7 @@ export const mockSales: Sale[] = [
   },
   {
     id: "s2",
-    tenantId: "t1",
+    tenantId: 1,
     userId: "u1",
     items: [
       { productId: "6", productName: "Leche Entera 1L", quantity: 2, unitPrice: 850, total: 1700 },

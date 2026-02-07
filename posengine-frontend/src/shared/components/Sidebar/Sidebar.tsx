@@ -46,7 +46,7 @@ export function Sidebar() {
           <div className={styles.logoIcon}>
             <ShoppingCart size={20} />
           </div>
-          {!isCollapsed && <span className={styles.logoText}>CloudPOS</span>}
+          {!isCollapsed && <span className={styles.logoText}>POSENGINE</span>}
         </div>
         <button
           className={styles.collapseButton}

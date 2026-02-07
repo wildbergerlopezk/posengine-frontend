@@ -6,7 +6,7 @@ import { useState } from "react"
 import Link from "next/link"
 import { Eye, EyeOff, Loader2 } from "lucide-react"
 import { useRegister } from "../hooks/useRegister"
-import styles from "./LoginForm.module.css"
+import styles from "./auth.module.css"
 
 export function RegisterForm() {
   const { register, isLoading, error } = useRegister()
@@ -25,7 +25,7 @@ export function RegisterForm() {
     <div className={styles.card}>
       <div className={styles.cardHeader}>
         <h1 className={styles.cardTitle}>Crear cuenta</h1>
-        <p className={styles.cardDescription}>Registra tu cuenta para comenzar a usar CloudPOS</p>
+        <p className={styles.cardDescription}>Registra tu cuenta para comenzar a usar POSENGINE</p>
       </div>
 
       <form onSubmit={handleSubmit}>

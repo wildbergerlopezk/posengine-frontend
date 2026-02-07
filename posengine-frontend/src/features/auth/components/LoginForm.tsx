@@ -6,7 +6,7 @@ import { useState } from "react"
 import Link from "next/link"
 import { Eye, EyeOff, Loader2 } from "lucide-react"
 import { useLogin } from "../hooks/useLogin"
-import styles from "./LoginForm.module.css"
+import styles from "./auth.module.css"
 
 export function LoginForm() {
   const { login, isLoading, error } = useLogin()

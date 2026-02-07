@@ -60,7 +60,7 @@ export function CategoriesPage() {
 
     const categoryData: Category = {
       id: editingCategory?.id || `c-${Date.now()}`,
-      tenantId: tenant?.id || "t1",
+      tenantId: 1,
       name: formData.name,
       parentId: formData.parentId === "none" ? undefined : formData.parentId,
       createdAt: editingCategory?.createdAt || new Date(),

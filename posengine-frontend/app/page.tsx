@@ -15,7 +15,7 @@ export default function HomePage() {
     } else if (!tenant) {
       router.push("/onboarding")
     } else {
-      router.push("/dashboard")
+      router.push("/dashboard") 
     }
   }, [isAuthenticated, tenant, router])
 

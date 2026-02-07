@@ -58,7 +58,7 @@ export function DashboardPage() {
                 <DollarSign size={16} />
               </div>
             </div>
-            <div className={styles.statValue}>{formatCurrency(stats.todayRevenue, tenant?.currency)}</div>
+            <div className={styles.statValue}>{formatCurrency(stats.todayRevenue)}</div>
             <div className={styles.statChange}>
               <ArrowUpRight size={12} />
               <span>+8% vs ayer</span>
@@ -72,7 +72,7 @@ export function DashboardPage() {
                 <TrendingUp size={16} />
               </div>
             </div>
-            <div className={styles.statValue}>{formatCurrency(stats.monthRevenue, tenant?.currency)}</div>
+            <div className={styles.statValue}>{formatCurrency(stats.monthRevenue)}</div>
             <div className={styles.statChange}>
               <ArrowUpRight size={12} />
               <span>+15% vs mes anterior</span>
@@ -110,7 +110,7 @@ export function DashboardPage() {
                     <XAxis dataKey="name" tick={{ fontSize: 12 }} />
                     <YAxis tick={{ fontSize: 12 }} tickFormatter={(v) => `$${v / 1000}k`} />
                     <Tooltip
-                      formatter={(value: number) => [formatCurrency(value, tenant?.currency), "Ventas"]}
+                      formatter={(value: number) => [formatCurrency(value), "Ventas"]}
                       contentStyle={{
                         backgroundColor: "#ffffff",
                         border: "1px solid #e2e8f0",
@@ -208,7 +208,6 @@ export function DashboardPage() {
                       </span>
                     </div>
                     <div className={styles.saleAmount}>
-                      <span className={styles.saleTotal}>{formatCurrency(sale.total, tenant?.currency)}</span>
                       <span className={styles.saleMethod}>
                         {sale.paymentMethod === "cash"
                           ? "Efectivo"

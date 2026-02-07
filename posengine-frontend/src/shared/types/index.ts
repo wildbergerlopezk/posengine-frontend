@@ -1,30 +1,7 @@
-// Multi-tenant types
-export interface Tenant {
-  id: string
-  name: string
-  slug: string
-  logo?: string
-  address?: string
-  phone?: string
-  email?: string
-  currency: string
-  createdAt: Date
-  updatedAt: Date
-}
-
-export interface User {
-  id: string
-  email: string
-  name: string
-  role: "owner" | "admin" | "cashier"
-  tenantId?: string
-  createdAt: Date
-  updatedAt: Date
-}
 
 export interface Category {
   id: string
-  tenantId: string
+  tenantId: number
   name: string
   parentId?: string
   createdAt: Date
@@ -33,7 +10,7 @@ export interface Category {
 
 export interface Product {
   id: string
-  tenantId: string
+  tenantId: number
   name: string
   description?: string
   barcode?: string
@@ -57,7 +34,7 @@ export interface CartItem {
 
 export interface Sale {
   id: string
-  tenantId: string
+  tenantId: number
   userId: string
   items: SaleItem[]
   subtotal: number

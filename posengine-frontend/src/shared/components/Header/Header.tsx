@@ -30,8 +30,8 @@ export function Header({ title, subtitle }: HeaderProps) {
         </button>
 
         <button className={styles.userButton}>
-          <div className={styles.avatar}>{user?.name?.charAt(0).toUpperCase() || "U"}</div>
-          <span className={styles.userName}>{user?.name || "Usuario"}</span>
+          <div className={styles.avatar}>{user?.fullName?.charAt(0).toUpperCase() || "U"}</div>
+          <span className={styles.userName}>{user?.fullName || "Usuario"}</span>
         </button>
       </div>
     </header>

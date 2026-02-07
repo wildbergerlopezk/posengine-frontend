@@ -1,26 +1,30 @@
-/* Variables globales */
+/* ============================================
+   TEMA CLARO
+   ============================================ */
 :root {
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --destructive-foreground: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
+  /* Sistema sin prefijo (compatibilidad con componentes que usan var(--background)) */
+  --background: #fafafa;
+  --foreground: #0a0a0a;
+  --card: #ffffff;
+  --card-foreground: #0a0a0a;
+  --popover: #ffffff;
+  --popover-foreground: #0a0a0a;
+  --primary: #2563eb;
+  --primary-foreground: #ffffff;
+  --secondary: #f1f5f9;
+  --secondary-foreground: #1e293b;
+  --muted: #f1f5f9;
+  --muted-foreground: #64748b;
+  --accent: #eff6ff;
+  --accent-foreground: #1e40af;
+  --destructive: #ef4444;
+  --destructive-foreground: #ef4444;
+  --border: #e2e8f0;
+  --input: #e2e8f0;
+  --ring: #b4b4b4;
   --radius: 0.625rem;
 
+  /* Sistema con prefijo color- (compatibilidad extendida) */
   --color-background: #fafafa;
   --color-foreground: #0a0a0a;
   --color-card: #ffffff;
@@ -30,7 +34,7 @@
   --color-primary-foreground: #ffffff;
   --color-secondary: #f1f5f9;
   --color-secondary-foreground: #1e293b;
-  --color-muted: #f1f5f9;
+  --color-muted: #fafafa; /* Cambiar de color card de auth */
   --color-muted-foreground: #64748b;
   --color-accent: #eff6ff;
   --color-accent-foreground: #1e40af;
@@ -49,28 +53,65 @@
   --color-sidebar-active: #2563eb;
 }
 
-/* Variables dark mode */
+
+/* ============================================
+   TEMA OSCURO
+   ============================================ */
 html.dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.145 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.985 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.396 0.141 25.723);
-  --destructive-foreground: oklch(0.637 0.237 25.331);
-  --border: oklch(0.269 0 0);
-  --input: oklch(0.269 0 0);
-  --ring: oklch(0.439 0 0);
+  /* Sistema sin prefijo */
+  --background: #0a0a0a;
+  --foreground: #fafafa;
+  --card: #0a0a0a;
+  --card-foreground: #fafafa;
+  --popover: #0a0a0a;
+  --popover-foreground: #fafafa;
+  --primary: #fafafa;
+  --primary-foreground: #0a0a0a;
+  --secondary: #1e1e1e;
+  --secondary-foreground: #fafafa;
+  --muted: #1e1e1e;
+  --muted-foreground: #b4b4b4;
+  --accent: #1e1e1e;
+  --accent-foreground: #fafafa;
+  --destructive: #7f1d1d;
+  --destructive-foreground: #fca5a5;
+  --border: #1e1e1e;
+  --input: #1e1e1e;
+  --ring: #525252;
+
+  /* Sistema con prefijo color- */
+  --color-background: #0a0a0a;
+  --color-foreground: #fafafa;
+  --color-card: #0a0a0a;
+  --color-card-foreground: #fafafa;
+  --color-primary: #fafafa;
+  --color-primary-hover: #e5e5e5;
+  --color-primary-foreground: #0a0a0a;
+  --color-secondary: #1e1e1e;
+  --color-secondary-foreground: #fafafa;
+  --color-muted: #1e1e1e;
+  --color-muted-foreground: #b4b4b4;
+  --color-accent: #1e1e1e;
+  --color-accent-foreground: #fafafa;
+  --color-destructive: #7f1d1d;
+  --color-destructive-foreground: #fca5a5;
+  --color-border: #1e1e1e;
+  --color-input: #1e1e1e;
+  --color-ring: #525252;
+  --color-success: #166534;
+  --color-success-foreground: #86efac;
+  --color-warning: #78350f;
+  --color-warning-foreground: #fde047;
+  --color-sidebar-bg: #0f172a;
+  --color-sidebar-foreground: #f1f5f9;
+  --color-sidebar-hover: #1e293b;
+  --color-sidebar-active: #3b82f6;
 }
 
-/* Reset y estilos globales */
+
+/* ============================================
+   RESET Y ESTILOS GLOBALES
+   ============================================ */
 * {
   margin: 0;
   padding: 0;
@@ -102,10 +143,23 @@ textarea {
   font-family: inherit;
 }
 
-/* Animaciones */
+html,
+body {
+  height: 100%;
+  overflow: hidden;
+}
+
+
+/* ============================================
+   ANIMACIONES
+   ============================================ */
 @keyframes spin {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .spinner {

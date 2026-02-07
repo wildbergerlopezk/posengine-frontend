@@ -22,10 +22,6 @@ export function BusinessPage() {
 
   const [formData, setFormData] = useState({
     name: tenant?.name || "",
-    address: tenant?.address || "",
-    phone: tenant?.phone || "",
-    email: tenant?.email || "",
-    currency: tenant?.currency || "ARS",
   })
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -38,11 +34,6 @@ export function BusinessPage() {
       setTenant({
         ...tenant,
         name: formData.name,
-        address: formData.address,
-        phone: formData.phone,
-        email: formData.email,
-        currency: formData.currency,
-        updatedAt: new Date(),
       })
     }
 
@@ -83,8 +74,6 @@ export function BusinessPage() {
               <label className={styles.label}>Dirección</label>
               <textarea
                 className={styles.textarea}
-                value={formData.address}
-                onChange={(e) => setFormData({ ...formData, address: e.target.value })}
                 placeholder="Dirección completa"
                 rows={2}
               />
@@ -96,8 +85,6 @@ export function BusinessPage() {
                 <input
                   className={styles.input}
                   type="tel"
-                  value={formData.phone}
-                  onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
                   placeholder="+54 11 1234-5678"
                 />
               </div>
@@ -106,8 +93,6 @@ export function BusinessPage() {
                 <input
                   className={styles.input}
                   type="email"
-                  value={formData.email}
-                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                   placeholder="contacto@negocio.com"
                 />
               </div>
@@ -117,8 +102,6 @@ export function BusinessPage() {
               <label className={styles.label}>Moneda</label>
               <select
                 className={styles.select}
-                value={formData.currency}
-                onChange={(e) => setFormData({ ...formData, currency: e.target.value })}
               >
                 {currencies.map((c) => (
                   <option key={c.code} value={c.code}>

@@ -10,7 +10,7 @@ export function LoginPage() {
           <div className={styles.logoIcon}>
             <ShoppingCart size={24} />
           </div>
-          <span className={styles.logoText}>CloudPOS</span>
+          <span className={styles.logoText}>POSENGINE</span>
         </div>
         <LoginForm />
       </div>

@@ -18,7 +18,7 @@ export default function AuthLayout({
           <div className={styles.brandingIcon}>
             <ShoppingCart size={32} />
           </div>
-          <h2 className={styles.brandingTitle}>CloudPOS</h2>
+          <h2 className={styles.brandingTitle}>POSENGINE</h2>
           <p className={styles.brandingDescription}>
             El sistema de punto de venta en la nube más completo para gestionar tu negocio de forma eficiente.
           </p>

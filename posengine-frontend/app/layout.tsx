@@ -7,7 +7,7 @@ import "@/styles/globals.css";
 const _inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "CloudPOS - Sistema de Punto de Venta",
+  title: "POSENGINE - Sistema de Punto de Venta",
   description: "Sistema POS en la nube para gestionar tu negocio de forma eficiente",
   generator: "v0.app",
   icons: {
@@ -24,7 +24,7 @@ export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="es" className="dark">
+    <html lang="es"> 
       <body className={`${_inter.className} font-sans antialiased`}>
         {children}
         <Analytics />

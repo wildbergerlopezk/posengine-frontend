@@ -1,7 +1,8 @@
 "use client"
 
 import { create } from "zustand"
-import type { User, Tenant } from "@/src/shared/types"
+import type { Tenant } from "@/src/shared/types/tenant/tenantType"
+import type { User } from "@/src/shared/types/user/userType"
 
 interface AuthState {
   user: User | null

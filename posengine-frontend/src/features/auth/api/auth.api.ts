@@ -1,61 +1,53 @@
-import type { LoginCredentials, RegisterCredentials, OnboardingData } from "../types"
-import type { User, Tenant } from "@/src/shared/types"
+import type { LoginCredentials, RegisterCredentials } from "../types"
+import type { User } from "@/src/shared/types/user/userType";
+import type { Tenant } from "@/src/shared/types/tenant/tenantType";
+import type { RegisterUserDto } from "@/src/shared/types/user/userType.dto";
+import type { RegisterTenantDto } from "@/src/shared/types/tenant/tenantType.dto";
+const BASE_URL = process.env.NEXT_PUBLIC_BACKEND_URL
 
-// Simulated API calls - replace with real API calls
 export async function loginApi(credentials: LoginCredentials): Promise<{ user: User; tenant: Tenant }> {
   await new Promise((resolve) => setTimeout(resolve, 1000))
-
+  //async de ejemplo
   return {
     user: {
       id: "u1",
       email: credentials.email,
-      name: "Juan Pérez",
-      role: "owner",
-      tenantId: "t1",
-      createdAt: new Date(),
-      updatedAt: new Date(),
+      fullName: "Juan Pérez",
+      tenantId: 1,
     },
     tenant: {
-      id: "t1",
+      id: 1,
       name: "Mi Tienda",
-      slug: "mi-tienda",
-      currency: "ARS",
-      createdAt: new Date(),
-      updatedAt: new Date(),
     },
   }
 }
 
-export async function registerApi(credentials: RegisterCredentials): Promise<User> {
-  await new Promise((resolve) => setTimeout(resolve, 1000))
+export async function registerUserApi(data: RegisterUserDto): Promise<User> {
+  const res = await fetch(`${BASE_URL}/api/v1/accounts/register-user`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data), 
+  });
 
-  return {
-    id: "u-new",
-    email: credentials.email,
-    name: credentials.name,
-    role: "owner",
-    createdAt: new Date(),
-    updatedAt: new Date(),
+  if (!res.ok) {
+    const error = await res.json();
+    throw new Error(error?.errorText || "Error al registrar usuario");
   }
+
+  return res.json(); 
 }
 
-export async function createTenantApi(data: OnboardingData, user: User): Promise<Tenant> {
-  await new Promise((resolve) => setTimeout(resolve, 1500))
+export async function createTenantApi(data: RegisterTenantDto): Promise<Tenant> {
+  const res = await fetch(`${BASE_URL}/api/v1/tenant`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data), 
+  });
 
-  const slug = data.businessName
-    .toLowerCase()
-    .replace(/\s+/g, "-")
-    .replace(/[^a-z0-9-]/g, "")
-
-  return {
-    id: `t-${Date.now()}`,
-    name: data.businessName,
-    slug,
-    address: data.address,
-    phone: data.phone,
-    currency: data.currency,
-    email: user.email,
-    createdAt: new Date(),
-    updatedAt: new Date(),
+  if (!res.ok) {
+    const error = await res.json();
+    throw new Error(error?.errorText || "Error al crear el negocio");
   }
+
+  return res.json();
 }

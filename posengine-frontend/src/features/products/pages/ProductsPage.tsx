@@ -78,7 +78,7 @@ export function ProductsPage() {
 
     const productData: Product = {
       id: editingProduct?.id || `p-${Date.now()}`,
-      tenantId: tenant?.id || "t1",
+      tenantId: 1,
       name: formData.name,
       barcode: formData.barcode || undefined,
       categoryId: formData.categoryId || undefined,
@@ -186,10 +186,8 @@ export function ProductsPage() {
                     </td>
                     <td className={styles.tableCell}>{getCategoryName(product.categoryId)}</td>
                     <td className={`${styles.tableCell} ${styles.tableCellRight}`}>
-                      {formatCurrency(product.purchasePrice, tenant?.currency)}
                     </td>
                     <td className={`${styles.tableCell} ${styles.tableCellRight} ${styles.priceText}`}>
-                      {formatCurrency(product.salePrice, tenant?.currency)}
                     </td>
                     <td className={`${styles.tableCell} ${styles.tableCellRight}`}>
                       <span className={product.stock <= product.minStock ? styles.stockWarning : ""}>

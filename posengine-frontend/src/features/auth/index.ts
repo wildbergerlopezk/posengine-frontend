@@ -16,7 +16,7 @@ export { useAuth } from "./hooks/useAuth"
 export { useAuthStore } from "./store/auth.store"
 
 // API
-export { loginApi, registerApi, createTenantApi } from "./api/auth.api"
+export { loginApi, registerUserApi, createTenantApi } from "./api/auth.api"
 
 // Types
 export type { LoginCredentials, RegisterCredentials, OnboardingData } from "./types"

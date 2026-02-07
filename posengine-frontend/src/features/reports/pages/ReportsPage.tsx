@@ -152,7 +152,6 @@ export function ReportsPage() {
               <span className={styles.summaryLabel}>Total Vendido</span>
               <DollarSign size={16} color="#64748b" />
             </div>
-            <div className={styles.summaryValue}>{formatCurrency(totalVentas, tenant?.currency)}</div>
           </div>
           <div className={styles.summaryCard}>
             <div className={styles.summaryHeader}>
@@ -160,7 +159,6 @@ export function ReportsPage() {
               <TrendingUp size={16} color="#22c55e" />
             </div>
             <div className={`${styles.summaryValue} ${styles.summaryValueSuccess}`}>
-              {formatCurrency(totalGanancias, tenant?.currency)}
             </div>
           </div>
           <div className={styles.summaryCard}>
@@ -169,7 +167,6 @@ export function ReportsPage() {
               <TrendingDown size={16} color="#ef4444" />
             </div>
             <div className={`${styles.summaryValue} ${styles.summaryValueDestructive}`}>
-              {formatCurrency(totalPerdidas, tenant?.currency)}
             </div>
           </div>
         </div>
@@ -206,7 +203,6 @@ export function ReportsPage() {
                     />
                     <Tooltip
                       formatter={(value: number, name: string) => [
-                        formatCurrency(value, tenant?.currency),
                         name === "ventas" ? "Ventas" : "Ganancias",
                       ]}
                       contentStyle={{
@@ -250,7 +246,6 @@ export function ReportsPage() {
                     <XAxis dataKey={getXKey()} tick={{ fontSize: 12 }} />
                     <YAxis tick={{ fontSize: 12 }} />
                     <Tooltip
-                      formatter={(value: number) => [formatCurrency(value, tenant?.currency), ""]}
                       contentStyle={{
                         backgroundColor: "#ffffff",
                         border: "1px solid #e2e8f0",

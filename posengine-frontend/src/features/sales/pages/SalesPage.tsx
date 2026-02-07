@@ -131,7 +131,7 @@ export function SalesPage() {
                   </div>
                   <span className={styles.productName}>{product.name}</span>
                   <span className={styles.productStock}>Stock: {product.stock}</span>
-                  <span className={styles.productPrice}>{formatCurrency(product.salePrice, tenant?.currency)}</span>
+                  <span className={styles.productPrice}>{formatCurrency(product.salePrice)}</span>
                 </button>
               ))}
             </div>
@@ -168,7 +168,7 @@ export function SalesPage() {
                           <div className={styles.cartItemInfo}>
                             <p className={styles.cartItemName}>{item.product.name}</p>
                             <p className={styles.cartItemPrice}>
-                              {formatCurrency(item.product.salePrice, tenant?.currency)} c/u
+                              {formatCurrency(item.product.salePrice)} c/u
                             </p>
                           </div>
                           <div className={styles.cartItemActions}>
@@ -195,7 +195,6 @@ export function SalesPage() {
 
                     <div className={styles.cartTotal}>
                       <span>Total</span>
-                      <span className={styles.cartTotalValue}>{formatCurrency(total, tenant?.currency)}</span>
                     </div>
 
                     <button className={styles.checkoutButton} onClick={() => setShowPaymentModal(true)}>
@@ -225,7 +224,7 @@ export function SalesPage() {
               <>
                 <div className={styles.modalHeader}>
                   <h2 className={styles.modalTitle}>Finalizar venta</h2>
-                  <p className={styles.modalDescription}>Total a cobrar: {formatCurrency(total, tenant?.currency)}</p>
+                  <p className={styles.modalDescription}>Total a cobrar: {formatCurrency(total)}</p>
                 </div>
 
                 <div className={styles.modalContent}>
