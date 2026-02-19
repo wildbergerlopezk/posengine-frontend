@@ -1,5 +1,5 @@
 import { RegisterForm } from "../components/RegisterForm"
-import { ShoppingCart } from "lucide-react"
+import { Settings } from "lucide-react"
 import styles from "./AuthLayout.module.css"
 
 export function RegisterPage() {
@@ -8,7 +8,7 @@ export function RegisterPage() {
       <div className={styles.content}>
         <div className={styles.logo}>
           <div className={styles.logoIcon}>
-            <ShoppingCart size={24} />
+            <Settings size={24} />
           </div>
           <span className={styles.logoText}>POSENGINE</span>
         </div>
@@ -17,3 +17,4 @@ export function RegisterPage() {
     </div>
   )
 }
+

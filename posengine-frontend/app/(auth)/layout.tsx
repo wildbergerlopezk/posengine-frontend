@@ -15,10 +15,6 @@ export default function AuthLayout({
       {/* Right side - Branding */}
       <div className={styles.brandingSection}>
         <div className={styles.brandingContent}>
-          <div className={styles.brandingBadge}>
-            <span className={styles.badgeDot}></span>
-            Sistema POS en la Nube
-          </div>
           
           <div className={styles.brandingIcon}>
             <Settings size={32} />

@@ -4,29 +4,15 @@ import { useState } from "react"
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
 import {
-  LayoutDashboard,
   ShoppingCart,
-  Package,
-  FolderTree,
-  Warehouse,
-  BarChart3,
   Building2,
   LogOut,
   ChevronLeft,
   ChevronRight,
 } from "lucide-react"
 import { useAuthStore } from "@/src/features/auth/store/auth.store"
+import { BUSINESS_TYPES, type BusinessType } from "../../../../config/Businesstypes.config"
 import styles from "./Sidebar.module.css"
-
-const navItems = [
-  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/dashboard/sales", label: "Ventas", icon: ShoppingCart },
-  { href: "/dashboard/products", label: "Productos", icon: Package },
-  { href: "/dashboard/categories", label: "Categorías", icon: FolderTree },
-  { href: "/dashboard/stock", label: "Stock", icon: Warehouse },
-  { href: "/dashboard/reports", label: "Reportes", icon: BarChart3 },
-  { href: "/dashboard/business", label: "Mi Negocio", icon: Building2 },
-]
 
 export function Sidebar() {
   const pathname = usePathname()
@@ -38,6 +24,17 @@ export function Sidebar() {
     logout()
     router.push("/login")
   }
+
+  // Obtiene los módulos según el tipo de negocio del tenant
+  // Si no tiene tipo asignado, usa los módulos de "tienda" por defecto
+  const tenantType = (tenant as any)?.type as BusinessType | undefined
+  const navItems = tenantType && BUSINESS_TYPES[tenantType]
+    ? BUSINESS_TYPES[tenantType].modules
+    : BUSINESS_TYPES["tienda"].modules
+
+  const businessTypeLabel = tenantType && BUSINESS_TYPES[tenantType]
+    ? BUSINESS_TYPES[tenantType].label
+    : "Negocio"
 
   return (
     <aside className={`${styles.sidebar} ${isCollapsed ? styles.sidebarCollapsed : ""}`}>
@@ -86,7 +83,7 @@ export function Sidebar() {
             </div>
             <div className={styles.tenantDetails}>
               <p className={styles.tenantName}>{tenant?.name || "Mi Tienda"}</p>
-              <p className={styles.tenantPlan}>Plan Pro</p>
+              <p className={styles.tenantPlan}>{businessTypeLabel}</p>
             </div>
           </div>
         )}

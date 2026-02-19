@@ -41,6 +41,7 @@
   top: 50%;
   transform: translateY(-50%);
   color: var(--color-muted-foreground);
+  pointer-events: none;
 }
 
 .searchInput {
@@ -50,7 +51,12 @@
   border-radius: 0.5rem;
   border: 1px solid var(--color-border);
   background-color: var(--color-background);
+  color: var(--color-foreground);
   font-size: 0.875rem;
+}
+
+.searchInput::placeholder {
+  color: var(--color-muted-foreground);
 }
 
 .searchInput:focus {
@@ -59,14 +65,46 @@
   box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.1);
 }
 
+.searchInput:-webkit-autofill,
+.searchInput:-webkit-autofill:hover,
+.searchInput:-webkit-autofill:focus {
+  -webkit-text-fill-color: var(--color-foreground);
+  -webkit-box-shadow: 0 0 0px 1000px var(--color-background) inset;
+  box-shadow: 0 0 0px 1000px var(--color-background) inset;
+  transition: background-color 5000s ease-in-out 0s;
+}
+
+/* Botón de ícono — usado para campanita y toggle de tema */
+.iconButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: 0.5rem;
+  border: none;
+  background: transparent;
+  color: var(--color-foreground);
+  cursor: pointer;
+  transition: background-color 0.2s, color 0.2s;
+  flex-shrink: 0;
+}
+
+.iconButton:hover {
+  background-color: var(--color-accent);
+  color: var(--color-foreground);
+}
+
+/* Botón de usuario */
 .userButton {
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  padding: 0.5rem;
+  padding: 0.375rem 0.5rem;
   border-radius: 0.5rem;
   border: none;
   background: transparent;
+  color: var(--color-foreground);
   cursor: pointer;
   transition: background-color 0.2s;
 }
@@ -86,6 +124,7 @@
   color: white;
   font-weight: 600;
   font-size: 0.875rem;
+  flex-shrink: 0;
 }
 
 .userName {
@@ -98,7 +137,6 @@
   .searchContainer {
     display: none;
   }
-
   .userName {
     display: none;
   }

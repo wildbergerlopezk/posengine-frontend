@@ -5,7 +5,7 @@ import type React from "react"
 import { useState } from "react"
 import Link from "next/link"
 import { Eye, EyeOff, Loader2 } from "lucide-react"
-import { useRegister } from "../hooks/useRegister"
+import { useRegister } from "../pages/useRegister.mock"
 import styles from "./auth.module.css"
 
 export function RegisterForm() {

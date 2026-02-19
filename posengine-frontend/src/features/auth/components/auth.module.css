@@ -18,6 +18,13 @@
   border: 1px solid var(--color-border);
   border-radius: 0.75rem;
   box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+  margin: 1rem;
+  animation: cardEnter 0.35s ease;
+}
+
+@keyframes cardEnter {
+  from { opacity: 0; transform: translateY(12px) scale(0.98); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
 }
 
 .cardHeader {
@@ -85,6 +92,17 @@
   outline: none;
   border-color: var(--color-primary);
   box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.1);
+}
+
+/* ── Evita que el autocompletado del navegador ponga fondo blanco ── */
+.input:-webkit-autofill,
+.input:-webkit-autofill:hover,
+.input:-webkit-autofill:focus {
+  -webkit-text-fill-color: var(--color-foreground);
+  -webkit-box-shadow: 0 0 0px 1000px var(--color-background) inset;
+  box-shadow: 0 0 0px 1000px var(--color-background) inset;
+  transition: background-color 5000s ease-in-out 0s;
+  caret-color: var(--color-foreground);
 }
 
 .inputWrapper {
@@ -163,18 +181,15 @@
 }
 
 @keyframes spin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
 }
 
 .registerLink {
   text-align: center;
   font-size: 0.875rem;
   color: var(--color-muted-foreground);
+  margin: 0;
 }
 
 .registerLink a {
@@ -184,4 +199,24 @@
 
 .registerLink a:hover {
   text-decoration: underline;
+}
+
+@media (max-width: 640px) {
+  .card {
+    margin: 0.5rem;
+    max-width: 100%;
+  }
+  .cardHeader, .cardContent, .cardFooter {
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+  .cardTitle    { font-size: 1.25rem; }
+  .cardDescription { font-size: 0.8125rem; }
+}
+
+@media (max-height: 700px) {
+  .cardHeader  { padding-top: 1rem;    padding-bottom: 0.25rem; }
+  .cardContent { padding-top: 0.75rem; padding-bottom: 0.75rem; }
+  .cardFooter  { padding-top: 0;       padding-bottom: 1rem; }
+  .form        { gap: 0.75rem; }
 }

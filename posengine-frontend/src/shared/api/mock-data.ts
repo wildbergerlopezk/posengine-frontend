@@ -37,7 +37,7 @@ export const mockProducts: Product[] = [
     categoryId: "1",
     subcategoryId: "1-1",
     purchasePrice: 750,
-    salePrice: 1100,
+    salePrice: 1000000,
     stock: 36,
     minStock: 12,
     isActive: true,

@@ -2,46 +2,44 @@
    TEMA CLARO
    ============================================ */
 :root {
-  /* Sistema sin prefijo (compatibilidad con componentes que usan var(--background)) */
-  --background: #fafafa;
+  --background: #e6eaef;
   --foreground: #0a0a0a;
-  --card: #ffffff;
+  --card: #f8fafc;
   --card-foreground: #0a0a0a;
-  --popover: #ffffff;
+  --popover: #f8fafc;
   --popover-foreground: #0a0a0a;
   --primary: #2563eb;
   --primary-foreground: #ffffff;
-  --secondary: #f1f5f9;
+  --secondary: #e1e6ec;
   --secondary-foreground: #1e293b;
-  --muted: #f1f5f9;
+  --muted: #e6eaef;
   --muted-foreground: #64748b;
-  --accent: #eff6ff;
+  --accent: #eef4ff;
   --accent-foreground: #1e40af;
   --destructive: #ef4444;
   --destructive-foreground: #ef4444;
-  --border: #e2e8f0;
-  --input: #e2e8f0;
+  --border: #cfd6de;
+  --input: #e1e6ec;
   --ring: #b4b4b4;
   --radius: 0.625rem;
 
-  /* Sistema con prefijo color- (compatibilidad extendida) */
-  --color-background: #fafafa;
+  --color-background: #e6eaef;
   --color-foreground: #0a0a0a;
-  --color-card: #ffffff;
+  --color-card: #f8fafc;
   --color-card-foreground: #0a0a0a;
   --color-primary: #2563eb;
   --color-primary-hover: #1d4ed8;
   --color-primary-foreground: #ffffff;
-  --color-secondary: #f1f5f9;
+  --color-secondary: #e1e6ec;
   --color-secondary-foreground: #1e293b;
-  --color-muted: #fafafa; /* Cambiar de color card de auth */
+  --color-muted: #e6eaef;
   --color-muted-foreground: #64748b;
-  --color-accent: #eff6ff;
+  --color-accent: #eef4ff;
   --color-accent-foreground: #1e40af;
   --color-destructive: #ef4444;
   --color-destructive-foreground: #ffffff;
-  --color-border: #e2e8f0;
-  --color-input: #e2e8f0;
+  --color-border: #cfd6de;
+  --color-input: #e1e6ec;
   --color-ring: #2563eb;
   --color-success: #22c55e;
   --color-success-foreground: #ffffff;
@@ -53,61 +51,57 @@
   --color-sidebar-active: #2563eb;
 }
 
-
 /* ============================================
    TEMA OSCURO
    ============================================ */
 html.dark {
-  /* Sistema sin prefijo */
-  --background: #0a0a0a;
-  --foreground: #fafafa;
-  --card: #0a0a0a;
-  --card-foreground: #fafafa;
-  --popover: #0a0a0a;
-  --popover-foreground: #fafafa;
-  --primary: #fafafa;
-  --primary-foreground: #0a0a0a;
-  --secondary: #1e1e1e;
-  --secondary-foreground: #fafafa;
-  --muted: #1e1e1e;
-  --muted-foreground: #b4b4b4;
-  --accent: #1e1e1e;
-  --accent-foreground: #fafafa;
-  --destructive: #7f1d1d;
+  --background: #0f172a;
+  --foreground: #f1f5f9;
+  --card: #1e293b;
+  --card-foreground: #f1f5f9;
+  --popover: #1e293b;
+  --popover-foreground: #f1f5f9;
+  --primary: #3b82f6;
+  --primary-foreground: #ffffff;
+  --secondary: #334155;
+  --secondary-foreground: #f1f5f9;
+  --muted: #334155;
+  --muted-foreground: #94a3b8;
+  --accent: #1e3a5f;
+  --accent-foreground: #93c5fd;
+  --destructive: #ef4444;
   --destructive-foreground: #fca5a5;
-  --border: #1e1e1e;
-  --input: #1e1e1e;
-  --ring: #525252;
+  --border: #334155;
+  --input: #334155;
+  --ring: #3b82f6;
 
-  /* Sistema con prefijo color- */
-  --color-background: #0a0a0a;
-  --color-foreground: #fafafa;
-  --color-card: #0a0a0a;
-  --color-card-foreground: #fafafa;
-  --color-primary: #fafafa;
-  --color-primary-hover: #e5e5e5;
-  --color-primary-foreground: #0a0a0a;
-  --color-secondary: #1e1e1e;
-  --color-secondary-foreground: #fafafa;
-  --color-muted: #1e1e1e;
-  --color-muted-foreground: #b4b4b4;
-  --color-accent: #1e1e1e;
-  --color-accent-foreground: #fafafa;
-  --color-destructive: #7f1d1d;
+  --color-background: #0f172a;
+  --color-foreground: #f1f5f9;
+  --color-card: #1e293b;
+  --color-card-foreground: #f1f5f9;
+  --color-primary: #3b82f6;
+  --color-primary-hover: #2563eb;
+  --color-primary-foreground: #ffffff;
+  --color-secondary: #334155;
+  --color-secondary-foreground: #f1f5f9;
+  --color-muted: #0f172a;
+  --color-muted-foreground: #94a3b8;
+  --color-accent: #1e3a5f;
+  --color-accent-foreground: #93c5fd;
+  --color-destructive: #ef4444;
   --color-destructive-foreground: #fca5a5;
-  --color-border: #1e1e1e;
-  --color-input: #1e1e1e;
-  --color-ring: #525252;
-  --color-success: #166534;
-  --color-success-foreground: #86efac;
-  --color-warning: #78350f;
-  --color-warning-foreground: #fde047;
+  --color-border: #334155;
+  --color-input: #334155;
+  --color-ring: #3b82f6;
+  --color-success: #22c55e;
+  --color-success-foreground: #ffffff;
+  --color-warning: #f59e0b;
+  --color-warning-foreground: #0a0a0a;
   --color-sidebar-bg: #0f172a;
   --color-sidebar-foreground: #f1f5f9;
   --color-sidebar-hover: #1e293b;
   --color-sidebar-active: #3b82f6;
 }
-
 
 /* ============================================
    RESET Y ESTILOS GLOBALES
@@ -146,20 +140,20 @@ textarea {
 html,
 body {
   height: 100%;
-  overflow: hidden;
+  overflow-x: hidden;
+  max-width: 100%;
 }
-
+::selection {
+  background-color: var(--color-primary);
+  color: var(--color-primary-foreground);
+}
 
 /* ============================================
    ANIMACIONES
    ============================================ */
 @keyframes spin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
 }
 
 .spinner {

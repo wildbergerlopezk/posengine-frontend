@@ -1,7 +1,8 @@
 import type React from "react";
 import type { Metadata } from "next";
-import { Inter, Geist_Mono } from "next/font/google";
+import { Inter } from "next/font/google";
 import { Analytics } from "@vercel/analytics/next";
+import { ThemeProvider } from "@/components/theme-provider";
 import "@/styles/globals.css";
 
 const _inter = Inter({ subsets: ["latin"] });
@@ -24,10 +25,23 @@ export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="es"> 
+    <html lang="es" suppressHydrationWarning>
       <body className={`${_inter.className} font-sans antialiased`}>
-        {children}
-        <Analytics />
+        {/* 
+          attribute="class" → agrega/quita la clase "dark" en <html>, 
+          igual que tu globals.css espera con html.dark { }
+          defaultTheme="system" → respeta la preferencia del SO por defecto
+          enableSystem → activa la detección automática del SO
+        */}
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="system"
+          enableSystem
+          disableTransitionOnChange
+        >
+          {children}
+          <Analytics />
+        </ThemeProvider>
       </body>
     </html>
   );
