@@ -5,12 +5,35 @@
   padding: 1rem 1.5rem;
   border-bottom: 1px solid var(--color-border);
   background-color: var(--color-card);
+  position: sticky;   /* ← esto */
+  top: 0;             /* ← y esto */
+  z-index: 10;        /* ← para que quede por encima del contenido al scrollear */
 }
 
 .titleSection {
   display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
+  align-items: center;
+  gap: 0.75rem;        /* ← actualizar el gap */
+  flex-direction: row; /* ← asegurarse que sea row */
+}
+
+.menuButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: 0.5rem;
+  border: none;
+  background: transparent;
+  color: var(--color-foreground);
+  cursor: pointer;
+  transition: background-color 0.2s;
+  flex-shrink: 0;
+}
+
+.menuButton:hover {
+  background-color: var(--color-accent);
 }
 
 .title {

@@ -46,11 +46,11 @@ export function OnboardingPage() {
   const router = useRouter()
   const { setTenant, setUser, user } = useAuthStore()
 
-  const [step, setStep]                   = useState<Step>("business")
-  const [isLoading, setIsLoading]         = useState(false)
-  const [businessName, setBusinessName]   = useState("")
-  const [businessType, setBusinessType]   = useState<BusinessType | "">("")
-  const [error, setError]                 = useState("")
+  const [step, setStep] = useState<Step>("business")
+  const [isLoading, setIsLoading] = useState(false)
+  const [businessName, setBusinessName] = useState("")
+  const [businessType, setBusinessType] = useState<BusinessType | "">("")
+  const [error, setError] = useState("")
 
   useEffect(() => {
     if (IS_MOCK && !user) setUser(MOCK_USER)
@@ -74,7 +74,7 @@ export function OnboardingPage() {
     try {
       const tenantDto: RegisterTenantDto = { name: businessName, type: businessType as BusinessType }
       const tenant = await createTenantApi(user.id, tenantDto)
-      setTenant(tenant)
+      setTenant({ ...tenant, type: businessType as BusinessType })
       setUser({ ...user, tenantId: tenant.id })
       setStep("send-code")
     } catch (err) {
@@ -115,17 +115,17 @@ export function OnboardingPage() {
 
   // ─── Stepper ──────────────────────────────────────────────────────────────
   const STEPS = [
-    { key: "business",      label: "Negocio"   },
-    { key: "business-type", label: "Tipo"      },
-    { key: "verify",        label: "Verificar" },
-    { key: "done",          label: "Listo"     },
+    { key: "business", label: "Negocio" },
+    { key: "business-type", label: "Tipo" },
+    { key: "verify", label: "Verificar" },
+    { key: "done", label: "Listo" },
   ] as const
 
   const currentStepIndex =
-    step === "business"      ? 0 :
-    step === "business-type" ? 1 :
-    step === "send-code"     ? 2 :
-    step === "verify"        ? 2 : 3
+    step === "business" ? 0 :
+      step === "business-type" ? 1 :
+        step === "send-code" ? 2 :
+          step === "verify" ? 2 : 3
 
   // Tipo seleccionado (para preview)
   const selectedTypeConfig = businessType
@@ -370,12 +370,12 @@ interface OtpVerificationProps {
 }
 
 function OtpVerification({ email, onVerified, onResendCode, onVerifyCode }: OtpVerificationProps) {
-  const [code, setCode]               = useState(["", "", "", "", "", ""])
+  const [code, setCode] = useState(["", "", "", "", "", ""])
   const [isVerifying, setIsVerifying] = useState(false)
   const [isResending, setIsResending] = useState(false)
-  const [error, setError]             = useState("")
+  const [error, setError] = useState("")
   const [resendCooldown, setResendCooldown] = useState(0)
-  const [verified, setVerified]       = useState(false)
+  const [verified, setVerified] = useState(false)
   const inputRefs = useRef<(HTMLInputElement | null)[]>([])
 
   useEffect(() => {
@@ -406,8 +406,8 @@ function OtpVerification({ email, onVerified, onResendCode, onVerifyCode }: OtpV
       } else if (index > 0) {
         inputRefs.current[index - 1]?.focus()
       }
-    } else if (e.key === "ArrowLeft"  && index > 0) inputRefs.current[index - 1]?.focus()
-      else if (e.key === "ArrowRight" && index < 5) inputRefs.current[index + 1]?.focus()
+    } else if (e.key === "ArrowLeft" && index > 0) inputRefs.current[index - 1]?.focus()
+    else if (e.key === "ArrowRight" && index < 5) inputRefs.current[index + 1]?.focus()
   }
 
   const handlePaste = (e: React.ClipboardEvent) => {
@@ -488,15 +488,14 @@ function OtpVerification({ email, onVerified, onResendCode, onVerifyCode }: OtpV
                   textAlign: "center",
                   fontSize: "clamp(1.125rem, 4vw, 1.375rem)",
                   fontWeight: 700,
-                  border: `1.5px solid ${
-                    verified ? "#16a34a" : error ? "#dc2626" : "var(--color-border)"
-                  }`,
+                  border: `1.5px solid ${verified ? "#16a34a" : error ? "#dc2626" : "var(--color-border)"
+                    }`,
                   borderRadius: "0.625rem",
                   background: verified
                     ? "rgba(22,163,74,0.06)"
                     : error
-                    ? "rgba(239,68,68,0.06)"
-                    : "var(--color-background)",
+                      ? "rgba(239,68,68,0.06)"
+                      : "var(--color-background)",
                   color: verified ? "#16a34a" : "var(--color-foreground)",
                   outline: "none",
                   transition: "border-color 0.15s, box-shadow 0.15s",
@@ -512,14 +511,14 @@ function OtpVerification({ email, onVerified, onResendCode, onVerifyCode }: OtpV
           </div>
 
           {verified && (
-            <div style={{ display:"flex", alignItems:"center", justifyContent:"center", gap:"0.375rem", color:"#16a34a", fontSize:"0.875rem", fontWeight:500 }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "0.375rem", color: "#16a34a", fontSize: "0.875rem", fontWeight: 500 }}>
               <CheckCircle2 size={16} />
               <span>¡Cuenta verificada correctamente!</span>
             </div>
           )}
 
           {isVerifying && !verified && (
-            <div style={{ display:"flex", alignItems:"center", justifyContent:"center", gap:"0.375rem", color:"var(--color-muted-foreground)", fontSize:"0.8125rem" }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "0.375rem", color: "var(--color-muted-foreground)", fontSize: "0.8125rem" }}>
               <Loader2 size={14} className={styles.spinner} />
               <span>Verificando código...</span>
             </div>
@@ -528,8 +527,8 @@ function OtpVerification({ email, onVerified, onResendCode, onVerifyCode }: OtpV
       </div>
 
       <div className={styles.cardContent} style={{ paddingTop: 0 }}>
-        <div style={{ display:"flex", flexDirection:"column", alignItems:"center", gap:"0.375rem" }}>
-          <span style={{ fontSize:"0.8125rem", color:"var(--color-muted-foreground)" }}>
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "0.375rem" }}>
+          <span style={{ fontSize: "0.8125rem", color: "var(--color-muted-foreground)" }}>
             ¿No recibiste el código?
           </span>
           <button
@@ -537,14 +536,14 @@ function OtpVerification({ email, onVerified, onResendCode, onVerifyCode }: OtpV
             onClick={handleResend}
             disabled={resendCooldown > 0 || isResending || verified}
             style={{
-              display:"inline-flex", alignItems:"center", gap:"0.35rem",
-              fontSize:"0.8125rem", fontWeight:500,
+              display: "inline-flex", alignItems: "center", gap: "0.35rem",
+              fontSize: "0.8125rem", fontWeight: 500,
               color: resendCooldown > 0 || isResending || verified
                 ? "var(--color-muted-foreground)"
                 : "var(--color-primary)",
-              background:"transparent", border:"none",
+              background: "transparent", border: "none",
               cursor: resendCooldown > 0 || isResending || verified ? "not-allowed" : "pointer",
-              padding:"0.25rem 0.5rem", borderRadius:"0.375rem",
+              padding: "0.25rem 0.5rem", borderRadius: "0.375rem",
             }}
           >
             {isResending
