@@ -4,11 +4,10 @@ import { useState } from "react"
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
 import {
-  ShoppingCart,
+  Settings,
   Building2,
   LogOut,
-  ChevronLeft,
-  ChevronRight,
+  Menu,
 } from "lucide-react"
 import { useAuthStore } from "@/src/features/auth/store/auth.store"
 import { BUSINESS_TYPES, type BusinessType } from "../../../../config/Businesstypes.config"
@@ -18,15 +17,13 @@ export function Sidebar() {
   const pathname = usePathname()
   const router = useRouter()
   const { tenant, logout } = useAuthStore()
-  const [isCollapsed, setIsCollapsed] = useState(false)
+  const [isOpen, setIsOpen] = useState(false)
 
   const handleLogout = () => {
     logout()
     router.push("/login")
   }
 
-  // Obtiene los módulos según el tipo de negocio del tenant
-  // Si no tiene tipo asignado, usa los módulos de "tienda" por defecto
   const tenantType = (tenant as any)?.type as BusinessType | undefined
   const navItems = tenantType && BUSINESS_TYPES[tenantType]
     ? BUSINESS_TYPES[tenantType].modules
@@ -36,62 +33,77 @@ export function Sidebar() {
     ? BUSINESS_TYPES[tenantType].label
     : "Negocio"
 
-  return (
-    <aside className={`${styles.sidebar} ${isCollapsed ? styles.sidebarCollapsed : ""}`}>
-      <div className={styles.header}>
-        <div className={styles.logo}>
-          <div className={styles.logoIcon}>
-            <ShoppingCart size={20} />
-          </div>
-          {!isCollapsed && <span className={styles.logoText}>POSENGINE</span>}
-        </div>
-        <button
-          className={styles.collapseButton}
-          onClick={() => setIsCollapsed(!isCollapsed)}
-          aria-label={isCollapsed ? "Expandir" : "Colapsar"}
-        >
-          {isCollapsed ? <ChevronRight size={18} /> : <ChevronLeft size={18} />}
-        </button>
-      </div>
+  const closeSidebar = () => setIsOpen(false)
+  const toggleSidebar = () => setIsOpen((prev) => !prev)
 
-      <nav className={styles.nav}>
-        <ul className={styles.navList}>
+  return (
+    <>
+      {/* Overlay solo cuando está expandido */}
+      {isOpen && <div className={styles.overlay} onClick={closeSidebar} />}
+
+      {/* Sidebar: siempre visible, comprimido o expandido */}
+      <aside className={`${styles.sidebar} ${isOpen ? styles.open : ""}`}>
+        <div className={styles.sidebarHeader}>
+          <button className={styles.menuButton} onClick={toggleSidebar} aria-label="Toggle menú">
+            <Menu size={24} />
+          </button>
+          {isOpen && (
+            <div className={styles.logo}>
+              <div className={styles.logoIcon}>
+                <Settings size={18} />
+              </div>
+              <span className={styles.logoText}>POSENGINE</span>
+            </div>
+          )}
+        </div>
+
+        <nav className={styles.nav}>
           {navItems.map((item) => {
             const isActive = pathname === item.href
             const Icon = item.icon
             return (
-              <li key={item.href}>
-                <Link
-                  href={item.href}
-                  className={`${styles.navItem} ${isActive ? styles.navItemActive : ""}`}
-                  title={isCollapsed ? item.label : undefined}
-                >
-                  <Icon size={20} className={styles.navIcon} />
-                  {!isCollapsed && <span className={styles.navLabel}>{item.label}</span>}
-                </Link>
-              </li>
+              <Link
+                key={item.href}
+                href={item.href}
+                onClick={closeSidebar}
+                className={`${styles.navItem} ${isActive ? styles.active : ""}`}
+                title={!isOpen ? item.label : undefined}
+              >
+                <Icon size={20} />
+                {isOpen && <span>{item.label}</span>}
+              </Link>
             )
           })}
-        </ul>
-      </nav>
+        </nav>
 
-      <div className={styles.footer}>
-        {!isCollapsed && (
-          <div className={styles.tenantInfo}>
-            <div className={styles.tenantIcon}>
-              <Building2 size={16} />
-            </div>
-            <div className={styles.tenantDetails}>
-              <p className={styles.tenantName}>{tenant?.name || "Mi Tienda"}</p>
-              <p className={styles.tenantPlan}>{businessTypeLabel}</p>
-            </div>
-          </div>
-        )}
-        <button className={styles.logoutButton} onClick={handleLogout}>
-          <LogOut size={18} />
-          {!isCollapsed && <span>Cerrar sesión</span>}
-        </button>
-      </div>
-    </aside>
+        <div className={styles.footer}>
+          {isOpen ? (
+            <>
+              <div className={styles.tenantInfo}>
+                <div className={styles.tenantIcon}>
+                  <Building2 size={16} />
+                </div>
+                <div className={styles.tenantDetails}>
+                  <p className={styles.tenantName}>{tenant?.name || "Mi Tienda"}</p>
+                  <p className={styles.tenantPlan}>{businessTypeLabel}</p>
+                </div>
+              </div>
+              <button className={styles.logoutButton} onClick={handleLogout}>
+                <LogOut size={18} />
+                <span>Cerrar sesión</span>
+              </button>
+            </>
+          ) : (
+            <button
+              className={styles.logoutButtonCollapsed}
+              onClick={handleLogout}
+              title="Cerrar sesión"
+            >
+              <LogOut size={18} />
+            </button>
+          )}
+        </div>
+      </aside>
+    </>
   )
 }

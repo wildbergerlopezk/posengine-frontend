@@ -2,12 +2,13 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 1rem 1.5rem;
+  padding: 0 1.5rem;       /* ← quitar padding vertical, solo horizontal */
+  height: 64px;            /* ← misma altura que .sidebarHeader */
   border-bottom: 1px solid var(--color-border);
   background-color: var(--color-card);
-  position: sticky;   /* ← esto */
-  top: 0;             /* ← y esto */
-  z-index: 10;        /* ← para que quede por encima del contenido al scrollear */
+  position: sticky;
+  top: 0;
+  z-index: 10;
 }
 
 .titleSection {

@@ -3,9 +3,10 @@
   background-color: var(--color-background);
 }
 
+/* El dashboard siempre respeta el ancho del sidebar comprimido (4rem) */
 .main {
-  padding-left: 16rem;
-  transition: padding-left 0.3s ease;
+  margin-left: 4rem;
+  min-height: 100vh;
 }
 
 .loadingContainer {
@@ -13,6 +14,7 @@
   min-height: 100vh;
   align-items: center;
   justify-content: center;
+  background-color: var(--color-background);
 }
 
 .spinner {
@@ -25,13 +27,5 @@
 }
 
 @keyframes spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
-
-@media (max-width: 1024px) {
-  .main {
-    padding-left: 0;
-  }
+  to { transform: rotate(360deg); }
 }
