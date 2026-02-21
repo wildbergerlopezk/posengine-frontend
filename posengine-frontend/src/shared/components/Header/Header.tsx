@@ -55,18 +55,6 @@ export function Header({
       </div>
 
       <div className={styles.actions}>
-        <div className={styles.searchContainer}>
-          <Search
-            size={16}
-            className={styles.searchIcon}
-          />
-          <input
-            type="text"
-            placeholder="Buscar..."
-            className={styles.searchInput}
-          />
-        </div>
-
         <button
           className={styles.iconButton}
           onClick={toggleTheme}
