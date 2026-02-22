@@ -3,6 +3,7 @@ import type { User } from "@/src/shared/types/user/userType";
 import type { Tenant } from "@/src/shared/types/tenant/tenantType";
 import type { RegisterUserDto } from "@/src/shared/types/user/userType.dto";
 import type { RegisterTenantDto } from "@/src/shared/types/tenant/tenantType.dto";
+import type { BusinessTypeDto } from "../types";
 
 const BASE_URL = process.env.NEXT_PUBLIC_BACKEND_URL
 
@@ -73,6 +74,13 @@ export async function createTenantApi(userId: string, data: RegisterTenantDto): 
 
   console.log("🎉 [createTenantApi] Proceso completado, retornando tenant");
   return tenant;
+}
+
+export async function getBusinessTypesApi(page = 1, size = 20): Promise<BusinessTypeDto[]> {
+  const res = await fetch(`${BASE_URL}/api/v1/bussinestypes/page/${page}/size/${size}`)
+  if (!res.ok) throw new Error("Error al obtener los tipos de negocio")
+  const data = await res.json()
+  return data.data
 }
 
 export async function updateUserTenantApi(userId: string, tenantId: number): Promise<User> {

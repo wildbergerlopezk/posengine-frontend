@@ -17,3 +17,12 @@ export interface OnboardingData {
   phone: string
   currency: string
 }
+
+export interface BusinessTypeDto {
+  id: number
+  key: string
+  label: string
+  description: string
+  icon: string
+  defaultModules: string[]
+}

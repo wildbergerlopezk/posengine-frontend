@@ -1,4 +1,4 @@
 export interface RegisterTenantDto {
   name: string;
-  type: string;
+  businessType: string;
 }

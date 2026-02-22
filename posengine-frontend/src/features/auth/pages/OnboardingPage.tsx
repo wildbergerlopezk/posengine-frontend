@@ -6,41 +6,13 @@ import {
   Send, ChevronDown, RefreshCw,
 } from "lucide-react"
 import { useAuthStore } from "../store/auth.store"
-import { BUSINESS_TYPES, type BusinessType } from "../../../../config/Businesstypes.config"
+import { createTenantApi, sendVerificationCodeApi, verifyCodeApi, getBusinessTypesApi } from "../api/auth.api"
+import type { BusinessTypeDto } from "../types"
 import type { RegisterTenantDto } from "@/src/shared/types/tenant/tenantType.dto"
 import styles from "./OnboardingPage.module.css"
 import typeStyles from "./BusinessTypeStep.module.css"
 
-// ─────────────────────────────────────────────────────────────────────────────
-// 🧪 MOCKS
-// ─────────────────────────────────────────────────────────────────────────────
-const IS_MOCK = true
-const MOCK_VALID_CODE = "123456"
-const delay = (ms: number) => new Promise((r) => setTimeout(r, ms))
-
-async function createTenantApi(_userId: string, data: RegisterTenantDto) {
-  await delay(1000)
-  return { id: 1, name: data.name }
-}
-async function sendVerificationCodeApi(email: string) {
-  await delay(1200)
-  console.log(`🧪 Código enviado a ${email} — usa ${MOCK_VALID_CODE} para verificar`)
-}
-async function verifyCodeApi(_email: string, code: string) {
-  await delay(900)
-  if (code !== MOCK_VALID_CODE)
-    throw new Error(`Código inválido. Usa "${MOCK_VALID_CODE}" para probar.`)
-}
-// ─────────────────────────────────────────────────────────────────────────────
-
 type Step = "business" | "business-type" | "send-code" | "verify" | "done"
-
-const MOCK_USER = {
-  id: "mock-user-id",
-  email: "williamgomez@gmail.com",
-  fullName: "William Gómez",
-  tenantId: 0,
-}
 
 export function OnboardingPage() {
   const router = useRouter()
@@ -49,12 +21,21 @@ export function OnboardingPage() {
   const [step, setStep] = useState<Step>("business")
   const [isLoading, setIsLoading] = useState(false)
   const [businessName, setBusinessName] = useState("")
-  const [businessType, setBusinessType] = useState<BusinessType | "">("")
+  const [businessType, setBusinessType] = useState("")
   const [error, setError] = useState("")
 
+  const [businessTypes, setBusinessTypes] = useState<BusinessTypeDto[]>([])
+  const [loadingTypes, setLoadingTypes] = useState(false)
+
   useEffect(() => {
-    if (IS_MOCK && !user) setUser(MOCK_USER)
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+    setLoadingTypes(true)
+    getBusinessTypesApi()
+      .then(setBusinessTypes)
+      .catch(() => setError("No se pudieron cargar los tipos de negocio"))
+      .finally(() => setLoadingTypes(false))
+  }, [])
+
+  const selectedType = businessTypes.find((t) => t.key === businessType) ?? null
 
   // ─── Paso 1 → 2 ───────────────────────────────────────────────────────────
   const handleBusinessName = (e: React.FormEvent) => {
@@ -65,16 +46,16 @@ export function OnboardingPage() {
     setStep("business-type")
   }
 
-  // ─── Paso 2: submit con select ────────────────────────────────────────────
+  // ─── Paso 2: submit ────────────────────────────────────────────────────────
   const handleSelectTypeSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!user || !businessType) return
     setIsLoading(true)
     setError("")
     try {
-      const tenantDto: RegisterTenantDto = { name: businessName, type: businessType as BusinessType }
+      const tenantDto: RegisterTenantDto = { name: businessName, businessType }
       const tenant = await createTenantApi(user.id, tenantDto)
-      setTenant({ ...tenant, type: businessType as BusinessType })
+      setTenant(tenant)
       setUser({ ...user, tenantId: tenant.id })
       setStep("send-code")
     } catch (err) {
@@ -123,16 +104,11 @@ export function OnboardingPage() {
 
   const currentStepIndex =
     step === "business" ? 0 :
-      step === "business-type" ? 1 :
-        step === "send-code" ? 2 :
-          step === "verify" ? 2 : 3
+    step === "business-type" ? 1 :
+    step === "send-code" ? 2 :
+    step === "verify" ? 2 : 3
 
-  // Tipo seleccionado (para preview)
-  const selectedTypeConfig = businessType
-    ? BUSINESS_TYPES[businessType as BusinessType]
-    : null
-
-  // ─── Render: Listo ────────────────────────────────────────────────────────
+  // ─── Done ─────────────────────────────────────────────────────────────────
   if (step === "done") {
     return (
       <div className={styles.page}>
@@ -152,7 +128,7 @@ export function OnboardingPage() {
     )
   }
 
-  // ─── Render: verify ───────────────────────────────────────────────────────
+  // ─── Verify ───────────────────────────────────────────────────────────────
   if (step === "verify") {
     return (
       <div className={styles.page}>
@@ -171,7 +147,7 @@ export function OnboardingPage() {
     )
   }
 
-  // ─── Render: send-code ────────────────────────────────────────────────────
+  // ─── Send-code ────────────────────────────────────────────────────────────
   if (step === "send-code") {
     const maskedEmail = (user?.email ?? "").replace(
       /(.{2})(.*)(@.*)/,
@@ -208,10 +184,8 @@ export function OnboardingPage() {
     )
   }
 
-  // ─── Render: business-type (SELECT) ───────────────────────────────────────
+  // ─── Business-type ────────────────────────────────────────────────────────
   if (step === "business-type") {
-    const SelectedIcon = selectedTypeConfig?.icon ?? null
-
     return (
       <div className={styles.page}>
         <div className={styles.card}>
@@ -229,48 +203,36 @@ export function OnboardingPage() {
             <div className={styles.formGroup}>
               <label className={styles.label}>Tipo de negocio *</label>
 
-              {/* Select con ícono + chevron */}
               <div className={typeStyles.selectWrapper}>
-                {/* Ícono del tipo seleccionado (o ícono genérico) */}
                 <span className={typeStyles.selectIcon}>
-                  {selectedTypeConfig && SelectedIcon
-                    ? <SelectedIcon size={16} />
-                    : <Building2 size={16} />
-                  }
+                  <Building2 size={16} />
                 </span>
 
                 <select
                   className={`${typeStyles.select} ${businessType ? typeStyles.selectFilled : ""}`}
                   value={businessType}
-                  onChange={(e) => {
-                    setBusinessType(e.target.value as BusinessType | "")
-                    setError("")
-                  }}
-                  disabled={isLoading}
+                  onChange={(e) => { setBusinessType(e.target.value); setError("") }}
+                  disabled={isLoading || loadingTypes}
                 >
-                  <option value="" disabled>Selecciona un tipo…</option>
-                  {(Object.entries(BUSINESS_TYPES) as [BusinessType, typeof BUSINESS_TYPES[BusinessType]][]).map(
-                    ([key, config]) => (
-                      <option key={key} value={key}>{config.label}</option>
-                    )
-                  )}
+                  <option value="" disabled>
+                    {loadingTypes ? "Cargando tipos…" : "Selecciona un tipo…"}
+                  </option>
+                  {businessTypes.map((t) => (
+                    <option key={t.key} value={t.key}>{t.label}</option>
+                  ))}
                 </select>
 
                 <ChevronDown size={16} className={typeStyles.selectChevron} />
               </div>
 
-              {/* Preview de selección */}
-              {selectedTypeConfig && SelectedIcon && (
+              {selectedType && (
                 <div className={typeStyles.selectedPreview}>
-                  <div className={typeStyles.selectedPreviewIcon}>
-                    <SelectedIcon size={18} />
-                  </div>
                   <div className={typeStyles.selectedPreviewInfo}>
                     <span className={typeStyles.selectedPreviewLabel}>
-                      {selectedTypeConfig.label}
+                      {selectedType.label}
                     </span>
                     <span className={typeStyles.selectedPreviewDesc}>
-                      {selectedTypeConfig.description}
+                      {selectedType.description}
                     </span>
                   </div>
                 </div>
@@ -280,7 +242,7 @@ export function OnboardingPage() {
             <button
               type="submit"
               className={styles.submitButton}
-              disabled={isLoading || !businessType}
+              disabled={isLoading || !businessType || loadingTypes}
             >
               {isLoading
                 ? <><Loader2 size={16} className={styles.spinner} /> Creando negocio…</>
@@ -293,7 +255,7 @@ export function OnboardingPage() {
     )
   }
 
-  // ─── Render: business (paso 1) ────────────────────────────────────────────
+  // ─── Business (paso 1) ────────────────────────────────────────────────────
   return (
     <div className={styles.page}>
       <div className={styles.card}>
@@ -488,8 +450,7 @@ function OtpVerification({ email, onVerified, onResendCode, onVerifyCode }: OtpV
                   textAlign: "center",
                   fontSize: "clamp(1.125rem, 4vw, 1.375rem)",
                   fontWeight: 700,
-                  border: `1.5px solid ${verified ? "#16a34a" : error ? "#dc2626" : "var(--color-border)"
-                    }`,
+                  border: `1.5px solid ${verified ? "#16a34a" : error ? "#dc2626" : "var(--color-border)"}`,
                   borderRadius: "0.625rem",
                   background: verified
                     ? "rgba(22,163,74,0.06)"
