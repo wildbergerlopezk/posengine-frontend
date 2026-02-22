@@ -27,7 +27,7 @@ export async function registerUserApi(data: RegisterUserDto): Promise<User> {
   const res = await fetch(`${BASE_URL}/api/v1/accounts/register-user`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(data), 
+    body: JSON.stringify(data),
   });
 
   if (!res.ok) {
@@ -35,7 +35,7 @@ export async function registerUserApi(data: RegisterUserDto): Promise<User> {
     throw new Error(error?.errorText || "Error al registrar usuario");
   }
 
-  return res.json(); 
+  return res.json();
 }
 
 export async function createTenantApi(userId: string, data: RegisterTenantDto): Promise<Tenant> {
