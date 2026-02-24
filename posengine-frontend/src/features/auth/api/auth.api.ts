@@ -115,32 +115,38 @@ export async function updateUserTenantApi(userId: string, tenantId: number): Pro
   return updatedUser;
 }
 
-export async function sendVerificationCodeApi(email: string): Promise<void> {
-  const response = await fetch("/api/auth/send-verification-code", {
+export async function sendVerificationCodeApi(email: string, userId: string): Promise<number> {
+  // 1. Genera el token
+  const sendRes = await fetch(`${BASE_URL}/api/v1/accounts/send-emailtoken`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ email }),
+    body: JSON.stringify({ userId }),
   })
-
-  if (!response.ok) {
-    const data = await response.json().catch(() => ({}))
-    throw new Error(data.message ?? "Error al enviar el código de verificación")
+  if (!sendRes.ok) {
+    const error = await sendRes.json().catch(() => ({}))
+    throw new Error(error?.errorText ?? "Error al generar el token")
   }
-}
 
-/**
- * Verifica el código OTP de 6 dígitos introducido por el usuario.
- * Lanza un error si el código es incorrecto o ha expirado.
- */
-export async function verifyCodeApi(email: string, code: string): Promise<void> {
-  const response = await fetch("/api/auth/verify-code", {
+  // 2. Obtiene el verificationCode
+  const encodedEmail = encodeURIComponent(email)
+  const keyRes = await fetch(`${BASE_URL}/api/v1/accounts/confirm-key/${encodedEmail}`)
+  if (!keyRes.ok) {
+    const error = await keyRes.json().catch(() => ({}))
+    throw new Error(error?.errorText ?? "Error al obtener el código")
+  }
+
+  const data = await keyRes.json()
+  return data.verificationCode
+}
+export async function verifyCodeApi(userId: string, confirmKey: number): Promise<void> {
+  const response = await fetch(`${BASE_URL}/api/v1/accounts/confirm-email`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ email, code }),
+    body: JSON.stringify({ userId, confirmKey }),
   })
 
   if (!response.ok) {
     const data = await response.json().catch(() => ({}))
-    throw new Error(data.message ?? "Código inválido o expirado")
+    throw new Error(data?.errorText ?? "Código inválido o expirado")
   }
 }

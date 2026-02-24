@@ -65,16 +65,19 @@ export function OnboardingPage() {
     }
   }
 
+  const [confirmKey, setConfirmKey] = useState<number | null>(null)
+
   // ─── Paso 3 → 4 ───────────────────────────────────────────────────────────
   const handleSendCode = async () => {
     if (!user) return
     setIsLoading(true)
     setError("")
     try {
-      await sendVerificationCodeApi(user.email)
+      const key = await sendVerificationCodeApi(user.email, user.id)
+      setConfirmKey(key)
       setStep("verify")
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Error al enviar el código")
+      setError(err instanceof Error ? err.message : "Error al obtener el código")
     } finally {
       setIsLoading(false)
     }
@@ -83,11 +86,17 @@ export function OnboardingPage() {
   // ─── Paso 4: verificar ────────────────────────────────────────────────────
   const handleResendCode = async () => {
     if (!user) throw new Error("No hay usuario autenticado")
-    await sendVerificationCodeApi(user.email)
+    if (!user.email) throw new Error("El usuario no tiene email registrado")
+    const key = await sendVerificationCodeApi(user.email, user.id)
+    setConfirmKey(key)
   }
   const handleVerifyCode = async (code: string) => {
     if (!user) throw new Error("No hay usuario autenticado")
-    await verifyCodeApi(user.email, code)
+    if (!user.id) throw new Error("El usuario no tiene ID válido")
+    if (!code || code.length !== 6) throw new Error("El código debe tener 6 dígitos")
+    const confirmKeyNum = parseInt(code)
+    if (isNaN(confirmKeyNum)) throw new Error("El código debe ser numérico")
+    await verifyCodeApi(user.id, confirmKeyNum)
   }
   const handleVerified = () => {
     setStep("done")
@@ -104,9 +113,9 @@ export function OnboardingPage() {
 
   const currentStepIndex =
     step === "business" ? 0 :
-    step === "business-type" ? 1 :
-    step === "send-code" ? 2 :
-    step === "verify" ? 2 : 3
+      step === "business-type" ? 1 :
+        step === "send-code" ? 2 :
+          step === "verify" ? 2 : 3
 
   // ─── Done ─────────────────────────────────────────────────────────────────
   if (step === "done") {
@@ -138,6 +147,7 @@ export function OnboardingPage() {
           </div>
           <OtpVerification
             email={user?.email ?? ""}
+            prefillCode={confirmKey}        // <-- nuevo prop
             onVerified={handleVerified}
             onResendCode={handleResendCode}
             onVerifyCode={handleVerifyCode}
@@ -326,12 +336,13 @@ function StepIndicator({ steps, currentIndex }: StepIndicatorProps) {
 // ─────────────────────────────────────────────────────────────────────────────
 interface OtpVerificationProps {
   email: string
+  prefillCode: number | null      // <-- nuevo
   onVerified: () => void
   onResendCode: () => Promise<void>
   onVerifyCode: (code: string) => Promise<void>
 }
 
-function OtpVerification({ email, onVerified, onResendCode, onVerifyCode }: OtpVerificationProps) {
+function OtpVerification({ email, prefillCode, onVerified, onResendCode, onVerifyCode }: OtpVerificationProps) {
   const [code, setCode] = useState(["", "", "", "", "", ""])
   const [isVerifying, setIsVerifying] = useState(false)
   const [isResending, setIsResending] = useState(false)
@@ -339,6 +350,13 @@ function OtpVerification({ email, onVerified, onResendCode, onVerifyCode }: OtpV
   const [resendCooldown, setResendCooldown] = useState(0)
   const [verified, setVerified] = useState(false)
   const inputRefs = useRef<(HTMLInputElement | null)[]>([])
+
+  useEffect(() => {
+    if (prefillCode !== null) {
+      const digits = String(prefillCode).padStart(6, "0").slice(0, 6).split("")
+      setCode(digits)
+    }
+  }, [prefillCode])
 
   useEffect(() => {
     if (resendCooldown > 0) {
