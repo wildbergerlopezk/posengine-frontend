@@ -3,14 +3,9 @@
 import { useState } from "react"
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
-import {
-  Settings,
-  Building2,
-  LogOut,
-  Menu,
-} from "lucide-react"
+import { Settings, Building2, LogOut, Menu } from "lucide-react"
 import { useAuthStore } from "@/src/features/auth/store/auth.store"
-import { BUSINESS_TYPES, type BusinessType } from "../../../../config/Businesstypes.config"
+import { BUSINESS_TYPES, DEFAULT_BUSINESS_TYPE_MODULES, type BusinessType } from "../../../../config/Businesstypes.config"
 import styles from "./Sidebar.module.css"
 
 export function Sidebar() {
@@ -24,10 +19,10 @@ export function Sidebar() {
     router.push("/login")
   }
 
-  const tenantType = (tenant as any)?.type as BusinessType | undefined
+  const tenantType = tenant?.type as BusinessType | undefined
   const navItems = tenantType && BUSINESS_TYPES[tenantType]
     ? BUSINESS_TYPES[tenantType].modules
-    : BUSINESS_TYPES["tienda"].modules
+    : DEFAULT_BUSINESS_TYPE_MODULES
 
   const businessTypeLabel = tenantType && BUSINESS_TYPES[tenantType]
     ? BUSINESS_TYPES[tenantType].label
@@ -38,10 +33,8 @@ export function Sidebar() {
 
   return (
     <>
-      {/* Overlay solo cuando está expandido */}
       {isOpen && <div className={styles.overlay} onClick={closeSidebar} />}
 
-      {/* Sidebar: siempre visible, comprimido o expandido */}
       <aside className={`${styles.sidebar} ${isOpen ? styles.open : ""}`}>
         <div className={styles.sidebarHeader}>
           <button className={styles.menuButton} onClick={toggleSidebar} aria-label="Toggle menú">
@@ -84,7 +77,7 @@ export function Sidebar() {
                   <Building2 size={16} />
                 </div>
                 <div className={styles.tenantDetails}>
-                  <p className={styles.tenantName}>{tenant?.name || "Mi Tienda"}</p>
+                  <p className={styles.tenantName}>{tenant?.name || "Mi Negocio"}</p>
                   <p className={styles.tenantPlan}>{businessTypeLabel}</p>
                 </div>
               </div>

@@ -7,17 +7,21 @@ import type { User } from "@/src/shared/types/user/userType"
 interface AuthState {
   user: User | null
   tenant: Tenant | null
+  token: string | null
   isAuthenticated: boolean
   setUser: (user: User | null) => void
   setTenant: (tenant: Tenant | null) => void
+  setToken: (token: string | null) => void
   logout: () => void
 }
 
 export const useAuthStore = create<AuthState>((set) => ({
   user: null,
   tenant: null,
+  token: null,
   isAuthenticated: false,
   setUser: (user) => set({ user, isAuthenticated: !!user }),
   setTenant: (tenant) => set({ tenant }),
-  logout: () => set({ user: null, tenant: null, isAuthenticated: false }),
+  setToken: (token) => set({ token }),
+  logout: () => set({ user: null, tenant: null, token: null, isAuthenticated: false }),
 }))

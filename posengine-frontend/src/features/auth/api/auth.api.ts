@@ -7,21 +7,42 @@ import type { BusinessTypeDto } from "../types";
 
 const BASE_URL = process.env.NEXT_PUBLIC_BACKEND_URL
 
-export async function loginApi(credentials: LoginCredentials): Promise<{ user: User; tenant: Tenant }> {
-  await new Promise((resolve) => setTimeout(resolve, 1000))
-  //async de ejemplo
-  return {
-    user: {
-      id: "u1",
+export async function loginApi(credentials: LoginCredentials): Promise<{ user: User; tenant: Tenant; token: string }> {
+  const res = await fetch(`${BASE_URL}/api/v1/accounts/createtoken`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
       email: credentials.email,
-      fullName: "Juan Pérez",
-      tenantId: 1,
-    },
-    tenant: {
-      id: 1,
-      name: "Mi Tienda",
-    },
+      password: credentials.password,
+      isRemember: credentials.isRemember ?? false,
+    }),
+  })
+
+  if (!res.ok) {
+    const error = await res.json().catch(() => ({}))
+    throw new Error(error?.errorText ?? "Credenciales incorrectas")
   }
+
+  const data = await res.json()
+
+  // Fetch del tenant para obtener nombre y tipo
+  const tenantRes = await fetch(`${BASE_URL}/api/v1/tenant/${data.tenantId}`)
+  const tenantData = tenantRes.ok ? await tenantRes.json() : null
+
+  const user: User = {
+    id: data.userId,
+    email: data.email,
+    fullName: data.userName,
+    tenantId: data.tenantId,
+  }
+
+  const tenant: Tenant = {
+    id: data.tenantId,
+    name: tenantData?.name ?? "",
+    type: tenantData?.businessType ?? "",
+  }
+
+  return { user, tenant, token: data.token }
 }
 
 export async function registerUserApi(data: RegisterUserDto): Promise<User> {

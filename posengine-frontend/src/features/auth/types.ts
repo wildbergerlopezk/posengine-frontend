@@ -1,6 +1,7 @@
 export interface LoginCredentials {
   email: string
   password: string
+  isRemember?: boolean
 }
 
 export interface RegisterCredentials {

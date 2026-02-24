@@ -9,6 +9,8 @@ import { useAuthStore } from "../store/auth.store"
 import { createTenantApi, sendVerificationCodeApi, verifyCodeApi, getBusinessTypesApi } from "../api/auth.api"
 import type { BusinessTypeDto } from "../types"
 import type { RegisterTenantDto } from "@/src/shared/types/tenant/tenantType.dto"
+// Importamos BusinessType desde la configuración para tipado
+import type { BusinessType } from "../../../../config/Businesstypes.config"
 import styles from "./OnboardingPage.module.css"
 import typeStyles from "./BusinessTypeStep.module.css"
 
@@ -21,7 +23,8 @@ export function OnboardingPage() {
   const [step, setStep] = useState<Step>("business")
   const [isLoading, setIsLoading] = useState(false)
   const [businessName, setBusinessName] = useState("")
-  const [businessType, setBusinessType] = useState("")
+  // Cambiamos el tipo a BusinessType | "" para permitir el valor vacío inicial
+  const [businessType, setBusinessType] = useState<BusinessType | "">("")
   const [error, setError] = useState("")
 
   const [businessTypes, setBusinessTypes] = useState<BusinessTypeDto[]>([])
@@ -35,7 +38,8 @@ export function OnboardingPage() {
       .finally(() => setLoadingTypes(false))
   }, [])
 
-  const selectedType = businessTypes.find((t) => t.key === businessType) ?? null
+  // selectedType puede ser null si businessType es "" o no coincide
+  const selectedType = businessType ? businessTypes.find((t) => t.key === businessType) : null
 
   // ─── Paso 1 → 2 ───────────────────────────────────────────────────────────
   const handleBusinessName = (e: React.FormEvent) => {
@@ -53,9 +57,14 @@ export function OnboardingPage() {
     setIsLoading(true)
     setError("")
     try {
-      const tenantDto: RegisterTenantDto = { name: businessName, businessType }
+      // Hacemos un cast explícito a BusinessType porque sabemos que el valor viene del select y es válido
+      const tenantDto: RegisterTenantDto = { name: businessName, businessType: businessType as BusinessType }
       const tenant = await createTenantApi(user.id, tenantDto)
-      setTenant(tenant)
+      setTenant({
+        id: tenant.id,
+        name: businessName,
+        type: businessType as BusinessType, // también casteamos aquí
+      })
       setUser({ ...user, tenantId: tenant.id })
       setStep("send-code")
     } catch (err) {
@@ -221,7 +230,7 @@ export function OnboardingPage() {
                 <select
                   className={`${typeStyles.select} ${businessType ? typeStyles.selectFilled : ""}`}
                   value={businessType}
-                  onChange={(e) => { setBusinessType(e.target.value); setError("") }}
+                  onChange={(e) => { setBusinessType(e.target.value as BusinessType); setError("") }}
                   disabled={isLoading || loadingTypes}
                 >
                   <option value="" disabled>

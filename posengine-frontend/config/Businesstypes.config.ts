@@ -1,25 +1,9 @@
-/**
- * Configuración de tipos de negocio y sus módulos disponibles
- * Agrega o quita tipos/módulos según necesites
- */
-
 import {
-  LayoutDashboard,
-  ShoppingCart,
-  Package,
-  FolderTree,
-  Warehouse,
-  BarChart3,
-  Building2,
-  Users,
-  Truck,
-  CalendarDays,
-  Stethoscope,
-  UtensilsCrossed,
-  BedDouble,
-  Wine,
-  Scissors,
-  type LucideIcon,
+  LayoutDashboard, ShoppingCart, Package, FolderTree, Warehouse,
+  BarChart3, Building2, Users, Truck, CalendarDays, Stethoscope,
+  UtensilsCrossed, BedDouble, Wine, Scissors, Wrench, Pill,
+  Dumbbell, Coffee, Scale, Dog, HardHat, Home, Calculator,
+  BookOpen, Monitor, Car, type LucideIcon,
 } from "lucide-react"
 
 export interface NavModule {
@@ -29,12 +13,26 @@ export interface NavModule {
 }
 
 export type BusinessType =
-  | "tienda"
-  | "veterinaria"
-  | "restaurante"
-  | "hotel"
-  | "bar"
-  | "salon"
+  | "Bakery"
+  | "AutoRepair"
+  | "Hotel"
+  | "HardwareStore"
+  | "Pharmacy"
+  | "Restaurant"
+  | "Gym"
+  | "MedicalClinic"
+  | "ClothingStore"
+  | "Supermarket"
+  | "Veterinary"
+  | "BeautySalon"
+  | "CoffeeShop"
+  | "LawFirm"
+  | "Construction"
+  | "RealEstate"
+  | "AccountingFirm"
+  | "LanguageSchool"
+  | "ITServices"
+  | "AutoParts"
 
 export interface BusinessTypeConfig {
   label: string
@@ -44,125 +42,161 @@ export interface BusinessTypeConfig {
 }
 
 // ─── Módulos reutilizables ─────────────────────────────────────────────────────
-const MOD_DASHBOARD:   NavModule = { href: "/dashboard",            label: "Dashboard",    icon: LayoutDashboard  }
-const MOD_VENTAS:      NavModule = { href: "/dashboard/sales",      label: "Ventas",       icon: ShoppingCart     }
-const MOD_PRODUCTOS:   NavModule = { href: "/dashboard/products",   label: "Productos",    icon: Package          }
-const MOD_CATEGORIAS:  NavModule = { href: "/dashboard/categories", label: "Categorías",   icon: FolderTree       }
-const MOD_STOCK:       NavModule = { href: "/dashboard/stock",      label: "Stock",        icon: Warehouse        }
-const MOD_REPORTES:    NavModule = { href: "/dashboard/reports",    label: "Reportes",     icon: BarChart3        }
-const MOD_NEGOCIO:     NavModule = { href: "/dashboard/business",   label: "Mi Negocio",   icon: Building2        }
-const MOD_CLIENTES:    NavModule = { href: "/dashboard/clients",    label: "Clientes",     icon: Users            }
-const MOD_PROVEEDORES: NavModule = { href: "/dashboard/suppliers",  label: "Proveedores",  icon: Truck            }
-const MOD_CITAS:       NavModule = { href: "/dashboard/appointments", label: "Citas",      icon: CalendarDays     }
-const MOD_PACIENTES:   NavModule = { href: "/dashboard/patients",   label: "Pacientes",    icon: Stethoscope      }
-const MOD_MESAS:       NavModule = { href: "/dashboard/tables",     label: "Mesas",        icon: UtensilsCrossed  }
-const MOD_HABITACIONES:NavModule = { href: "/dashboard/rooms",      label: "Habitaciones", icon: BedDouble        }
-const MOD_RESERVAS:    NavModule = { href: "/dashboard/reservations", label: "Reservas",   icon: CalendarDays     }
-const MOD_BEBIDAS:     NavModule = { href: "/dashboard/drinks",     label: "Carta/Bebidas",icon: Wine             }
-const MOD_SERVICIOS:   NavModule = { href: "/dashboard/services",   label: "Servicios",    icon: Scissors         }
+const MOD_DASHBOARD:    NavModule = { href: "/dashboard",              label: "Dashboard",     icon: LayoutDashboard }
+const MOD_VENTAS:       NavModule = { href: "/dashboard/sales",        label: "Ventas",        icon: ShoppingCart    }
+const MOD_PRODUCTOS:    NavModule = { href: "/dashboard/products",     label: "Productos",     icon: Package         }
+const MOD_CATEGORIAS:   NavModule = { href: "/dashboard/categories",   label: "Categorías",    icon: FolderTree      }
+const MOD_STOCK:        NavModule = { href: "/dashboard/stock",        label: "Stock",         icon: Warehouse       }
+const MOD_REPORTES:     NavModule = { href: "/dashboard/reports",      label: "Reportes",      icon: BarChart3       }
+const MOD_NEGOCIO:      NavModule = { href: "/dashboard/business",     label: "Mi Negocio",    icon: Building2       }
+const MOD_CLIENTES:     NavModule = { href: "/dashboard/clients",      label: "Clientes",      icon: Users           }
+const MOD_PROVEEDORES:  NavModule = { href: "/dashboard/suppliers",    label: "Proveedores",   icon: Truck           }
+const MOD_CITAS:        NavModule = { href: "/dashboard/appointments", label: "Citas",         icon: CalendarDays    }
+const MOD_PACIENTES:    NavModule = { href: "/dashboard/patients",     label: "Pacientes",     icon: Stethoscope     }
+const MOD_MESAS:        NavModule = { href: "/dashboard/tables",       label: "Mesas",         icon: UtensilsCrossed }
+const MOD_HABITACIONES: NavModule = { href: "/dashboard/rooms",        label: "Habitaciones",  icon: BedDouble       }
+const MOD_RESERVAS:     NavModule = { href: "/dashboard/reservations", label: "Reservas",      icon: CalendarDays    }
+const MOD_BEBIDAS:      NavModule = { href: "/dashboard/drinks",       label: "Carta/Bebidas", icon: Wine            }
+const MOD_SERVICIOS:    NavModule = { href: "/dashboard/services",     label: "Servicios",     icon: Scissors        }
+const MOD_RECETAS:      NavModule = { href: "/dashboard/recipes",      label: "Recetas",       icon: Package         }
+const MOD_PRODUCCION:   NavModule = { href: "/dashboard/production",   label: "Producción",    icon: Wrench          }
+const MOD_MEMBRESIAS:   NavModule = { href: "/dashboard/memberships",  label: "Membresías",    icon: Users           }
+const MOD_EXPEDIENTES:  NavModule = { href: "/dashboard/cases",        label: "Expedientes",   icon: Scale           }
+const MOD_PROYECTOS:    NavModule = { href: "/dashboard/projects",     label: "Proyectos",     icon: HardHat         }
+const MOD_PROPIEDADES:  NavModule = { href: "/dashboard/properties",   label: "Propiedades",   icon: Home            }
+const MOD_TICKETS:      NavModule = { href: "/dashboard/tickets",      label: "Tickets",       icon: Monitor         }
+const MOD_ALUMNOS:      NavModule = { href: "/dashboard/students",     label: "Alumnos",       icon: BookOpen        }
+const MOD_CURSOS:       NavModule = { href: "/dashboard/courses",      label: "Cursos",        icon: BookOpen        }
 
+export const DEFAULT_BUSINESS_TYPE_MODULES: NavModule[] = [
+  MOD_DASHBOARD,
+  MOD_VENTAS,
+  MOD_PRODUCTOS,
+  MOD_STOCK,
+  MOD_CLIENTES,
+  MOD_REPORTES,
+  MOD_NEGOCIO,
+]
 // ─── Configuración por tipo de negocio ────────────────────────────────────────
 export const BUSINESS_TYPES: Record<BusinessType, BusinessTypeConfig> = {
-  tienda: {
-    label: "Tienda / Retail",
-    description: "Venta de productos al público general",
-    icon: ShoppingCart,
-    modules: [
-      MOD_DASHBOARD,
-      MOD_VENTAS,
-      MOD_PRODUCTOS,
-      MOD_CATEGORIAS,
-      MOD_STOCK,
-      MOD_CLIENTES,
-      MOD_PROVEEDORES,
-      MOD_REPORTES,
-      MOD_NEGOCIO,
-    ],
+  Bakery: {
+    label: "Panadería",
+    description: "Gestión de producción artesanal, recetas y venta al mostrador.",
+    icon: Package,
+    modules: [MOD_DASHBOARD, MOD_VENTAS, MOD_PRODUCCION, MOD_RECETAS, MOD_STOCK, MOD_PROVEEDORES, MOD_REPORTES, MOD_NEGOCIO],
   },
-
-  veterinaria: {
-    label: "Veterinaria",
-    description: "Clínica veterinaria y venta de productos para mascotas",
-    icon: Stethoscope,
-    modules: [
-      MOD_DASHBOARD,
-      MOD_CITAS,
-      MOD_PACIENTES,
-      MOD_CLIENTES,
-      MOD_PRODUCTOS,
-      MOD_STOCK,
-      MOD_PROVEEDORES,
-      MOD_VENTAS,
-      MOD_REPORTES,
-      MOD_NEGOCIO,
-    ],
+  AutoRepair: {
+    label: "Taller Mecánico",
+    description: "Control de órdenes de servicio, repuestos y mano de obra.",
+    icon: Wrench,
+    modules: [MOD_DASHBOARD, MOD_VENTAS, MOD_PRODUCTOS, MOD_STOCK, MOD_CLIENTES, MOD_PROVEEDORES, MOD_REPORTES, MOD_NEGOCIO],
   },
-
-  restaurante: {
-    label: "Restaurante",
-    description: "Restaurante, cafetería o comida para llevar",
-    icon: UtensilsCrossed,
-    modules: [
-      MOD_DASHBOARD,
-      MOD_VENTAS,
-      MOD_MESAS,
-      MOD_PRODUCTOS,
-      MOD_CATEGORIAS,
-      MOD_STOCK,
-      MOD_PROVEEDORES,
-      MOD_REPORTES,
-      MOD_NEGOCIO,
-    ],
-  },
-
-  hotel: {
-    label: "Hotel / Hospedaje",
-    description: "Hotel, hostal o alojamiento turístico",
+  Hotel: {
+    label: "Hotel",
+    description: "Administración de reservas, disponibilidad de habitaciones y limpieza.",
     icon: BedDouble,
-    modules: [
-      MOD_DASHBOARD,
-      MOD_RESERVAS,
-      MOD_HABITACIONES,
-      MOD_CLIENTES,
-      MOD_VENTAS,
-      MOD_PRODUCTOS,
-      MOD_STOCK,
-      MOD_PROVEEDORES,
-      MOD_REPORTES,
-      MOD_NEGOCIO,
-    ],
+    modules: [MOD_DASHBOARD, MOD_RESERVAS, MOD_HABITACIONES, MOD_CLIENTES, MOD_VENTAS, MOD_STOCK, MOD_PROVEEDORES, MOD_REPORTES, MOD_NEGOCIO],
   },
-
-  bar: {
-    label: "Bar / Cantina",
-    description: "Bar, pub o cantina con venta de bebidas",
-    icon: Wine,
-    modules: [
-      MOD_DASHBOARD,
-      MOD_VENTAS,
-      MOD_MESAS,
-      MOD_BEBIDAS,
-      MOD_STOCK,
-      MOD_PROVEEDORES,
-      MOD_REPORTES,
-      MOD_NEGOCIO,
-    ],
+  HardwareStore: {
+    label: "Ferretería",
+    description: "Venta mayorista/minorista de herramientas y materiales de construcción.",
+    icon: Wrench,
+    modules: [MOD_DASHBOARD, MOD_VENTAS, MOD_PRODUCTOS, MOD_CATEGORIAS, MOD_STOCK, MOD_CLIENTES, MOD_PROVEEDORES, MOD_REPORTES, MOD_NEGOCIO],
   },
-
-  salon: {
-    label: "Salón de belleza",
-    description: "Peluquería, barbería o centro de estética",
+  Pharmacy: {
+    label: "Farmacia",
+    description: "Control estricto de lotes, vencimientos y trazabilidad médica.",
+    icon: Pill,
+    modules: [MOD_DASHBOARD, MOD_VENTAS, MOD_PRODUCTOS, MOD_STOCK, MOD_CLIENTES, MOD_PROVEEDORES, MOD_REPORTES, MOD_NEGOCIO],
+  },
+  Restaurant: {
+    label: "Restaurante",
+    description: "Gestión de mesas, comandería para cocina y menú digital.",
+    icon: UtensilsCrossed,
+    modules: [MOD_DASHBOARD, MOD_VENTAS, MOD_MESAS, MOD_PRODUCTOS, MOD_CATEGORIAS, MOD_STOCK, MOD_PROVEEDORES, MOD_REPORTES, MOD_NEGOCIO],
+  },
+  Gym: {
+    label: "Gimnasio",
+    description: "Control de membresías, acceso de socios y planes de entrenamiento.",
+    icon: Dumbbell,
+    modules: [MOD_DASHBOARD, MOD_MEMBRESIAS, MOD_CLIENTES, MOD_VENTAS, MOD_PRODUCTOS, MOD_REPORTES, MOD_NEGOCIO],
+  },
+  MedicalClinic: {
+    label: "Clínica Médica",
+    description: "Agenda de turnos, expedientes de pacientes y triaje.",
+    icon: Stethoscope,
+    modules: [MOD_DASHBOARD, MOD_CITAS, MOD_PACIENTES, MOD_CLIENTES, MOD_PRODUCTOS, MOD_STOCK, MOD_REPORTES, MOD_NEGOCIO],
+  },
+  ClothingStore: {
+    label: "Tienda de Ropa",
+    description: "Gestión de tallas, colores y catálogos de temporada.",
+    icon: ShoppingCart,
+    modules: [MOD_DASHBOARD, MOD_VENTAS, MOD_PRODUCTOS, MOD_CATEGORIAS, MOD_STOCK, MOD_CLIENTES, MOD_PROVEEDORES, MOD_REPORTES, MOD_NEGOCIO],
+  },
+  Supermarket: {
+    label: "Supermercado",
+    description: "Ventas masivas, control de balanzas y programas de lealtad.",
+    icon: ShoppingCart,
+    modules: [MOD_DASHBOARD, MOD_VENTAS, MOD_PRODUCTOS, MOD_CATEGORIAS, MOD_STOCK, MOD_CLIENTES, MOD_PROVEEDORES, MOD_REPORTES, MOD_NEGOCIO],
+  },
+  Veterinary: {
+    label: "Veterinaria",
+    description: "Historial clínico de mascotas, vacunas y cirugías.",
+    icon: Dog,
+    modules: [MOD_DASHBOARD, MOD_CITAS, MOD_PACIENTES, MOD_CLIENTES, MOD_PRODUCTOS, MOD_STOCK, MOD_PROVEEDORES, MOD_VENTAS, MOD_REPORTES, MOD_NEGOCIO],
+  },
+  BeautySalon: {
+    label: "Estética / Peluquería",
+    description: "Agenda de servicios de belleza y comisiones para estilistas.",
     icon: Scissors,
-    modules: [
-      MOD_DASHBOARD,
-      MOD_CITAS,
-      MOD_CLIENTES,
-      MOD_SERVICIOS,
-      MOD_PRODUCTOS,
-      MOD_STOCK,
-      MOD_VENTAS,
-      MOD_REPORTES,
-      MOD_NEGOCIO,
-    ],
+    modules: [MOD_DASHBOARD, MOD_CITAS, MOD_CLIENTES, MOD_SERVICIOS, MOD_PRODUCTOS, MOD_STOCK, MOD_VENTAS, MOD_REPORTES, MOD_NEGOCIO],
+  },
+  CoffeeShop: {
+    label: "Cafetería",
+    description: "Punto de venta rápido para bebidas, insumos y barismo.",
+    icon: Coffee,
+    modules: [MOD_DASHBOARD, MOD_VENTAS, MOD_BEBIDAS, MOD_PRODUCTOS, MOD_STOCK, MOD_PROVEEDORES, MOD_REPORTES, MOD_NEGOCIO],
+  },
+  LawFirm: {
+    label: "Bufete de Abogados",
+    description: "Seguimiento de expedientes judiciales y plazos legales.",
+    icon: Scale,
+    modules: [MOD_DASHBOARD, MOD_EXPEDIENTES, MOD_CLIENTES, MOD_REPORTES, MOD_NEGOCIO],
+  },
+  Construction: {
+    label: "Constructora",
+    description: "Gestión de proyectos de obra, maquinaria y presupuestos.",
+    icon: HardHat,
+    modules: [MOD_DASHBOARD, MOD_PROYECTOS, MOD_PRODUCTOS, MOD_STOCK, MOD_PROVEEDORES, MOD_CLIENTES, MOD_REPORTES, MOD_NEGOCIO],
+  },
+  RealEstate: {
+    label: "Inmobiliaria",
+    description: "Administración de propiedades, contratos de alquiler y visitas.",
+    icon: Home,
+    modules: [MOD_DASHBOARD, MOD_PROPIEDADES, MOD_CLIENTES, MOD_CITAS, MOD_REPORTES, MOD_NEGOCIO],
+  },
+  AccountingFirm: {
+    label: "Estudio Contable",
+    description: "Auditoría, declaración de impuestos y gestión de documentos fiscales.",
+    icon: Calculator,
+    modules: [MOD_DASHBOARD, MOD_CLIENTES, MOD_REPORTES, MOD_NEGOCIO],
+  },
+  LanguageSchool: {
+    label: "Academia de Idiomas",
+    description: "Matriculación de alumnos, cursos y seguimiento de exámenes.",
+    icon: BookOpen,
+    modules: [MOD_DASHBOARD, MOD_ALUMNOS, MOD_CURSOS, MOD_CITAS, MOD_REPORTES, MOD_NEGOCIO],
+  },
+  ITServices: {
+    label: "Servicios IT",
+    description: "Mesa de ayuda, tickets de soporte y gestión de proyectos tecnológicos.",
+    icon: Monitor,
+    modules: [MOD_DASHBOARD, MOD_TICKETS, MOD_PROYECTOS, MOD_CLIENTES, MOD_REPORTES, MOD_NEGOCIO],
+  },
+  AutoParts: {
+    label: "Venta de Repuestos",
+    description: "Catálogo técnico de piezas, compatibilidad por marca y almacén.",
+    icon: Car,
+    modules: [MOD_DASHBOARD, MOD_VENTAS, MOD_PRODUCTOS, MOD_CATEGORIAS, MOD_STOCK, MOD_CLIENTES, MOD_PROVEEDORES, MOD_REPORTES, MOD_NEGOCIO],
   },
 }

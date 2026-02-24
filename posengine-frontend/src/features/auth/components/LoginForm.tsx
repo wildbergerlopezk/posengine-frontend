@@ -1,7 +1,6 @@
 "use client"
 
 import type React from "react"
-
 import { useState } from "react"
 import Link from "next/link"
 import { Eye, EyeOff, Loader2 } from "lucide-react"
@@ -13,10 +12,11 @@ export function LoginForm() {
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [showPassword, setShowPassword] = useState(false)
+  const [isRemember, setIsRemember] = useState(false)
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    await login({ email, password })
+    await login({ email, password, isRemember })
   }
 
   return (
@@ -32,9 +32,7 @@ export function LoginForm() {
             {error && <div className={styles.errorMessage}>{error}</div>}
 
             <div className={styles.formGroup}>
-              <label htmlFor="email" className={styles.label}>
-                Email
-              </label>
+              <label htmlFor="email" className={styles.label}>Email</label>
               <input
                 id="email"
                 type="email"
@@ -47,9 +45,7 @@ export function LoginForm() {
             </div>
 
             <div className={styles.formGroup}>
-              <label htmlFor="password" className={styles.label}>
-                Contraseña
-              </label>
+              <label htmlFor="password" className={styles.label}>Contraseña</label>
               <div className={styles.inputWrapper}>
                 <input
                   id="password"
@@ -66,8 +62,19 @@ export function LoginForm() {
               </div>
             </div>
 
-            <div className={styles.forgotLink}>
-              <Link href="/forgot-password">¿Olvidaste tu contraseña?</Link>
+            <div className={styles.rememberRow}>
+              <label className={styles.checkboxLabel}>
+                <input
+                  type="checkbox"
+                  checked={isRemember}
+                  onChange={(e) => setIsRemember(e.target.checked)}
+                  className={styles.checkbox}
+                />
+                Recordarme
+              </label>
+              <Link href="/forgot-password" className={styles.forgotLink}>
+                ¿Olvidaste tu contraseña?
+              </Link>
             </div>
           </div>
         </div>
@@ -75,15 +82,11 @@ export function LoginForm() {
         <div className={styles.cardFooter}>
           <button type="submit" className={styles.submitButton} disabled={isLoading}>
             {isLoading ? (
-              <>
-                <Loader2 size={16} className={styles.spinner} />
-                Ingresando...
-              </>
+              <><Loader2 size={16} className={styles.spinner} />Ingresando...</>
             ) : (
               "Ingresar"
             )}
           </button>
-
           <p className={styles.registerLink}>
             ¿No tienes una cuenta? <Link href="/register">Regístrate</Link>
           </p>
