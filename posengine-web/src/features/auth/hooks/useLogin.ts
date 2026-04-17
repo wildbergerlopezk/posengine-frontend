@@ -8,7 +8,8 @@ import type { LoginCredentials } from "../types"
 
 export function useLogin() {
   const router = useRouter()
-  const { setUser, setTenant, setToken } = useAuthStore()
+  const { setAuth } = useAuthStore()
+
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState("")
 
@@ -17,14 +18,10 @@ export function useLogin() {
     setIsLoading(true)
 
     try {
-      if (!credentials.email || !credentials.password) {
-        throw new Error("Por favor completa todos los campos")
-      }
+      const data = await loginApi(credentials)
 
-      const { user, tenant, token } = await loginApi(credentials)
-      setUser(user)
-      setTenant(tenant)
-      setToken(token)
+      setAuth(data)
+
       router.push("/dashboard")
     } catch (err) {
       setError(err instanceof Error ? err.message : "Error al iniciar sesión")

@@ -27,7 +27,7 @@ const categoryData = [
 ]
 
 export function DashboardPage() {
-  const { tenant } = useAuthStore()
+  const { user } = useAuthStore()
   const stats = mockDashboardStats
   const lowStockProducts = mockProducts.filter((p) => p.stock <= p.minStock)
 

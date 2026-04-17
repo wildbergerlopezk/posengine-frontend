@@ -7,17 +7,15 @@ import styles from "./home.module.css"
 
 export default function HomePage() {
   const router = useRouter()
-  const { isAuthenticated, tenant } = useAuthStore()
+  const { isAuthenticated } = useAuthStore()
 
   useEffect(() => {
     if (!isAuthenticated) {
       router.push("/login")
-    } else if (!tenant) {
-      router.push("/onboarding")
     } else {
-      router.push("/dashboard") 
+      router.push("/dashboard")
     }
-  }, [isAuthenticated, tenant, router])
+  }, [isAuthenticated, router])
 
   return (
     <div className={styles.container}>

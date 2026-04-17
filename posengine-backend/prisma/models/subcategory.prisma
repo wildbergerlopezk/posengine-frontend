@@ -1,0 +1,16 @@
+model Subcategory {
+  id         String   @id @default(uuid())
+  tenantId   String
+  categoryId String
+  name       String
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  tenant   Tenant   @relation(fields: [tenantId], references: [id])
+  category Category @relation(fields: [categoryId], references: [id])
+
+  products Product[]
+
+  @@unique([name, tenantId])
+  @@map("subcategories")
+}

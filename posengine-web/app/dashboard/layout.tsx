@@ -12,7 +12,7 @@ export default function DashboardLayout({
 }: {
   children: React.ReactNode
 }) {
-  const { isAuthenticated, tenant } = useAuthStore()
+  const { isAuthenticated } = useAuthStore()
   const router = useRouter()
   const [mounted, setMounted] = useState(false)
 
@@ -23,10 +23,8 @@ export default function DashboardLayout({
   useEffect(() => {
     if (mounted && !isAuthenticated) {
       router.push("/login")
-    } else if (mounted && !tenant) {
-      router.push("/onboarding")
     }
-  }, [mounted, isAuthenticated, tenant, router])
+  }, [mounted, isAuthenticated, router])
 
   if (!mounted) {
     return (

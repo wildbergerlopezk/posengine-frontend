@@ -94,12 +94,12 @@ export function Header({
 
         <button className={styles.userButton}>
           <div className={styles.avatar}>
-            {user?.fullName
+            {user?.name
               ?.charAt(0)
               .toUpperCase() || "U"}
           </div>
           <span className={styles.userName}>
-            {user?.fullName || "Usuario"}
+            {user?.name || "Usuario"}
           </span>
         </button>
       </div>

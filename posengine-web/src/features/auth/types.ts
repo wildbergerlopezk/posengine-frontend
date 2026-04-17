@@ -8,22 +8,16 @@ export interface RegisterCredentials {
   name: string
   email: string
   password: string
-  confirmPassword: string
+  tenantName: string
 }
 
-export interface OnboardingData {
-  businessName: string
-  businessType: string
-  address: string
-  phone: string
-  currency: string
-}
-
-export interface BusinessTypeDto {
-  id: number
-  key: string
-  label: string
-  description: string
-  icon: string
-  defaultModules: string[]
+export interface AuthResponse {
+  accessToken: string
+  user: {
+    id: string
+    name: string
+    email: string
+    tenantId: string | null
+    tenantName?: string | null
+  }
 }

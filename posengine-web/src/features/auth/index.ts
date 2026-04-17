@@ -5,7 +5,6 @@ export { RegisterForm } from "./components/RegisterForm"
 // Pages
 export { LoginPage } from "./pages/LoginPage"
 export { RegisterPage } from "./pages/RegisterPage"
-export { OnboardingPage } from "./pages/OnboardingPage"
 
 // Hooks
 export { useLogin } from "./hooks/useLogin"
@@ -16,7 +15,7 @@ export { useAuth } from "./hooks/useAuth"
 export { useAuthStore } from "./store/auth.store"
 
 // API
-export { loginApi, registerUserApi, createTenantApi, getBusinessTypesApi } from "./api/auth.api"
+export { loginApi, registerApi } from "./api/auth.api"
 
 // Types
-export type { LoginCredentials, RegisterCredentials, OnboardingData, BusinessTypeDto } from "./types"
+export type { LoginCredentials, RegisterCredentials, AuthResponse } from "./types"

@@ -10,7 +10,7 @@ import type { Category } from "@/src/shared/types"
 import styles from "./CategoriesPage.module.css"
 
 export function CategoriesPage() {
-  const { tenant } = useAuthStore()
+  const { user } = useAuthStore()
   const [categories, setCategories] = useState<Category[]>(mockCategories)
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [editingCategory, setEditingCategory] = useState<Category | null>(null)

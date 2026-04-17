@@ -1,4 +1,6 @@
 import type { Product, Category, Sale, DashboardStats } from "../types"
+import type { User } from "../types/user/userType"
+import type { Tenant } from "../types/tenant/tenantType"
 
 export const mockCategories: Category[] = [
   { id: "1", tenantId: 1, name: "Bebidas", createdAt: new Date(), updatedAt: new Date() },
@@ -174,4 +176,17 @@ export const mockDashboardStats: DashboardStats = {
   monthRevenue: 1250000,
   lowStockProducts: 2,
   totalProducts: 8,
+}
+
+export const mockTenant: Tenant = {
+  id: 1,
+  name: "Mi Tienda Mock",
+  type: "Supermarket",
+}
+
+export const mockUser: User = {
+  id: "u1",
+  fullName: "Admin Mock",
+  email: "admin@mock.com",
+  tenantId: 1,
 }

@@ -3,13 +3,15 @@ import {
   BarChart3, Building2, Users, Truck, CalendarDays, Stethoscope,
   UtensilsCrossed, BedDouble, Wine, Scissors, Wrench, Pill,
   Dumbbell, Coffee, Scale, Dog, HardHat, Home, Calculator,
-  BookOpen, Monitor, Car, type LucideIcon,
+  BookOpen, Monitor, Car, History, ArrowLeftRight, ShoppingBag,
+  Banknote, Vault, Printer, FileText, PlusCircle, Tags, type LucideIcon,
 } from "lucide-react"
 
 export interface NavModule {
   href: string
   label: string
   icon: LucideIcon
+  subItems?: NavModule[]
 }
 
 export type BusinessType =
@@ -42,40 +44,113 @@ export interface BusinessTypeConfig {
 }
 
 // ─── Módulos reutilizables ─────────────────────────────────────────────────────
-const MOD_DASHBOARD:    NavModule = { href: "/dashboard",              label: "Dashboard",     icon: LayoutDashboard }
-const MOD_VENTAS:       NavModule = { href: "/dashboard/sales",        label: "Ventas",        icon: ShoppingCart    }
-const MOD_PRODUCTOS:    NavModule = { href: "/dashboard/products",     label: "Productos",     icon: Package         }
-const MOD_CATEGORIAS:   NavModule = { href: "/dashboard/categories",   label: "Categorías",    icon: FolderTree      }
-const MOD_STOCK:        NavModule = { href: "/dashboard/stock",        label: "Stock",         icon: Warehouse       }
-const MOD_REPORTES:     NavModule = { href: "/dashboard/reports",      label: "Reportes",      icon: BarChart3       }
-const MOD_NEGOCIO:      NavModule = { href: "/dashboard/business",     label: "Mi Negocio",    icon: Building2       }
-const MOD_CLIENTES:     NavModule = { href: "/dashboard/clients",      label: "Clientes",      icon: Users           }
-const MOD_PROVEEDORES:  NavModule = { href: "/dashboard/suppliers",    label: "Proveedores",   icon: Truck           }
-const MOD_CITAS:        NavModule = { href: "/dashboard/appointments", label: "Citas",         icon: CalendarDays    }
-const MOD_PACIENTES:    NavModule = { href: "/dashboard/patients",     label: "Pacientes",     icon: Stethoscope     }
-const MOD_MESAS:        NavModule = { href: "/dashboard/tables",       label: "Mesas",         icon: UtensilsCrossed }
-const MOD_HABITACIONES: NavModule = { href: "/dashboard/rooms",        label: "Habitaciones",  icon: BedDouble       }
-const MOD_RESERVAS:     NavModule = { href: "/dashboard/reservations", label: "Reservas",      icon: CalendarDays    }
-const MOD_BEBIDAS:      NavModule = { href: "/dashboard/drinks",       label: "Carta/Bebidas", icon: Wine            }
-const MOD_SERVICIOS:    NavModule = { href: "/dashboard/services",     label: "Servicios",     icon: Scissors        }
-const MOD_RECETAS:      NavModule = { href: "/dashboard/recipes",      label: "Recetas",       icon: Package         }
-const MOD_PRODUCCION:   NavModule = { href: "/dashboard/production",   label: "Producción",    icon: Wrench          }
-const MOD_MEMBRESIAS:   NavModule = { href: "/dashboard/memberships",  label: "Membresías",    icon: Users           }
-const MOD_EXPEDIENTES:  NavModule = { href: "/dashboard/cases",        label: "Expedientes",   icon: Scale           }
-const MOD_PROYECTOS:    NavModule = { href: "/dashboard/projects",     label: "Proyectos",     icon: HardHat         }
-const MOD_PROPIEDADES:  NavModule = { href: "/dashboard/properties",   label: "Propiedades",   icon: Home            }
-const MOD_TICKETS:      NavModule = { href: "/dashboard/tickets",      label: "Tickets",       icon: Monitor         }
-const MOD_ALUMNOS:      NavModule = { href: "/dashboard/students",     label: "Alumnos",       icon: BookOpen        }
-const MOD_CURSOS:       NavModule = { href: "/dashboard/courses",      label: "Cursos",        icon: BookOpen        }
+const MOD_DASHBOARD: NavModule = { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard }
+
+const MOD_POS_VENTAS: NavModule = {
+  href: "/dashboard/sales",
+  label: "Ventas",
+  icon: ShoppingCart,
+  subItems: [
+    { href: "/dashboard/sales/pos", label: "Caja", icon: ShoppingCart },
+    { href: "/dashboard/sales/history", label: "Historial de ventas", icon: History },
+    { href: "/dashboard/sales/returns", label: "Devoluciones", icon: ArrowLeftRight },
+  ]
+}
+
+const MOD_POS_INVENTARIO: NavModule = {
+  href: "/dashboard/inventory",
+  label: "Inventario",
+  icon: Package,
+  subItems: [
+    { href: "/dashboard/products", label: "Productos", icon: Package },
+    { href: "/dashboard/categories", label: "Categorías", icon: FolderTree },
+    { href: "/dashboard/inventory/subcategories", label: "Subcategorías", icon: Tags },
+  ]
+}
+
+const MOD_POS_COMPRAS: NavModule = {
+  href: "/dashboard/purchases",
+  label: "Compras",
+  icon: ShoppingBag,
+  subItems: [
+    { href: "/dashboard/purchases/new", label: "Registrar compra", icon: PlusCircle },
+    { href: "/dashboard/purchases/history", label: "Historial de compras", icon: History },
+  ]
+}
+
+const MOD_POS_CLIENTES: NavModule = {
+  href: "/dashboard/clients",
+  label: "Clientes",
+  icon: Users,
+  subItems: [
+    { href: "/dashboard/clients", label: "Lista de clientes", icon: Users },
+    { href: "/dashboard/clients/payments", label: "Pagos de deuda", icon: Banknote },
+  ]
+}
+
+const MOD_POS_PROVEEDORES: NavModule = {
+  href: "/dashboard/suppliers",
+  label: "Proveedores",
+  icon: Truck,
+}
+
+const MOD_POS_CAJA: NavModule = {
+  href: "/dashboard/cash",
+  label: "Caja",
+  icon: Vault,
+}
+
+const MOD_POS_REPORTES: NavModule = {
+  href: "/dashboard/reports",
+  label: "Reportes",
+  icon: BarChart3,
+}
+
+const MOD_POS_IMPRESION: NavModule = {
+  href: "/dashboard/printing",
+  label: "Impresión",
+  icon: Printer,
+  subItems: [
+    { href: "/dashboard/printing/invoices", label: "Facturas", icon: FileText },
+  ]
+}
+
+// Legacy modules for compatibility
+const MOD_VENTAS: NavModule = MOD_POS_VENTAS
+const MOD_PRODUCTOS: NavModule = { href: "/dashboard/products", label: "Productos", icon: Package }
+const MOD_CATEGORIAS: NavModule = { href: "/dashboard/categories", label: "Categorías", icon: FolderTree }
+const MOD_STOCK: NavModule = { href: "/dashboard/stock", label: "Stock", icon: Warehouse }
+const MOD_REPORTES: NavModule = MOD_POS_REPORTES
+const MOD_NEGOCIO: NavModule = { href: "/dashboard/business", label: "Mi Negocio", icon: Building2 }
+const MOD_CLIENTES: NavModule = MOD_POS_CLIENTES
+const MOD_PROVEEDORES: NavModule = MOD_POS_PROVEEDORES
+const MOD_CITAS: NavModule = { href: "/dashboard/appointments", label: "Citas", icon: CalendarDays }
+const MOD_PACIENTES: NavModule = { href: "/dashboard/patients", label: "Pacientes", icon: Stethoscope }
+const MOD_MESAS: NavModule = { href: "/dashboard/tables", label: "Mesas", icon: UtensilsCrossed }
+const MOD_HABITACIONES: NavModule = { href: "/dashboard/rooms", label: "Habitaciones", icon: BedDouble }
+const MOD_RESERVAS: NavModule = { href: "/dashboard/reservations", label: "Reservas", icon: CalendarDays }
+const MOD_BEBIDAS: NavModule = { href: "/dashboard/drinks", label: "Carta/Bebidas", icon: Wine }
+const MOD_SERVICIOS: NavModule = { href: "/dashboard/services", label: "Servicios", icon: Scissors }
+const MOD_RECETAS: NavModule = { href: "/dashboard/recipes", label: "Recetas", icon: Package }
+const MOD_PRODUCCION: NavModule = { href: "/dashboard/production", label: "Producción", icon: Wrench }
+const MOD_MEMBRESIAS: NavModule = { href: "/dashboard/memberships", label: "Membresías", icon: Users }
+const MOD_EXPEDIENTES: NavModule = { href: "/dashboard/cases", label: "Expedientes", icon: Scale }
+const MOD_PROYECTOS: NavModule = { href: "/dashboard/projects", label: "Proyectos", icon: HardHat }
+const MOD_PROPIEDADES: NavModule = { href: "/dashboard/properties", label: "Propiedades", icon: Home }
+const MOD_TICKETS: NavModule = { href: "/dashboard/tickets", label: "Tickets", icon: Monitor }
+const MOD_ALUMNOS: NavModule = { href: "/dashboard/students", label: "Alumnos", icon: BookOpen }
+const MOD_CURSOS: NavModule = { href: "/dashboard/courses", label: "Cursos", icon: BookOpen }
 
 export const DEFAULT_BUSINESS_TYPE_MODULES: NavModule[] = [
   MOD_DASHBOARD,
-  MOD_VENTAS,
-  MOD_PRODUCTOS,
-  MOD_STOCK,
-  MOD_CLIENTES,
-  MOD_REPORTES,
-  MOD_NEGOCIO,
+  MOD_POS_VENTAS,
+  MOD_POS_INVENTARIO,
+  MOD_POS_COMPRAS,
+  MOD_POS_CLIENTES,
+  MOD_POS_PROVEEDORES,
+  MOD_POS_CAJA,
+  MOD_POS_REPORTES,
+  MOD_POS_IMPRESION,
 ]
 // ─── Configuración por tipo de negocio ────────────────────────────────────────
 export const BUSINESS_TYPES: Record<BusinessType, BusinessTypeConfig> = {

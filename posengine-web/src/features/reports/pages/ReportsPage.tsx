@@ -72,7 +72,7 @@ const categoryPieData = [
 ]
 
 export function ReportsPage() {
-  const { tenant } = useAuthStore()
+  const { user } = useAuthStore()
   const [period, setPeriod] = useState<"day" | "week" | "month" | "year">("week")
 
   const getData = () => {

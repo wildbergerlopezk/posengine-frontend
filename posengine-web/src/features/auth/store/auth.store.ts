@@ -1,27 +1,42 @@
 "use client"
 
 import { create } from "zustand"
-import type { Tenant } from "@/src/shared/types/tenant/tenantType"
-import type { User } from "@/src/shared/types/user/userType"
+import { persist } from "zustand/middleware"
+import type { AuthResponse } from "../types"
+
+type AuthUser = AuthResponse["user"]
 
 interface AuthState {
-  user: User | null
-  tenant: Tenant | null
-  token: string | null
+  user: AuthUser | null
+  accessToken: string | null
   isAuthenticated: boolean
-  setUser: (user: User | null) => void
-  setTenant: (tenant: Tenant | null) => void
-  setToken: (token: string | null) => void
+  setAuth: (data: AuthResponse) => void
   logout: () => void
 }
 
-export const useAuthStore = create<AuthState>((set) => ({
-  user: null,
-  tenant: null,
-  token: null,
-  isAuthenticated: false,
-  setUser: (user) => set({ user, isAuthenticated: !!user }),
-  setTenant: (tenant) => set({ tenant }),
-  setToken: (token) => set({ token }),
-  logout: () => set({ user: null, tenant: null, token: null, isAuthenticated: false }),
-}))
+export const useAuthStore = create<AuthState>()(
+  persist(
+    (set) => ({
+      user: null,
+      accessToken: null,
+      isAuthenticated: false,
+
+      setAuth: ({ user, accessToken }) =>
+        set({
+          user,
+          accessToken,
+          isAuthenticated: true,
+        }),
+
+      logout: () =>
+        set({
+          user: null,
+          accessToken: null,
+          isAuthenticated: false,
+        }),
+    }),
+    {
+      name: "auth-storage",
+    }
+  )
+)

@@ -353,26 +353,6 @@ export function SalesPage() {
                   <span className={styles.currencyValue}>{formatCurrency(getTotalInCurrency("GS") * 1)}</span>
                 </div>
               </button>
-              <button
-                className={`${styles.currencyBtn} ${currency === "USD" ? styles.currencyBtnActive : ""}`}
-                onClick={() => setCurrency("USD")}
-              >
-                <span className={styles.currencySymbol}>$</span>
-                <div className={styles.currencyInfo}>
-                  <span className={styles.currencyName}>Dólar</span>
-                  <span className={styles.currencyValue}>${getTotalInCurrency("USD").toFixed(2)}</span>
-                </div>
-              </button>
-              <button
-                className={`${styles.currencyBtn} ${currency === "BRL" ? styles.currencyBtnActive : ""}`}
-                onClick={() => setCurrency("BRL")}
-              >
-                <span className={styles.currencySymbol}>R$</span>
-                <div className={styles.currencyInfo}>
-                  <span className={styles.currencyName}>Real</span>
-                  <span className={styles.currencyValue}>R$ {getTotalInCurrency("BRL").toFixed(2)}</span>
-                </div>
-              </button>
             </div>
           </div>
         </div>

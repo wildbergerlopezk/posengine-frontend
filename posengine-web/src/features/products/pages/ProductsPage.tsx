@@ -11,7 +11,7 @@ import type { Product } from "@/src/shared/types"
 import styles from "./ProductsPage.module.css"
 
 export function ProductsPage() {
-  const { tenant } = useAuthStore()
+  const { user } = useAuthStore()
   const [products, setProducts] = useState<Product[]>(mockProducts)
   const [searchQuery, setSearchQuery] = useState("")
   const [isDialogOpen, setIsDialogOpen] = useState(false)
