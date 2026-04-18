@@ -1,9 +1,19 @@
-
 export interface Category {
   id: string
-  tenantId: number
+  tenantId: string
   name: string
   parentId?: string
+  subcategories?: Category[]
+  createdAt: Date
+  updatedAt: Date
+}
+
+export interface Subcategory {
+  id: string
+  tenantId: string
+  name: string
+  categoryId: string
+  category?: Category
   createdAt: Date
   updatedAt: Date
 }

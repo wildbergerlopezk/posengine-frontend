@@ -51,7 +51,7 @@ const MOD_POS_VENTAS: NavModule = {
   label: "Ventas",
   icon: ShoppingCart,
   subItems: [
-    { href: "/dashboard/sales/pos", label: "Caja", icon: ShoppingCart },
+    { href: "/dashboard/sales", label: "Caja", icon: ShoppingCart },
     { href: "/dashboard/sales/history", label: "Historial de ventas", icon: History },
     { href: "/dashboard/sales/returns", label: "Devoluciones", icon: ArrowLeftRight },
   ]

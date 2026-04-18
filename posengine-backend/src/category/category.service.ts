@@ -55,7 +55,7 @@ export class CategoryService {
   async findOne(id: string, tenantId: string) {
     const category = await this.prisma.category.findFirst({
       where: { id, tenantId },
-      include: { subcategories: true },
+      include: { subcategories: true, products: true },
     });
 
     if (!category) {
@@ -97,6 +97,12 @@ export class CategoryService {
     if (category.subcategories.length > 0) {
       throw new ConflictException(
         'No se puede eliminar una categoría que tiene subcategorías asociadas',
+      );
+    }
+
+    if (category.products && category.products.length > 0) {
+      throw new ConflictException(
+        'No se puede eliminar una categoría que tiene productos asociados',
       );
     }
 
