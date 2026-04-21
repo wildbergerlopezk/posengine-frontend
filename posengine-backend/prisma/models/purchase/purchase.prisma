@@ -1,0 +1,42 @@
+model Purchase {
+  id       String @id @default(uuid())
+  tenantId String
+
+  supplierId    String
+  invoiceNumber String?
+  purchaseDate  DateTime
+
+  paymentType PurchasePaymentType
+
+  subtotal  Float
+  taxAmount Float  @default(0)
+  total     Float
+
+  status PurchaseStatus @default(PENDING)
+
+  notes String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant   Tenant   @relation(fields: [tenantId], references: [id])
+  supplier Supplier @relation(fields: [supplierId], references: [id])
+
+  items      PurchaseItem[]
+  creditPlan PurchaseCreditPlan?
+  returns    PurchaseReturn[]
+
+  @@unique([invoiceNumber, tenantId])
+  @@map("purchases")
+}
+
+enum PurchasePaymentType {
+  CASH
+  CREDIT
+}
+
+enum PurchaseStatus {
+  PENDING
+  RECEIVED
+  CANCELLED
+}

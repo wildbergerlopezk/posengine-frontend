@@ -75,6 +75,7 @@ const MOD_POS_COMPRAS: NavModule = {
   subItems: [
     { href: "/dashboard/purchases/new", label: "Registrar compra", icon: PlusCircle },
     { href: "/dashboard/purchases/history", label: "Historial de compras", icon: History },
+    { href: "/dashboard/suppliers", label: "Proveedores", icon: Truck },
   ]
 }
 

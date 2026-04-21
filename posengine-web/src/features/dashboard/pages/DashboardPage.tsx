@@ -29,7 +29,7 @@ const categoryData = [
 export function DashboardPage() {
   const { user } = useAuthStore()
   const stats = mockDashboardStats
-  const lowStockProducts = mockProducts.filter((p) => p.stock <= p.minStock)
+  const lowStockProducts = mockProducts.filter((p) => p.stock <= p.stockMinimum)
 
   return (
     <div className={styles.page}>
@@ -173,7 +173,7 @@ export function DashboardPage() {
                     <div key={product.id} className={styles.alertItem}>
                       <div className={styles.alertInfo}>
                         <span className={styles.alertTitle}>{product.name}</span>
-                        <span className={styles.alertSubtitle}>Stock mínimo: {product.minStock}</span>
+                        <span className={styles.alertSubtitle}>Stock mínimo: {product.stockMinimum}</span>
                       </div>
                       <div className={styles.alertValue}>
                         <span className={styles.alertNumber}>{product.stock}</span>

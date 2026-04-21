@@ -456,11 +456,11 @@ export function SalesPage() {
                       )}
                     </td>
                     <td className={styles.tableCell}>
-                      <span className={styles.priceText}>{formatCurrency(item.product.salePrice)}</span>
+                      <span className={styles.priceText}>{formatCurrency(item.product.price)}</span>
                     </td>
                     <td className={styles.tableCell}>
                       <strong className={styles.subtotalText}>
-                        {formatCurrency(item.product.salePrice * item.quantity)}
+                        {formatCurrency(item.product.price * item.quantity)}
                       </strong>
                     </td>
                   </tr>
@@ -509,7 +509,7 @@ export function SalesPage() {
                   <div className={styles.productRowCode}>{product.barcode || product.id}</div>
                   <div className={styles.productRowName}>{product.name}</div>
                   <div className={styles.productRowStock}>Stock: {product.stock}</div>
-                  <div className={styles.productRowPrice}>{formatCurrency(product.salePrice)}</div>
+                  <div className={styles.productRowPrice}>{formatCurrency(product.price)}</div>
                 </button>
               ))}
             </div>

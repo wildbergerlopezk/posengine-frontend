@@ -20,8 +20,8 @@ export function StockPage() {
       product.name.toLowerCase().includes(searchQuery.toLowerCase()) || product.barcode?.includes(searchQuery),
   )
 
-  const lowStockProducts = filteredProducts.filter((p) => p.stock <= p.minStock)
-  const normalStockProducts = filteredProducts.filter((p) => p.stock > p.minStock)
+  const lowStockProducts = filteredProducts.filter((p) => p.stock <= p.stockMinimum)
+  const normalStockProducts = filteredProducts.filter((p) => p.stock > p.stockMinimum)
 
   const displayProducts =
     activeTab === "low" ? lowStockProducts : activeTab === "normal" ? normalStockProducts : filteredProducts
@@ -132,7 +132,7 @@ export function StockPage() {
                 </tr>
               ) : (
                 displayProducts.map((product) => {
-                  const isLowStock = product.stock <= product.minStock
+                  const isLowStock = product.stock <= product.stockMinimum
                   return (
                     <tr key={product.id} className={styles.tableRow}>
                       <td className={styles.tableCell}>
@@ -149,7 +149,7 @@ export function StockPage() {
                           {product.stock}
                         </span>
                       </td>
-                      <td className={`${styles.tableCell} ${styles.tableCellCenter}`}>{product.minStock}</td>
+                      <td className={`${styles.tableCell} ${styles.tableCellCenter}`}>{product.stockMinimum}</td>
                       <td className={`${styles.tableCell} ${styles.tableCellCenter}`}>
                         {isLowStock ? (
                           <span className={`${styles.badge} ${styles.badgeWarning}`}>

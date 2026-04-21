@@ -5,8 +5,21 @@ model Product {
   categoryId    String
   subcategoryId String?
 
-  name  String
-  price Float
+  name        String
+  description String?
+  sku         String?
+  barcode     String?
+  imageUrl    String?
+
+  price   Float
+  cost    Float?
+  taxRate Float @default(0)
+
+  stock        Int         @default(0)
+  stockMinimum Int         @default(0)
+  unit         ProductUnit @default(UNIT)
+
+  isActive Boolean @default(true)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -15,6 +28,23 @@ model Product {
   category    Category     @relation(fields: [categoryId], references: [id])
   subcategory Subcategory? @relation(fields: [subcategoryId], references: [id])
 
+  // saleItems        SaleItem[]
+  purchaseItems       PurchaseItem[]
+  purchaseReturnItems PurchaseReturnItem[]
+
   @@unique([name, tenantId])
+  @@unique([sku, tenantId])
+  @@unique([barcode, tenantId])
   @@map("products")
+}
+
+enum ProductUnit {
+  UNIT
+  METER
+  LITER
+  KILOGRAM
+  GRAM
+  PIECE
+  BOX
+  PACK
 }

@@ -1,0 +1,14 @@
+model PurchaseCreditPlan {
+  id         String @id @default(uuid())
+  purchaseId String @unique
+
+  totalInstallments Int
+  installmentAmount Float
+  firstDueDate      DateTime
+  intervalDays      Int @default(30)
+
+  purchase     Purchase              @relation(fields: [purchaseId], references: [id])
+  installments PurchaseInstallment[]
+
+  @@map("purchase_credit_plans")
+}

@@ -1,0 +1,19 @@
+model PurchaseReturn {
+  id         String @id @default(uuid())
+  tenantId   String
+  purchaseId String
+
+  returnDate       DateTime
+  reason           String?
+  creditNoteNumber String?
+
+  total Float
+
+  items PurchaseReturnItem[]
+
+  purchase Purchase @relation(fields: [purchaseId], references: [id])
+  tenant   Tenant   @relation(fields: [tenantId], references: [id])
+
+  @@map("purchase_returns")
+}
+

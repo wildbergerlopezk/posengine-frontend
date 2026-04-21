@@ -1,0 +1,35 @@
+/* [project]/app/home.module.css [app-client] (css) */
+.home-module__txgM7a__container {
+  background-color: var(--color-background);
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
+  display: flex;
+}
+
+.home-module__txgM7a__loader {
+  align-items: center;
+  gap: .5rem;
+  display: flex;
+}
+
+.home-module__txgM7a__spinner {
+  border: 4px solid var(--color-primary);
+  border-top-color: #0000;
+  border-radius: 50%;
+  width: 2rem;
+  height: 2rem;
+  animation: 1s linear infinite home-module__txgM7a__spin;
+}
+
+@keyframes home-module__txgM7a__spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.home-module__txgM7a__text {
+  color: var(--color-muted-foreground);
+}
+
+/*# sourceMappingURL=app_home_module_54e62cad.css.map*/

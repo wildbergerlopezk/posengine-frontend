@@ -3,10 +3,75 @@
 import { useState } from "react"
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
-import { Settings, Building2, LogOut, Menu, ChevronDown, ChevronRight } from "lucide-react"
+import {
+  LayoutDashboard, ShoppingCart, Package, Users, Truck,
+  Wallet, BarChart2, Printer, Settings, ShoppingBag, History,
+  PlusCircle, List, Tags, Tag, Building2, LogOut, Menu,
+  ChevronDown, ChevronRight
+} from "lucide-react"
 import { useAuthStore } from "@/src/features/auth/store/auth.store"
-import { BUSINESS_TYPES, DEFAULT_BUSINESS_TYPE_MODULES, type BusinessType } from "../../../../config/Businesstypes.config"
 import styles from "./Sidebar.module.css"
+
+const navItems = [
+  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+
+  {
+    href: "/dashboard/sales",
+    label: "Ventas",
+    icon: ShoppingCart,
+    subItems: [
+      { href: "/dashboard/sales/pos", label: "Nueva venta", icon: PlusCircle },
+      { href: "/dashboard/sales/history", label: "Historial", icon: History },
+    ],
+  },
+
+  {
+    href: "/dashboard/products",
+    label: "Inventario",
+    icon: Package,
+    subItems: [
+      { href: "/dashboard/products", label: "Productos", icon: List },
+      { href: "/dashboard/categories", label: "Categorías", icon: Tags },
+      { href: "/dashboard/subcategories", label: "Subcategorías", icon: Tag },
+    ],
+  },
+
+  {
+    href: "/dashboard/purchases",
+    label: "Compras",
+    icon: ShoppingBag,
+    subItems: [
+      { href: "/dashboard/purchases/new", label: "Registrar compra", icon: PlusCircle },
+      { href: "/dashboard/purchases/history", label: "Historial de compras", icon: History },
+    ],
+  },
+
+  {
+    href: "/dashboard/clients",
+    label: "Clientes",
+    icon: Users,
+    subItems: [
+      { href: "/dashboard/clients", label: "Lista de clientes", icon: List },
+      { href: "/dashboard/clients/payments", label: "Pagos de deuda", icon: Wallet },
+    ],
+  },
+
+  { href: "/dashboard/suppliers", label: "Proveedores", icon: Truck },
+
+  { href: "/dashboard/cash", label: "Caja", icon: Wallet },
+
+  { href: "/dashboard/reports", label: "Reportes", icon: BarChart2 },
+
+  {
+    href: "/dashboard/printing",
+    label: "Impresión",
+    icon: Printer,
+    subItems: [
+      { href: "/dashboard/printing/invoices", label: "Facturas", icon: List },
+      { href: "/dashboard/printing/labels", label: "Etiquetas", icon: Tag },
+    ],
+  },
+]
 
 export function Sidebar() {
   const pathname = usePathname()
@@ -26,19 +91,16 @@ export function Sidebar() {
     router.push("/login")
   }
 
-  // derive business type from user if available, otherwise use default
-  // note: tenant type logic can be updated here if user object contains it
-  const tenantType = undefined as BusinessType | undefined
-  const navItems = tenantType && BUSINESS_TYPES[tenantType]
-    ? BUSINESS_TYPES[tenantType].modules
-    : DEFAULT_BUSINESS_TYPE_MODULES
-
-  const businessTypeLabel = tenantType && BUSINESS_TYPES[tenantType]
-    ? BUSINESS_TYPES[tenantType].label
-    : "Negocio"
-
   const closeSidebar = () => setIsOpen(false)
   const toggleSidebar = () => setIsOpen((prev) => !prev)
+
+  // --- FIX: Identificar rutas que ya están "cubiertas" por un subitem ---
+  // Esto evita que un item raíz se marque como activo si su href coincide con
+  // el href de un subitem que ya pertenece a un grupo padre expandible.
+  const subItemHrefs = new Set(
+    navItems.flatMap(item => item.subItems?.map(s => s.href) ?? [])
+  )
+  // ------------------------------------------------------------------------
 
   return (
     <>
@@ -114,7 +176,16 @@ export function Sidebar() {
                     key={item.href}
                     href={item.href}
                     onClick={closeSidebar}
-                    className={`${styles.navItem} ${pathname === item.href ? styles.active : ""}`}
+                    // --- FIX: Aplicar lógica de activación segura ---
+                    // El item raíz solo se marca activo si:
+                    // 1. La ruta coincide exactamente (pathname === item.href)
+                    // 2. Y esa ruta NO está registrada como subItem de otro grupo (!subItemHrefs.has(item.href))
+                    className={`${styles.navItem} ${
+                      pathname === item.href && !subItemHrefs.has(item.href) 
+                        ? styles.active 
+                        : ""
+                    }`}
+                    // -------------------------------------------------
                     title={!isOpen ? item.label : undefined}
                   >
                     <Icon size={20} />
@@ -135,7 +206,7 @@ export function Sidebar() {
                 </div>
                 <div className={styles.tenantDetails}>
                   <p className={styles.tenantName}>{user?.tenantName || "Mi Negocio"}</p>
-                  <p className={styles.tenantPlan}>{businessTypeLabel}</p>
+                  <p className={styles.tenantPlan}>Plan Estándar</p>
                 </div>
               </div>
               <button className={styles.logoutButton} onClick={handleLogout}>

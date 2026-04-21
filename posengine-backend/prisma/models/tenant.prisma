@@ -11,4 +11,7 @@ model Tenant {
     categories    Category[]
     subcategories Subcategory[]
     products      Product[]
+    suppliers     Supplier[]
+    purchases      Purchase[]
+    purchaseReturns PurchaseReturn[]
 }

@@ -18,20 +18,31 @@ export interface Subcategory {
   updatedAt: Date
 }
 
+export interface Supplier {
+  id: string
+  tenantId: string
+  name: string
+  address?: string | null
+  phone?: string | null
+  RUC?: string | null
+  createdAt: string
+  updatedAt: string
+}
+
 export interface Product {
   id: string
-  tenantId: number
+  tenantId: string
   name: string
   description?: string
   barcode?: string
   sku?: string
   categoryId?: string
   subcategoryId?: string
-  purchasePrice: number
-  salePrice: number
+  cost?: number
+  price: number
   stock: number
-  minStock: number
-  image?: string
+  stockMinimum: number
+  imageUrl?: string
   isActive: boolean
   createdAt: Date
   updatedAt: Date

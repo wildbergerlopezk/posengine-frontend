@@ -2,12 +2,16 @@ import { Module } from '@nestjs/common';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { PrismaModule } from './prisma/prisma.module';
-import { UserModule } from './user/user.module';
-import { AuthModule } from './auth/auth.module';
+import { UserModule } from './modules/user/user.module';
+import { AuthModule } from './modules/auth/auth.module';
 import { ConfigModule } from '@nestjs/config';
-import { CategoryModule } from './category/category.module';
-import { SubcategoryModule } from './subcategory/subcategory.module';
-import { ProductModule } from './product/product.module';
+import { CategoryModule } from './modules/category/category.module';
+import { SubcategoryModule } from './modules/subcategory/subcategory.module';
+import { ProductModule } from './modules/product/product.module';
+import { UploadModule } from './modules/upload/upload.module';
+import { ServeStaticModule } from '@nestjs/serve-static';
+import { join } from 'path';
+import { SupplierModule } from './modules/supplier/supplier.module';
 
 @Module({
   imports: [
@@ -18,8 +22,14 @@ import { ProductModule } from './product/product.module';
     CategoryModule,
     SubcategoryModule,
     ProductModule,
+    UploadModule,
+    ServeStaticModule.forRoot({
+      rootPath: join(process.cwd(), 'uploads'),
+      serveRoot: '/uploads',
+    }),
+    SupplierModule,
   ],
   controllers: [AppController],
   providers: [AppService],
 })
-export class AppModule { }
+export class AppModule {}

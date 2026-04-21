@@ -1,0 +1,18 @@
+model Supplier {
+  id       String @id @default(uuid())
+  tenantId String
+
+  name    String
+  address String?
+  phone   String?
+  RUC     String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant    Tenant     @relation(fields: [tenantId], references: [id])
+  purchases Purchase[]
+
+  @@unique([name, tenantId])
+  @@map("suppliers")
+}

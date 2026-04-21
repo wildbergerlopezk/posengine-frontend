@@ -51,7 +51,7 @@ export const useCartStore = create<CartState>((set, get) => ({
           : state.items.map((item) => (item.product.id === productId ? { ...item, quantity } : item)),
     })),
   clearCart: () => set({ items: [] }),
-  getTotal: () => get().items.reduce((sum, item) => sum + item.product.salePrice * item.quantity, 0),
+  getTotal: () => get().items.reduce((sum, item) => sum + item.product.price * item.quantity, 0),
   getItemCount: () => get().items.reduce((sum, item) => sum + item.quantity, 0),
   setCurrency: (currency) => set({ currency }),
   getTotalInCurrency: (currency) => {

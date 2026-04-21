@@ -16,12 +16,12 @@ const currencies = [
 ]
 
 export function BusinessPage() {
-  const { tenant, setTenant } = useAuthStore()
+  // const { tenant, setTenant } = useAuthStore() // Tenant is not in AuthState
   const [isLoading, setIsLoading] = useState(false)
   const [saved, setSaved] = useState(false)
 
   const [formData, setFormData] = useState({
-    name: tenant?.name || "",
+    name: "",
   })
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -30,12 +30,14 @@ export function BusinessPage() {
 
     await new Promise((resolve) => setTimeout(resolve, 1000))
 
+    /*
     if (tenant) {
       setTenant({
         ...tenant,
         name: formData.name,
       })
     }
+    */
 
     setIsLoading(false)
     setSaved(true)
