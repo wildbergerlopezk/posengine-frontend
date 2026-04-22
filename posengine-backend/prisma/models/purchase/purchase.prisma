@@ -3,7 +3,7 @@ model Purchase {
   tenantId String
 
   supplierId    String
-  invoiceNumber String?
+  invoiceNumber String
   purchaseDate  DateTime
 
   paymentType PurchasePaymentType
