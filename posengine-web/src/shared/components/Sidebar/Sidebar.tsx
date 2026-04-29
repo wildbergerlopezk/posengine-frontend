@@ -7,7 +7,7 @@ import {
   LayoutDashboard, ShoppingCart, Package, Users, Truck,
   Wallet, BarChart2, Printer, Settings, ShoppingBag, History,
   PlusCircle, List, Tags, Tag, Building2, LogOut, Menu,
-  ChevronDown, ChevronRight
+  ChevronDown, ChevronRight, RotateCcw
 } from "lucide-react"
 import { useAuthStore } from "@/src/features/auth/store/auth.store"
 import styles from "./Sidebar.module.css"
@@ -31,6 +31,7 @@ const navItems = [
     icon: Package,
     subItems: [
       { href: "/dashboard/products", label: "Productos", icon: List },
+      { href: "/dashboard/stock/history", label: "Historial de stock", icon: History },
       { href: "/dashboard/categories", label: "Categorías", icon: Tags },
       { href: "/dashboard/subcategories", label: "Subcategorías", icon: Tag },
     ],
@@ -43,6 +44,7 @@ const navItems = [
     subItems: [
       { href: "/dashboard/purchases/new", label: "Registrar compra", icon: PlusCircle },
       { href: "/dashboard/purchases/history", label: "Historial de compras", icon: History },
+      { href: "/dashboard/purchases/returns", label: "Devoluciones", icon: RotateCcw },
     ],
   },
 

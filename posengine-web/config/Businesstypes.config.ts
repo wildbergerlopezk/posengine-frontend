@@ -63,6 +63,7 @@ const MOD_POS_INVENTARIO: NavModule = {
   icon: Package,
   subItems: [
     { href: "/dashboard/products", label: "Productos", icon: Package },
+    { href: "/dashboard/stock/history", label: "Historial de stock", icon: History },
     { href: "/dashboard/categories", label: "Categorías", icon: FolderTree },
     { href: "/dashboard/inventory/subcategories", label: "Subcategorías", icon: Tags },
   ]

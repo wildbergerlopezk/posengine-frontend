@@ -3,6 +3,8 @@ model PurchaseReturn {
   tenantId   String
   purchaseId String
 
+  status PurchaseReturnStatus @default(PENDING)
+
   returnDate       DateTime
   reason           String?
   creditNoteNumber String?
@@ -14,6 +16,16 @@ model PurchaseReturn {
   purchase Purchase @relation(fields: [purchaseId], references: [id])
   tenant   Tenant   @relation(fields: [tenantId], references: [id])
 
+  createdAt DateTime @default(now())
+
+  @@index([tenantId])
+  @@index([purchaseId])
   @@map("purchase_returns")
+}
+
+enum PurchaseReturnStatus {
+  PENDING
+  CONFIRMED
+  CANCELLED
 }
 

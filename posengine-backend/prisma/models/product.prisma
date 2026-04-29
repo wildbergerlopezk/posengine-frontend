@@ -12,12 +12,11 @@ model Product {
   imageUrl    String?
 
   price   Float
-  cost    Float?
-  taxRate Float @default(0)
+  cost    Float
+  //taxRate Float @default(0)
 
   stock        Int         @default(0)
   stockMinimum Int         @default(0)
-  unit         ProductUnit @default(UNIT)
 
   isActive Boolean @default(true)
 
@@ -31,20 +30,9 @@ model Product {
   // saleItems        SaleItem[]
   purchaseItems       PurchaseItem[]
   purchaseReturnItems PurchaseReturnItem[]
-
+  stockMovements StockMovement[]
   @@unique([name, tenantId])
   @@unique([sku, tenantId])
   @@unique([barcode, tenantId])
   @@map("products")
-}
-
-enum ProductUnit {
-  UNIT
-  METER
-  LITER
-  KILOGRAM
-  GRAM
-  PIECE
-  BOX
-  PACK
 }

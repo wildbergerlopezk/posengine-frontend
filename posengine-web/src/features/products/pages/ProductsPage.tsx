@@ -58,6 +58,7 @@ export function ProductsPage() {
   const [formData, setFormData] = useState({
     name: "", barcode: "", categoryId: "", subcategoryId: "",
     price: "", cost: "", stock: "", stockMinimum: "", imageUrl: "",
+    stockNotes: "",
   })
 
   // ─── Keyboard navigation refs ─────────────────────────────────────────────
@@ -130,7 +131,7 @@ export function ProductsPage() {
   )
 
   const resetForm = () => {
-    setFormData({ name: "", barcode: "", categoryId: "", subcategoryId: "", price: "", cost: "", stock: "", stockMinimum: "", imageUrl: "" })
+    setFormData({ name: "", barcode: "", categoryId: "", subcategoryId: "", price: "", cost: "", stock: "", stockMinimum: "", imageUrl: "", stockNotes: "" })
     setEditingProduct(null)
     setSubmitError(null)
   }
@@ -147,6 +148,7 @@ export function ProductsPage() {
       stock: product.stock?.toString() || "0",
       stockMinimum: product.stockMinimum?.toString() || "0",
       imageUrl: product.imageUrl || "",
+      stockNotes: "",
     })
     setIsDialogOpen(true)
     setOpenDropdown(null)
@@ -216,6 +218,7 @@ export function ProductsPage() {
       stock: Number.parseInt(formData.stock || "0"),
       stockMinimum: Number.parseInt(formData.stockMinimum || "0"),
       imageUrl: formData.imageUrl || undefined,
+      stockNotes: formData.stockNotes || undefined,
     }
     try {
       if (editingProduct) {
@@ -539,6 +542,23 @@ export function ProductsPage() {
                     <span className={styles.fieldHint}>Alerta de reposición</span>
                   </div>
                 </div>
+
+                {/* ── Nota de ajuste — solo visible al editar si el stock cambió ── */}
+                {editingProduct && Number.parseInt(formData.stock || "0") !== editingProduct.stock && (
+                  <div className={styles.formGroup}>
+                    <label className={styles.label}>Motivo del ajuste de stock</label>
+                    <input
+                      className={styles.input}
+                      value={formData.stockNotes}
+                      onChange={(e) => setFormData({ ...formData, stockNotes: e.target.value })}
+                      placeholder="Ej: Conteo físico, merma, corrección de error…"
+                      maxLength={300}
+                    />
+                    <span className={styles.fieldHint}>
+                      Stock actual: {editingProduct.stock} → nuevo: {formData.stock || "0"}
+                    </span>
+                  </div>
+                )}
               </div>
               <div className={styles.modalFooter}>
                 <button type="button" className={styles.cancelButton} onClick={() => { setIsDialogOpen(false); resetForm() }} disabled={submitting}>

@@ -1,0 +1,37 @@
+model StockMovement {
+    id       String @id @default(uuid())
+    tenantId String
+
+    productId String
+    type      StockMovementType
+
+    quantity    Float
+    before      Float
+    after       Float
+    notes       String?
+    sourceType  StockMovementSourceType
+    referenceId String?
+
+    createdAt DateTime @default(now())
+
+    product Product @relation(fields: [productId], references: [id])
+    tenant  Tenant  @relation(fields: [tenantId], references: [id])
+
+    @@index([productId, createdAt])
+    @@index([tenantId])
+    @@map("stock_movements")
+}
+
+enum StockMovementType {
+    INITIAL
+    PURCHASE
+    SALE
+    MANUAL
+}
+
+enum StockMovementSourceType {
+    PURCHASE
+    SALE
+    MANUAL
+    RETURN
+}

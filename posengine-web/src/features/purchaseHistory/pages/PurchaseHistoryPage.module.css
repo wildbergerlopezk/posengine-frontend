@@ -1,0 +1,705 @@
+/* ── Page layout ─────────────────────────────────────────────────────────── */
+.page { min-height: 100vh; }
+
+.container {
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+/* ── Error banner close btn ──────────────────────────────────────────────── */
+.bannerClose {
+  margin-left: auto;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: inherit;
+  display: flex;
+  align-items: center;
+  opacity: 0.7;
+  padding: 0;
+}
+.bannerClose:hover { opacity: 1; }
+
+/* ══════════════════════════════════════════════════
+   FILTERS BAR
+══════════════════════════════════════════════════ */
+.filtersBar {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.filtersRow {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  width: 100%;
+}
+
+.clearFiltersBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.35rem 0.75rem;
+  border: 1px solid var(--color-border);
+  border-radius: 0.375rem;
+  background: transparent;
+  font-size: 0.78rem;
+  font-weight: 500;
+  color: var(--color-muted-foreground);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background-color 0.15s, color 0.15s;
+}
+.clearFiltersBtn:hover {
+  background-color: var(--color-accent);
+  color: var(--color-foreground);
+}
+
+.dateRange {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.dateInput {
+  height: 2.1rem;
+  padding: 0 0.6rem;
+  border: 1.5px solid var(--color-border);
+  border-radius: 0.375rem;
+  background-color: var(--color-background);
+  font-size: 0.8rem;
+  color: var(--color-foreground);
+  cursor: pointer;
+  transition: border-color 0.15s;
+}
+.dateInput:focus {
+  outline: none;
+  border-color: var(--color-primary);
+}
+
+.dateSeparator {
+  font-size: 0.8rem;
+  color: var(--color-muted-foreground);
+}
+
+/* ── Search ──────────────────────────────────────────────────────────────── */
+.searchWrapper {
+  position: relative;
+  flex: 1;
+  min-width: 260px;
+  max-width: 400px;
+}
+
+.searchIcon {
+  position: absolute;
+  left: 0.75rem;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--color-muted-foreground);
+  pointer-events: none;
+}
+
+.searchInput {
+  width: 100%;
+  height: 2.5rem;
+  padding: 0 2.25rem 0 2.25rem;
+  border: 1.5px solid var(--color-border);
+  border-radius: 0.5rem;
+  background-color: var(--color-background);
+  font-size: 0.875rem;
+  color: var(--color-foreground);
+  box-sizing: border-box;
+  transition: border-color 0.15s;
+}
+
+.searchInput:focus {
+  outline: none;
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-primary) 15%, transparent);
+}
+
+.searchClear {
+  position: absolute;
+  right: 0.6rem;
+  top: 50%;
+  transform: translateY(-50%);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: var(--color-muted-foreground);
+  display: flex;
+  align-items: center;
+  padding: 0.2rem;
+  border-radius: 0.25rem;
+}
+.searchClear:hover { color: var(--color-foreground); }
+
+/* ── Status tabs ─────────────────────────────────────────────────────────── */
+.statusTabs {
+  display: flex;
+  gap: 0.35rem;
+  background-color: var(--color-muted);
+  border: 1px solid var(--color-border);
+  border-radius: 0.5rem;
+  padding: 0.25rem;
+}
+
+.statusTab {
+  border: none;
+  background: transparent;
+  padding: 0.35rem 0.85rem;
+  font-size: 0.8rem;
+  font-weight: 500;
+  border-radius: 0.35rem;
+  cursor: pointer;
+  color: var(--color-muted-foreground);
+  transition: background-color 0.15s, color 0.15s;
+  white-space: nowrap;
+}
+
+.statusTab:hover:not(.statusTabActive) {
+  background-color: var(--color-background);
+  color: var(--color-foreground);
+}
+
+.statusTabActive {
+  background-color: var(--color-background);
+  color: var(--color-foreground);
+  font-weight: 600;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+/* ══════════════════════════════════════════════════
+   TABLE TOOLBAR
+══════════════════════════════════════════════════ */
+.tableToolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.875rem 1rem;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.tableTitle {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--color-foreground);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.tableCount {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.4rem;
+  height: 1.4rem;
+  padding: 0 0.35rem;
+  border-radius: 9999px;
+  background-color: var(--color-primary);
+  color: white;
+  font-size: 0.7rem;
+  font-weight: 700;
+}
+
+/* ── Invoice chip ────────────────────────────────────────────────────────── */
+.invoiceChip {
+  font-family: ui-monospace, monospace;
+  font-size: 0.8rem;
+  font-weight: 600;
+  background-color: var(--color-muted);
+  padding: 0.25rem 0.6rem;
+  border-radius: 0.35rem;
+  color: var(--color-foreground);
+  white-space: nowrap;
+}
+
+/* ── Supplier cell ───────────────────────────────────────────────────────── */
+.supplierCell {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+}
+
+.supplierName {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--color-foreground);
+}
+
+.supplierRuc {
+  font-size: 0.75rem;
+  color: var(--color-muted-foreground);
+}
+
+/* ── Date ────────────────────────────────────────────────────────────────── */
+.dateText {
+  font-size: 0.875rem;
+  color: var(--color-muted-foreground);
+}
+
+/* ── Payment badge ───────────────────────────────────────────────────────── */
+.paymentBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.78rem;
+  font-weight: 500;
+  padding: 0.25rem 0.65rem;
+  border-radius: 9999px;
+}
+
+.paymentCash {
+  background-color: color-mix(in srgb, #22c55e 12%, transparent);
+  color: #16a34a;
+}
+
+.paymentCredit {
+  background-color: color-mix(in srgb, #38bdf8 12%, transparent);
+  color: #0ea5e9;
+}
+
+/* ── Status badge ────────────────────────────────────────────────────────── */
+.statusBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  padding: 0.25rem 0.65rem;
+  border-radius: 9999px;
+}
+
+.statusPending {
+  background-color: color-mix(in srgb, #f59e0b 15%, transparent);
+  color: #d97706;
+}
+
+.statusReceived {
+  background-color: color-mix(in srgb, #22c55e 15%, transparent);
+  color: #16a34a;
+}
+
+.statusCancelled {
+  background-color: color-mix(in srgb, #ef4444 12%, transparent);
+  color: #dc2626;
+}
+
+.statusWarning {
+  background-color: rgba(245, 158, 11, 0.1);
+  color: #f59e0b;
+}
+
+/* ── Total amount ────────────────────────────────────────────────────────── */
+.totalAmount {
+  font-size: 0.925rem;
+  font-weight: 700;
+  color: var(--color-foreground);
+}
+
+/* ── View button ─────────────────────────────────────────────────────────── */
+.viewBtn {
+  width: 2rem;
+  height: 2rem;
+  border: none;
+  background: transparent;
+  border-radius: 0.375rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-muted-foreground);
+  transition: background-color 0.15s, color 0.15s;
+}
+
+.viewBtn:hover {
+  background-color: color-mix(in srgb, var(--color-primary) 10%, transparent);
+  color: var(--color-primary);
+}
+
+/* ══════════════════════════════════════════════════
+   PAGINATION
+══════════════════════════════════════════════════ */
+.pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.875rem 1.25rem;
+  border-top: 1px solid var(--color-border);
+  background-color: var(--color-muted);
+  border-radius: 0 0 0.75rem 0.75rem;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.paginationInfo {
+  font-size: 0.8rem;
+  color: var(--color-muted-foreground);
+}
+
+.paginationControls {
+  display: flex;
+  gap: 0.25rem;
+  align-items: center;
+}
+
+.pageBtn {
+  min-width: 2rem;
+  height: 2rem;
+  padding: 0 0.5rem;
+  border: 1px solid var(--color-border);
+  border-radius: 0.375rem;
+  background-color: var(--color-background);
+  font-size: 0.8rem;
+  font-weight: 500;
+  cursor: pointer;
+  color: var(--color-foreground);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background-color 0.15s, color 0.15s, border-color 0.15s;
+}
+
+.pageBtn:hover:not(:disabled):not(.pageBtnActive) {
+  background-color: var(--color-accent);
+}
+
+.pageBtn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.pageBtnActive {
+  background-color: var(--color-primary);
+  color: white;
+  border-color: var(--color-primary);
+}
+
+.pageDots {
+  padding: 0 0.25rem;
+  font-size: 0.8rem;
+  color: var(--color-muted-foreground);
+}
+
+/* ══════════════════════════════════════════════════
+   DETAIL MODAL — estilo factura
+══════════════════════════════════════════════════ */
+.detailModal {
+  background-color: var(--color-card);
+  border-radius: 0.875rem;
+  width: 100%;
+  max-width: 820px;
+  max-height: 88vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.28);
+  overflow: hidden;
+}
+
+/* ── Modal header ────────────────────────────────────────────────────────── */
+.detailModalHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1.125rem 1.5rem;
+  border-bottom: 1px solid var(--color-border);
+  background-color: var(--color-muted);
+  flex-shrink: 0;
+}
+
+.detailModalHeaderLeft {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.detailModalIcon {
+  color: var(--color-primary);
+}
+
+.detailModalTitle {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--color-foreground);
+  margin: 0;
+}
+
+.detailModalSubtitle {
+  font-size: 0.8rem;
+  font-family: ui-monospace, monospace;
+  color: var(--color-muted-foreground);
+  margin: 0.1rem 0 0;
+}
+
+.modalCloseBtn {
+  width: 2rem;
+  height: 2rem;
+  border: none;
+  border-radius: 0.375rem;
+  background: transparent;
+  color: var(--color-muted-foreground);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background-color 0.15s, color 0.15s;
+}
+
+.modalCloseBtn:hover {
+  background-color: var(--color-accent);
+  color: var(--color-foreground);
+}
+
+/* ── Modal body (scrollable) ─────────────────────────────────────────────── */
+.detailModalBody {
+  overflow-y: auto;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ── Receipt header grid ─────────────────────────────────────────────────── */
+.receiptHeader {
+  padding: 1.25rem 1.5rem;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.receiptHeaderGrid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 1rem 2rem;
+}
+
+@media (min-width: 600px) {
+  .receiptHeaderGrid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+.receiptInfoBlock {
+  display: flex;
+  flex-direction: column;
+}
+
+.receiptInfoBlockFull {
+  grid-column: 1 / -1;
+}
+
+.receiptInfoRow {
+  display: flex;
+  gap: 0.6rem;
+  align-items: flex-start;
+}
+
+.receiptInfoIcon {
+  color: var(--color-primary);
+  margin-top: 0.15rem;
+  flex-shrink: 0;
+}
+
+.receiptInfoLabel {
+  display: block;
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--color-muted-foreground);
+  margin-bottom: 0.2rem;
+}
+
+.receiptInfoValue {
+  display: block;
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: var(--color-foreground);
+}
+
+.receiptInfoSub {
+  display: block;
+  font-size: 0.78rem;
+  color: var(--color-muted-foreground);
+  margin-top: 0.1rem;
+}
+
+.receiptInvoiceNumber {
+  font-family: ui-monospace, monospace;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--color-primary);
+}
+
+/* ── Items section ───────────────────────────────────────────────────────── */
+.receiptItemsSection {
+  flex: 1;
+  padding: 1.25rem 1.5rem 0;
+}
+
+.receiptItemsTitle {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--color-muted-foreground);
+  margin-bottom: 0.875rem;
+}
+
+.receiptItemsCount {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.3rem;
+  height: 1.3rem;
+  padding: 0 0.3rem;
+  border-radius: 9999px;
+  background-color: var(--color-primary);
+  color: white;
+  font-size: 0.68rem;
+  font-weight: 700;
+}
+
+/* ── Receipt table ───────────────────────────────────────────────────────── */
+.receiptTable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+}
+
+.receiptTable thead tr {
+  border-bottom: 2px solid var(--color-border);
+}
+
+.receiptTable thead th {
+  padding: 0.5rem 0.75rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-muted-foreground);
+  text-align: left;
+  white-space: nowrap;
+}
+
+.receiptTable tbody tr {
+  border-bottom: 1px solid var(--color-border);
+  transition: background-color 0.1s;
+}
+
+.receiptTable tbody tr:hover {
+  background-color: var(--color-accent);
+}
+
+.receiptTable tbody tr:last-child {
+  border-bottom: none;
+}
+
+.receiptTable tbody td {
+  padding: 0.65rem 0.75rem;
+  vertical-align: middle;
+}
+
+.receiptTableNum {
+  font-size: 0.75rem;
+  color: var(--color-muted-foreground);
+  font-weight: 600;
+  text-align: center;
+}
+
+.receiptTableName {
+  font-weight: 500;
+  color: var(--color-foreground);
+  line-height: 1.35;
+}
+
+.receiptTableRight {
+  text-align: right !important;
+  color: var(--color-muted-foreground);
+  font-size: 0.875rem;
+}
+
+.receiptTableSubtotal {
+  font-weight: 700;
+  color: var(--color-foreground) !important;
+}
+
+/* ── Code chip (reutilizado desde PurchasePage) ──────────────────────────── */
+.codeChip {
+  display: inline-block;
+  font-family: ui-monospace, monospace;
+  font-size: 0.75rem;
+  background-color: var(--color-muted);
+  padding: 0.18rem 0.45rem;
+  border-radius: 0.3rem;
+  color: var(--color-muted-foreground);
+  max-width: 110px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ── Total footer ────────────────────────────────────────────────────────── */
+.receiptTotalFooter {
+  padding: 1rem 1.5rem 1.5rem;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.5rem;
+  flex-shrink: 0;
+}
+
+.receiptTotalDivider {
+  width: 100%;
+  height: 2px;
+  background: repeating-linear-gradient(
+    90deg,
+    var(--color-border) 0,
+    var(--color-border) 6px,
+    transparent 6px,
+    transparent 10px
+  );
+  margin-bottom: 0.5rem;
+}
+
+.receiptTotalRow {
+  display: flex;
+  align-items: baseline;
+  gap: 2rem;
+}
+
+.receiptTotalLabel {
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--color-muted-foreground);
+}
+
+.receiptTotalValue {
+  font-size: 1.75rem;
+  font-weight: 800;
+  color: var(--color-primary);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Loading / error inside modal ───────────────────────────────────────── */
+.detailLoading,
+.detailError {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  padding: 2.5rem 1rem;
+  font-size: 0.875rem;
+  color: var(--color-muted-foreground);
+}
+
+.detailError {
+  color: var(--color-destructive);
+}

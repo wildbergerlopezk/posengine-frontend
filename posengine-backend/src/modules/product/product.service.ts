@@ -8,10 +8,15 @@ import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
 import { ProductFilterDto } from './dto/product-filter.dto';
 import { Prisma } from '../../generated/prisma/client';
+import { StockMovementService } from '../../stock-movement/stock-movement.service';
+import { StockMovementType } from '../../generated/prisma/enums';
 
 @Injectable()
 export class ProductService {
-  constructor(private readonly prisma: PrismaService) { }
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly stockMovementService: StockMovementService,
+  ) { }
   
   private async generateSku(tenantId: string, categoryId: string): Promise<string> {
     const category = await this.prisma.category.findUnique({
@@ -33,55 +38,59 @@ export class ProductService {
   }
 
   async create(tenantId: string, dto: CreateProductDto) {
-    // Verificar que la categoría pertenezca al tenant
+    // ── Validate category ──────────────────────────────────────────────────
     const category = await this.prisma.category.findFirst({
       where: { id: dto.categoryId, tenantId },
     });
+
     if (!category) {
       throw new NotFoundException(`Categoría con id "${dto.categoryId}" no encontrada`);
     }
 
-    // Verificar subcategoría si se provee
+    // ── Validate subcategory ───────────────────────────────────────────────
     if (dto.subcategoryId) {
       const subcategory = await this.prisma.subcategory.findFirst({
         where: { id: dto.subcategoryId, categoryId: dto.categoryId },
       });
+
       if (!subcategory) {
         throw new NotFoundException(`Subcategoría con id "${dto.subcategoryId}" no encontrada`);
       }
     }
 
-    // Verificar unicidad de nombre
+    // ── Unique checks ──────────────────────────────────────────────────────
     const nameConflict = await this.prisma.product.findFirst({
       where: { name: dto.name, tenantId },
     });
+
     if (nameConflict) {
       throw new ConflictException(`Ya existe un producto con el nombre "${dto.name}"`);
     }
 
-    // Verificar unicidad de barcode si se provee
     if (dto.barcode) {
       const barcodeConflict = await this.prisma.product.findFirst({
         where: { barcode: dto.barcode, tenantId },
       });
+
       if (barcodeConflict) {
         throw new ConflictException(`Ya existe un producto con el código de barras "${dto.barcode}"`);
       }
     }
 
-    // Generar o validar SKU
     const sku = dto.sku ?? (await this.generateSku(tenantId, dto.categoryId));
 
     if (dto.sku) {
       const skuConflict = await this.prisma.product.findFirst({
         where: { sku, tenantId },
       });
+
       if (skuConflict) {
         throw new ConflictException(`Ya existe un producto con el SKU "${sku}"`);
       }
     }
 
-    return this.prisma.product.create({
+    // ── Create product + initial stock movement ────────────────────────────
+    const product = await this.prisma.product.create({
       data: {
         tenantId,
         categoryId: dto.categoryId,
@@ -92,13 +101,19 @@ export class ProductService {
         barcode: dto.barcode,
         imageUrl: dto.imageUrl,
         price: dto.price,
-        cost: dto.cost,
-        taxRate: dto.taxRate ?? 0,
+        cost: dto.cost ?? 0,
         stock: dto.stock ?? 0,
         stockMinimum: dto.stockMinimum ?? 0,
-        unit: dto.unit,
         isActive: dto.isActive ?? true,
       },
+    });
+
+    // Register INITIAL stock movement if stock > 0
+    // Uses StockMovementSourceType.MANUAL — PRODUCT is not a valid sourceType
+    await this.stockMovementService.registerInitial(tenantId, product.id, dto.stock ?? 0);
+
+    return this.prisma.product.findUnique({
+      where: { id: product.id },
       include: {
         category: { select: { id: true, name: true } },
         subcategory: { select: { id: true, name: true } },
@@ -107,14 +122,13 @@ export class ProductService {
   }
 
   async findAll(tenantId: string, query: ProductFilterDto) {
-    const { search, categoryId, subcategoryId, isActive, lowStock, unit, limit, skip, page } = query;
+    const { search, categoryId, subcategoryId, isActive, lowStock, limit, skip, page } = query;
 
     const where: Prisma.ProductWhereInput = {
       tenantId,
       ...(isActive !== undefined && { isActive }),
       ...(categoryId && { categoryId }),
       ...(subcategoryId && { subcategoryId }),
-      ...(unit && { unit }),
       ...(search && {
         OR: [
           { name: { contains: search, mode: Prisma.QueryMode.insensitive } },
@@ -183,53 +197,100 @@ export class ProductService {
     return product;
   }
 
-  async update(id: string, tenantId: string, dto: UpdateProductDto) {
-    await this.findOne(id, tenantId);
+  async getPriceHistory(productId: string, tenantId: string) {
+    await this.findOne(productId, tenantId); // valida existencia
 
-    if (dto.name) {
-      const conflict = await this.prisma.product.findFirst({
-        where: { name: dto.name, tenantId, NOT: { id } },
-      });
-      if (conflict) {
-        throw new ConflictException(`Ya existe otro producto con el nombre "${dto.name}"`);
-      }
+    const items = await this.prisma.purchaseItem.findMany({
+      where: {
+        productId,
+        purchase: {
+          tenantId,
+          status: 'RECEIVED', // solo compras confirmadas
+        },
+      },
+      include: {
+        purchase: {
+          select: {
+            invoiceNumber: true,
+            purchaseDate: true,
+            supplier: { select: { id: true, name: true } },
+          },
+        },
+      },
+      orderBy: {
+        purchase: { purchaseDate: 'desc' },
+      },
+    });
+
+    return items.map((item) => ({
+      date: item.purchase.purchaseDate,
+      invoiceNumber: item.purchase.invoiceNumber,
+      supplier: item.purchase.supplier,
+      quantity: item.quantity,
+      unitCost: item.unitCost,
+    }));
+  }
+
+  async update(id: string, tenantId: string, dto: UpdateProductDto, stockNotes?: string) {
+  const current = await this.findOne(id, tenantId);
+
+  if (dto.name) {
+    const conflict = await this.prisma.product.findFirst({
+      where: { name: dto.name, tenantId, NOT: { id } },
+    });
+    if (conflict) {
+      throw new ConflictException(`Ya existe otro producto con el nombre "${dto.name}"`);
     }
+  }
 
-    if (dto.barcode) {
-      const conflict = await this.prisma.product.findFirst({
-        where: { barcode: dto.barcode, tenantId, NOT: { id } },
-      });
-      if (conflict) {
-        throw new ConflictException(`Ya existe otro producto con el código de barras "${dto.barcode}"`);
-      }
+  if (dto.barcode) {
+    const conflict = await this.prisma.product.findFirst({
+      where: { barcode: dto.barcode, tenantId, NOT: { id } },
+    });
+    if (conflict) {
+      throw new ConflictException(`Ya existe otro producto con el código de barras "${dto.barcode}"`);
     }
+  }
 
-    if (dto.sku) {
-      const conflict = await this.prisma.product.findFirst({
-        where: { sku: dto.sku, tenantId, NOT: { id } },
-      });
+  if (dto.sku) {
+    const conflict = await this.prisma.product.findFirst({
+      where: { sku: dto.sku, tenantId, NOT: { id } },
+    });
       if (conflict) {
         throw new ConflictException(`Ya existe otro producto con el SKU "${dto.sku}"`);
       }
-    }
+  }
+
+  // ── Si cambió el stock, registrar movimiento MANUAL ──────────────────────
+  if (dto.stock !== undefined && dto.stock !== current.stock) {
+    const delta = dto.stock - current.stock;
+
+    await this.stockMovementService.registerManual(tenantId, {
+      productId: id,
+      type: StockMovementType.MANUAL,
+      quantity: delta,
+      notes: stockNotes?.trim() || 'Ajuste manual desde edición de producto',
+    });
+
+    // registerManual ya actualizó el stock en la BD,
+    // así que lo sacamos del update para no pisarlo
+    const { stock: _stock, ...restDto } = dto;
 
     return this.prisma.product.update({
       where: { id },
       data: {
-        ...(dto.categoryId && { categoryId: dto.categoryId }),
-        ...(dto.subcategoryId !== undefined && { subcategoryId: dto.subcategoryId }),
-        ...(dto.name && { name: dto.name }),
-        ...(dto.description !== undefined && { description: dto.description }),
-        ...(dto.sku && { sku: dto.sku }),
-        ...(dto.barcode !== undefined && { barcode: dto.barcode }),
-        ...(dto.imageUrl !== undefined && { imageUrl: dto.imageUrl }),
-        ...(dto.price !== undefined && { price: dto.price }),
-        ...(dto.cost !== undefined && { cost: dto.cost }),
-        ...(dto.taxRate !== undefined && { taxRate: dto.taxRate }),
-        ...(dto.stock !== undefined && { stock: dto.stock }),
-        ...(dto.stockMinimum !== undefined && { stockMinimum: dto.stockMinimum }),
-        ...(dto.unit && { unit: dto.unit }),
-        ...(dto.isActive !== undefined && { isActive: dto.isActive }),
+        ...(restDto.categoryId && { categoryId: restDto.categoryId }),
+        ...(restDto.subcategoryId !== undefined && { subcategoryId: restDto.subcategoryId }),
+        ...(restDto.name && { name: restDto.name }),
+        ...(restDto.description !== undefined && { description: restDto.description }),
+        ...(restDto.sku && { sku: restDto.sku }),
+        ...(restDto.barcode !== undefined && { barcode: restDto.barcode }),
+        ...(restDto.imageUrl !== undefined && { imageUrl: restDto.imageUrl }),
+        ...(restDto.price !== undefined && { price: restDto.price }),
+        ...(restDto.cost !== undefined && { cost: restDto.cost }),
+        ...(restDto.taxRate !== undefined && { taxRate: restDto.taxRate }),
+        ...(restDto.stockMinimum !== undefined && { stockMinimum: restDto.stockMinimum }),
+        ...(restDto.isActive !== undefined && { isActive: restDto.isActive }),
       },
       include: {
         category: { select: { id: true, name: true } },
@@ -237,6 +298,31 @@ export class ProductService {
       },
     });
   }
+
+  // ── Sin cambio de stock — update normal ───────────────────────────────────
+  return this.prisma.product.update({
+    where: { id },
+    data: {
+      ...(dto.categoryId && { categoryId: dto.categoryId }),
+      ...(dto.subcategoryId !== undefined && { subcategoryId: dto.subcategoryId }),
+      ...(dto.name && { name: dto.name }),
+      ...(dto.description !== undefined && { description: dto.description }),
+      ...(dto.sku && { sku: dto.sku }),
+      ...(dto.barcode !== undefined && { barcode: dto.barcode }),
+      ...(dto.imageUrl !== undefined && { imageUrl: dto.imageUrl }),
+      ...(dto.price !== undefined && { price: dto.price }),
+      ...(dto.cost !== undefined && { cost: dto.cost }),
+      ...(dto.taxRate !== undefined && { taxRate: dto.taxRate }),
+      ...(dto.stock !== undefined && { stock: dto.stock }),
+      ...(dto.stockMinimum !== undefined && { stockMinimum: dto.stockMinimum }),
+      ...(dto.isActive !== undefined && { isActive: dto.isActive }),
+    },
+    include: {
+      category: { select: { id: true, name: true } },
+      subcategory: { select: { id: true, name: true } },
+    },
+  });
+}
 
   async deactivate(id: string, tenantId: string) {
     await this.findOne(id, tenantId);

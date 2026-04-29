@@ -12,6 +12,8 @@ import { UploadModule } from './modules/upload/upload.module';
 import { ServeStaticModule } from '@nestjs/serve-static';
 import { join } from 'path';
 import { SupplierModule } from './modules/supplier/supplier.module';
+import { PurchaseModule } from './modules/purchase/purchase.module';
+import { StockMovementModule } from './stock-movement/stock-movement.module';
 
 @Module({
   imports: [
@@ -23,11 +25,13 @@ import { SupplierModule } from './modules/supplier/supplier.module';
     SubcategoryModule,
     ProductModule,
     UploadModule,
+    PurchaseModule,
     ServeStaticModule.forRoot({
       rootPath: join(process.cwd(), 'uploads'),
       serveRoot: '/uploads',
     }),
     SupplierModule,
+    StockMovementModule,
   ],
   controllers: [AppController],
   providers: [AppService],

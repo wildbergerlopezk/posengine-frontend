@@ -1,0 +1,327 @@
+/* ── Page layout ─────────────────────────────────────────────────────────── */
+.page { min-height: 100vh; }
+
+.container {
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+/* ── Error banner close btn ──────────────────────────────────────────────── */
+.bannerClose {
+  margin-left: auto;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: inherit;
+  display: flex;
+  align-items: center;
+  opacity: 0.7;
+  padding: 0;
+}
+.bannerClose:hover { opacity: 1; }
+
+/* ══════════════════════════════════════════════════
+   FILTERS BAR
+══════════════════════════════════════════════════ */
+.filtersBar {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.filtersRow {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  width: 100%;
+}
+
+.clearFiltersBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.35rem 0.75rem;
+  border: 1px solid var(--color-border);
+  border-radius: 0.375rem;
+  background: transparent;
+  font-size: 0.78rem;
+  font-weight: 500;
+  color: var(--color-muted-foreground);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background-color 0.15s, color 0.15s;
+}
+.clearFiltersBtn:hover {
+  background-color: var(--color-accent);
+  color: var(--color-foreground);
+}
+
+.dateRange {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.dateInput {
+  height: 2.1rem;
+  padding: 0 0.6rem;
+  border: 1.5px solid var(--color-border);
+  border-radius: 0.375rem;
+  background-color: var(--color-background);
+  font-size: 0.8rem;
+  color: var(--color-foreground);
+  cursor: pointer;
+  transition: border-color 0.15s;
+}
+.dateInput:focus {
+  outline: none;
+  border-color: var(--color-primary);
+}
+
+.dateSeparator {
+  font-size: 0.8rem;
+  color: var(--color-muted-foreground);
+}
+
+/* ── Search ──────────────────────────────────────────────────────────────── */
+.searchWrapper {
+  position: relative;
+  flex: 1;
+  min-width: 260px;
+  max-width: 400px;
+}
+
+.searchIcon {
+  position: absolute;
+  left: 0.75rem;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--color-muted-foreground);
+  pointer-events: none;
+}
+
+.searchInput {
+  width: 100%;
+  height: 2.5rem;
+  padding: 0 2.25rem 0 2.25rem;
+  border: 1.5px solid var(--color-border);
+  border-radius: 0.5rem;
+  background-color: var(--color-background);
+  font-size: 0.875rem;
+  color: var(--color-foreground);
+  box-sizing: border-box;
+  transition: border-color 0.15s;
+}
+
+.searchInput:focus {
+  outline: none;
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-primary) 15%, transparent);
+}
+
+.searchClear {
+  position: absolute;
+  right: 0.6rem;
+  top: 50%;
+  transform: translateY(-50%);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: var(--color-muted-foreground);
+  display: flex;
+  align-items: center;
+  padding: 0.2rem;
+  border-radius: 0.25rem;
+}
+.searchClear:hover { color: var(--color-foreground); }
+
+/* ── Status tabs ─────────────────────────────────────────────────────────── */
+.statusTabs {
+  display: flex;
+  gap: 0.35rem;
+  background-color: var(--color-muted);
+  border: 1px solid var(--color-border);
+  border-radius: 0.5rem;
+  padding: 0.25rem;
+}
+
+.statusTab {
+  border: none;
+  background: transparent;
+  padding: 0.35rem 0.85rem;
+  font-size: 0.8rem;
+  font-weight: 500;
+  border-radius: 0.35rem;
+  cursor: pointer;
+  color: var(--color-muted-foreground);
+  transition: background-color 0.15s, color 0.15s;
+  white-space: nowrap;
+}
+
+.statusTab:hover:not(.statusTabActive) {
+  background-color: var(--color-background);
+  color: var(--color-foreground);
+}
+
+.statusTabActive {
+  background-color: var(--color-background);
+  color: var(--color-foreground);
+  font-weight: 600;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+/* ══════════════════════════════════════════════════
+   TABLE TOOLBAR
+══════════════════════════════════════════════════ */
+.tableToolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.875rem 1rem;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.tableTitle {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--color-foreground);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.tableCount {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.4rem;
+  height: 1.4rem;
+  padding: 0 0.35rem;
+  border-radius: 9999px;
+  background-color: var(--color-primary);
+  color: white;
+  font-size: 0.7rem;
+  font-weight: 700;
+}
+
+/* ── Date ────────────────────────────────────────────────────────────────── */
+.dateText {
+  font-size: 0.875rem;
+  color: var(--color-muted-foreground);
+}
+
+/* ── Product cell ────────────────────────────────────────────────────────── */
+.productCell {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+}
+
+.productName {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--color-foreground);
+}
+
+.productSku {
+  font-size: 0.75rem;
+  color: var(--color-muted-foreground);
+}
+
+/* ── Type badge ──────────────────────────────────────────────────────────── */
+.typeBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  padding: 0.25rem 0.65rem;
+  border-radius: 9999px;
+  background-color: color-mix(in srgb, var(--color-primary) 12%, transparent);
+  color: var(--color-primary);
+}
+
+/* ── Quantity ─────────────────────────────────────────────────────────────── */
+.qty {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.875rem;
+  font-weight: 700;
+}
+
+.qtyIn  { color: #16a34a; }
+.qtyOut { color: #dc2626; }
+
+/* ── Stock values (before / after) ───────────────────────────────────────── */
+.stockValue {
+  font-size: 0.875rem;
+  color: var(--color-muted-foreground);
+}
+
+/* ── Note text ───────────────────────────────────────────────────────────── */
+.noteText {
+  font-size: 0.8rem;
+  color: var(--color-muted-foreground);
+}
+
+/* ══════════════════════════════════════════════════
+   PAGINATION
+══════════════════════════════════════════════════ */
+.pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.875rem 1.25rem;
+  border-top: 1px solid var(--color-border);
+  background-color: var(--color-muted);
+  border-radius: 0 0 0.75rem 0.75rem;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.paginationInfo {
+  font-size: 0.8rem;
+  color: var(--color-muted-foreground);
+}
+
+.paginationControls {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.pageBtn {
+  min-width: 2rem;
+  height: 2rem;
+  padding: 0 0.75rem;
+  border: 1px solid var(--color-border);
+  border-radius: 0.375rem;
+  background-color: var(--color-background);
+  font-size: 0.8rem;
+  font-weight: 500;
+  cursor: pointer;
+  color: var(--color-foreground);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background-color 0.15s, color 0.15s, border-color 0.15s;
+}
+
+.pageBtn:hover:not(:disabled) {
+  background-color: var(--color-accent);
+}
+
+.pageBtn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.pageText {
+  font-size: 0.8rem;
+  color: var(--color-muted-foreground);
+  white-space: nowrap;
+}

@@ -2,17 +2,15 @@ model Purchase {
   id       String @id @default(uuid())
   tenantId String
 
-  supplierId    String
-  invoiceNumber String
+  supplierId    String 
+  invoiceNumber String 
   purchaseDate  DateTime
 
   paymentType PurchasePaymentType
 
-  subtotal  Float
-  taxAmount Float  @default(0)
-  total     Float
+  total    Float
 
-  status PurchaseStatus @default(PENDING)
+  status PurchaseStatus @default(RECEIVED)
 
   notes String?
 
@@ -36,7 +34,7 @@ enum PurchasePaymentType {
 }
 
 enum PurchaseStatus {
-  PENDING
   RECEIVED
+  FULLY_RETURNED
   CANCELLED
 }

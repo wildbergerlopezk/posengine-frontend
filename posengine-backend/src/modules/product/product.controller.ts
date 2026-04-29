@@ -85,6 +85,17 @@ export class ProductController {
     return this.productService.findOne(id, tenantId);
   }
 
+  @Get(':id/price-history')
+  @Roles(UserRole.ADMIN, UserRole.SUPERADMIN)
+  @ApiOperation({ summary: 'Historial de precios de compra de un producto' })
+  @ApiParam({ name: 'id', description: 'Product ID' })
+  findPriceHistory(
+    @Param('id') id: string,
+    @CurrentUser('tenantId') tenantId: string,
+  ) {
+    return this.productService.getPriceHistory(id, tenantId);
+  }
+
   @Patch(':id')
   @Roles(UserRole.ADMIN, UserRole.SUPERADMIN)
   @ApiOperation({ summary: 'Actualizar producto por ID' })
@@ -98,7 +109,8 @@ export class ProductController {
     @CurrentUser('tenantId') tenantId: string,
     @Body() dto: UpdateProductDto,
   ) {
-    return this.productService.update(id, tenantId, dto);
+    const { stockNotes, ...rest } = dto;
+    return this.productService.update(id, tenantId, rest, stockNotes);
   }
 
   @Patch(':id/deactivate')

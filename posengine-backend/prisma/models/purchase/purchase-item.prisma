@@ -5,13 +5,11 @@ model PurchaseItem {
 
   quantity  Float
   unitCost  Float
-  taxRate   Float @default(0)
-  subtotal  Float
-  taxAmount Float @default(0)
   total     Float
 
-  purchase Purchase @relation(fields: [purchaseId], references: [id])
-  product  Product  @relation(fields: [productId], references: [id])
+  purchase    Purchase             @relation(fields: [purchaseId], references: [id])
+  product     Product              @relation(fields: [productId], references: [id])
+  returnItems PurchaseReturnItem[]
 
   @@map("purchase_items")
 }

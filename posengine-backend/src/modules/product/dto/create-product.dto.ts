@@ -12,7 +12,6 @@ import {
 } from 'class-validator';
 import { Transform, Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { ProductUnit } from '../../../generated/prisma/enums';
 
 export class CreateProductDto {
   @ApiProperty({ example: 'Cadena 428H x 120 eslabones' })
@@ -92,11 +91,6 @@ export class CreateProductDto {
   @Min(0)
   @Type(() => Number)
   stockMinimum?: number;
-
-  @ApiPropertyOptional({ enum: ProductUnit, default: ProductUnit.UNIT })
-  @IsOptional()
-  @IsEnum(ProductUnit)
-  unit?: ProductUnit;
 
   @ApiPropertyOptional({ example: true, default: true })
   @IsOptional()

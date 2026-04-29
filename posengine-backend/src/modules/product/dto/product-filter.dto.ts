@@ -1,7 +1,6 @@
 import { IsOptional, IsString, IsBoolean, IsEnum } from 'class-validator';
 import { Transform, Type } from 'class-transformer';
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { ProductUnit } from '../../../generated/prisma/enums';
 import { PaginationQueryDto } from '../../../common/dto/pagination-query.dto';
 
 export class ProductFilterDto extends PaginationQueryDto {
@@ -40,9 +39,4 @@ export class ProductFilterDto extends PaginationQueryDto {
     return value;
   })
   lowStock?: boolean;
-
-  @ApiPropertyOptional({ enum: ProductUnit })
-  @IsOptional()
-  @IsEnum(ProductUnit)
-  unit?: ProductUnit;
 }

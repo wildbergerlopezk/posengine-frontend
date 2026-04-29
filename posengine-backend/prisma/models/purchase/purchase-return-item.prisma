@@ -2,6 +2,7 @@ model PurchaseReturnItem {
   id               String @id @default(uuid())
   purchaseReturnId String
   productId        String
+  purchaseItemId   String
 
   quantity Float
   unitCost Float
@@ -9,6 +10,7 @@ model PurchaseReturnItem {
 
   purchaseReturn PurchaseReturn @relation(fields: [purchaseReturnId], references: [id])
   product        Product        @relation(fields: [productId], references: [id])
+  purchaseItem   PurchaseItem   @relation(fields: [purchaseItemId], references: [id])
 
   @@map("purchase_return_items")
 }

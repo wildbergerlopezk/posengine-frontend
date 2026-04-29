@@ -1,0 +1,660 @@
+/* ── Page layout ─────────────────────────────────────────────────────────── */
+.page { min-height: 100vh; }
+
+.container {
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+/* ── Error banner close btn ──────────────────────────────────────────────── */
+.bannerClose {
+  margin-left: auto;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: inherit;
+  display: flex;
+  align-items: center;
+  opacity: 0.7;
+  padding: 0;
+}
+.bannerClose:hover { opacity: 1; }
+
+/* ══════════════════════════════════════════════════
+   HEADER CARD — diferenciado con acento izquierdo
+══════════════════════════════════════════════════ */
+.headerCard {
+  background-color: var(--color-header-card);
+  border: 1px solid var(--color-header-card-border);
+  border-radius: 0.75rem;
+  padding: 1.25rem 1.5rem 1.5rem;
+}
+
+.headerCardTitle {
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--color-muted-foreground);
+  margin-bottom: 1rem;
+}
+
+.headerGrid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 1rem;
+}
+
+@media (min-width: 900px) {
+  .headerGrid {
+    grid-template-columns: 2fr 1.5fr 1fr 1fr;
+  }
+  .fullWidth {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 899px) {
+  .fullWidth {
+    grid-column: 1 / -1;
+  }
+}
+
+/* ── Select wrapper ──────────────────────────────────────────────────────── */
+.selectWrapper {
+  position: relative;
+}
+
+.selectIcon {
+  position: absolute;
+  right: 0.75rem;
+  top: 50%;
+  transform: translateY(-50%);
+  pointer-events: none;
+  color: var(--color-muted-foreground);
+}
+
+/* ── Invoice input ───────────────────────────────────────────────────────── */
+.labelHint {
+  margin-left: 0.5rem;
+  font-size: 0.7rem;
+  font-weight: 400;
+  color: var(--color-muted-foreground);
+}
+
+.invoiceWrapper {
+  position: relative;
+}
+
+.invoiceSpinner {
+  position: absolute;
+  right: 0.75rem;
+  top: 50%;
+  transform: translateY(-50%);
+  animation: spin 1s linear infinite;
+  color: var(--color-muted-foreground);
+}
+
+/* ── Payment toggle ──────────────────────────────────────────────────────── */
+.paymentToggle {
+  display: flex;
+  border: 1px solid var(--color-border);
+  border-radius: 0.5rem;
+  overflow: hidden;
+  height: 2.5rem;
+}
+
+.payToggleBtn {
+  flex: 1;
+  border: none;
+  background: transparent;
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  color: var(--color-muted-foreground);
+  transition: background-color 0.15s, color 0.15s;
+}
+
+.payToggleBtn:first-child {
+  border-right: 1px solid var(--color-border);
+}
+
+.payToggleBtn:hover:not(.payToggleBtnActive) {
+  background-color: var(--color-accent);
+  color: var(--color-foreground);
+}
+
+.payToggleBtnActive {
+  background-color: var(--color-primary);
+  color: white;
+}
+
+/* ══════════════════════════════════════════════════
+   ITEMS TOOLBAR
+══════════════════════════════════════════════════ */
+.itemsToolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.875rem 1rem;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.itemsTitle {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--color-foreground);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.itemsCount {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.4rem;
+  height: 1.4rem;
+  padding: 0 0.35rem;
+  border-radius: 9999px;
+  background-color: var(--color-primary);
+  color: white;
+  font-size: 0.7rem;
+  font-weight: 700;
+}
+
+.itemsActions {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.shortcutHint {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.8rem;
+  color: var(--color-muted-foreground);
+}
+
+.shortcutHint kbd,
+.kbdInline {
+  display: inline-block;
+  background: var(--color-muted);
+  border: 1px solid var(--color-border);
+  border-radius: 0.25rem;
+  padding: 0.1rem 0.4rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  font-family: monospace;
+  color: var(--color-foreground);
+}
+
+/* ── Row number ──────────────────────────────────────────────────────────── */
+.rowNum {
+  font-size: 0.75rem;
+  color: var(--color-muted-foreground);
+  font-weight: 600;
+}
+
+/* ── Code chip ───────────────────────────────────────────────────────────── */
+.codeChip {
+  display: inline-block;
+  font-family: ui-monospace, monospace;
+  font-size: 0.78rem;
+  background-color: var(--color-muted);
+  padding: 0.2rem 0.5rem;
+  border-radius: 0.3rem;
+  color: var(--color-muted-foreground);
+}
+
+/* ── Editable cell ───────────────────────────────────────────────────────── */
+.editableCell {
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--color-primary);
+  padding: 0.25rem 0.5rem;
+  border-radius: 0.375rem;
+  transition: background-color 0.15s;
+  text-align: right;
+  width: 100%;
+}
+
+.editableCell:hover {
+  background-color: color-mix(in srgb, var(--color-primary) 10%, transparent);
+}
+
+/* ── Inline edit input ───────────────────────────────────────────────────── */
+.inlineInput {
+  width: 90px;
+  height: 2rem;
+  padding: 0 0.5rem;
+  border: 2px solid var(--color-primary);
+  border-radius: 0.375rem;
+  background: var(--color-background);
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--color-primary);
+  text-align: right;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-primary) 15%, transparent);
+}
+
+.inlineInput:focus { outline: none; }
+
+.inlineInput::-webkit-outer-spin-button,
+.inlineInput::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+.inlineInput[type=number] { -moz-appearance: textfield; }
+
+/* ── Remove button ───────────────────────────────────────────────────────── */
+.removeBtn {
+  width: 1.9rem;
+  height: 1.9rem;
+  border: none;
+  background: transparent;
+  border-radius: 0.375rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-muted-foreground);
+  transition: background-color 0.15s, color 0.15s;
+}
+
+.removeBtn:hover {
+  background-color: rgba(239, 68, 68, 0.1);
+  color: var(--color-destructive);
+}
+
+/* ══════════════════════════════════════════════════
+   TABLE FOOTER — totales
+══════════════════════════════════════════════════ */
+.tableFooter {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 1rem;
+  padding: 1rem 1.25rem;
+  border-top: 1px solid var(--color-border);
+  background-color: var(--color-muted);
+  border-radius: 0 0 0.75rem 0.75rem;
+}
+
+.totalsBlock {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  min-width: 200px;
+}
+
+.totalRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 2rem;
+}
+
+.totalRowFinal {
+  padding-top: 0.4rem;
+  border-top: 1px solid var(--color-border);
+  margin-top: 0.2rem;
+}
+
+.totalLabel {
+  font-size: 0.825rem;
+  color: var(--color-muted-foreground);
+}
+
+.totalValue {
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: var(--color-foreground);
+}
+
+.totalValueFinal {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--color-primary);
+}
+
+/* ============================================
+   MODAL DE CONFIRMACIÓN - MINIMALISTA
+   ============================================ */
+.modalOverlay {
+  position: fixed;
+  inset: 0;
+  background-color: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 50;
+  padding: 1rem;
+  animation: fadeIn 0.15s ease-out;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideUp {
+  from { transform: translateY(20px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+.confirmModal {
+  background-color: var(--color-card);
+  border-radius: 0.75rem;
+  padding: 1.5rem;
+  width: 100%;
+  max-width: 360px;
+  text-align: center;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.2);
+  animation: slideUp 0.2s ease-out;
+}
+
+.confirmIcon {
+  width: 3rem;
+  height: 3rem;
+  margin: 0 auto 1rem;
+  background-color: rgba(249, 115, 22, 0.1);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #f97316;
+}
+
+.confirmTitle {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--color-foreground);
+  margin: 0 0 0.5rem 0;
+}
+
+.confirmDescription {
+  font-size: 0.875rem;
+  color: var(--color-muted-foreground);
+  margin: 0 0 1.5rem 0;
+}
+
+.confirmDescription strong {
+  color: var(--color-primary);
+  font-size: 1rem;
+}
+
+.confirmButtons {
+  display: flex;
+  gap: 0.75rem;
+}
+
+.confirmCancel,
+.confirmAccept {
+  flex: 1;
+  height: 2.75rem;
+  border-radius: 0.5rem;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.confirmCancel {
+  border: 1px solid var(--color-border);
+  background: transparent;
+  color: var(--color-foreground);
+}
+
+.confirmCancel:hover {
+  background-color: var(--color-accent);
+}
+
+.confirmAccept {
+  border: none;
+  background-color: var(--color-primary);
+  color: white;
+}
+
+.confirmAccept:hover {
+  background-color: var(--color-primary-hover);
+}
+
+.buttonFocused {
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.3);
+}
+
+.confirmHint {
+  margin-top: 1rem;
+  font-size: 0.75rem;
+  color: var(--color-muted-foreground);
+}
+
+.confirmHint kbd {
+  background: var(--color-muted);
+  border: 1px solid var(--color-border);
+  border-radius: 0.25rem;
+  padding: 0.125rem 0.375rem;
+  font-size: 0.625rem;
+  font-weight: 600;
+  margin: 0 0.25rem;
+}
+
+.kbdWhite {
+  display: inline-block;
+  background: rgba(255, 255, 255, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 0.2rem;
+  padding: 0.05rem 0.35rem;
+  font-size: 0.7rem;
+  font-weight: 700;
+  font-family: monospace;
+  margin-left: 0.4rem;
+}
+
+/* ══════════════════════════════════════════════════
+   PRODUCT SEARCH MODAL
+══════════════════════════════════════════════════ */
+.productModal {
+  background-color: var(--color-card);
+  border-radius: 0.875rem;
+  width: 100%;
+  max-width: 720px;
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+  overflow: hidden;
+}
+
+.modalCloseBtn {
+  width: 2rem;
+  height: 2rem;
+  border: none;
+  border-radius: 0.375rem;
+  background: transparent;
+  color: var(--color-muted-foreground);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background-color 0.15s, color 0.15s;
+}
+
+.modalCloseBtn:hover {
+  background-color: var(--color-accent);
+  color: var(--color-foreground);
+}
+
+/* ── Search box ──────────────────────────────────────────────────────────── */
+.modalSearchBox {
+  position: relative;
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.modalSearchIcon {
+  position: absolute;
+  left: 2rem;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--color-muted-foreground);
+}
+
+.modalSearchInput {
+  width: 100%;
+  height: 2.75rem;
+  padding: 0 0.75rem 0 2.5rem;
+  border: 1.5px solid var(--color-border);
+  border-radius: 0.5rem;
+  background-color: var(--color-background);
+  font-size: 0.9375rem;
+  color: var(--color-foreground);
+  box-sizing: border-box;
+  transition: border-color 0.15s;
+}
+
+.modalSearchInput:focus {
+  outline: none;
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-primary) 15%, transparent);
+}
+
+/* ── Product list ────────────────────────────────────────────────────────── */
+.productList {
+  overflow-y: auto;
+  flex: 1;
+}
+
+.productListEmpty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  padding: 3rem 2rem;
+  color: var(--color-muted-foreground);
+  font-size: 0.875rem;
+}
+
+.productRow {
+  display: grid;
+  grid-template-columns: 130px 1fr 90px 110px;
+  gap: 1rem;
+  padding: 0.75rem 1.25rem;
+  border: none;
+  border-bottom: 1px solid var(--color-border);
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  width: 100%;
+  transition: background-color 0.12s;
+  align-items: center;
+}
+
+.productRow:last-child { border-bottom: none; }
+
+.productRow:hover { background-color: var(--color-accent); }
+
+.productRowSelected {
+  background-color: color-mix(in srgb, var(--color-primary) 8%, transparent) !important;
+  border-left: 3px solid var(--color-primary);
+  padding-left: calc(1.25rem - 3px);
+}
+
+.productRowCode {
+  font-family: ui-monospace, monospace;
+  font-size: 0.8rem;
+  color: var(--color-muted-foreground);
+  background: var(--color-muted);
+  padding: 0.2rem 0.5rem;
+  border-radius: 0.3rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.productRowName {
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: var(--color-foreground);
+  line-height: 1.35;
+}
+
+.productRowStock {
+  font-size: 0.8rem;
+  color: var(--color-muted-foreground);
+  text-align: right;
+}
+
+.productRowCost {
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--color-primary);
+  text-align: right;
+}
+
+/* ── Modal hints ─────────────────────────────────────────────────────────── */
+.modalHints {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1.5rem;
+  padding: 0.75rem 1.25rem;
+  border-top: 1px solid var(--color-border);
+  background-color: var(--color-muted);
+  font-size: 0.8rem;
+  color: var(--color-muted-foreground);
+}
+
+.modalHints kbd {
+  background: var(--color-card);
+  border: 1px solid var(--color-border);
+  border-radius: 0.25rem;
+  padding: 0.15rem 0.45rem;
+  font-size: 0.7rem;
+  font-weight: 600;
+  font-family: monospace;
+  margin-right: 0.3rem;
+}
+
+.supplierTrigger {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+  text-align: left;
+}
+
+.footerActions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem; /* Espacio entre los dos botones */
+  margin-top: 1rem; /* Ajusta según sea necesario */
+}
+
+.clearButton {
+  /* Estilos para que el botón 'Limpiar' se vea bien */
+  padding: 0.5rem 1rem;
+  border: 1px solid var(--color-border);
+  border-radius: 0.5rem;
+  background: transparent;
+  cursor: pointer;
+}
+
+.submitButton {
+  /* Asegúrate de que este mantenga sus estilos originales */
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+/* ── Spinner ─────────────────────────────────────────────────────────────── */
+@keyframes spin {
+  from { transform: translateY(-50%) rotate(0deg); }
+  to   { transform: translateY(-50%) rotate(360deg); }
+}

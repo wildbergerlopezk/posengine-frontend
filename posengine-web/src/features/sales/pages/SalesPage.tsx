@@ -20,6 +20,8 @@ import { useCartStore, type Currency } from "../store/cart.store"
 import { formatCurrency } from "@/src/shared/hooks/useFormatCurrency"
 import type { PaymentMethod } from "../types"
 import styles from "./SalesPage.module.css"
+import { usePriceHistory } from "@/src/shared/hooks/usePriceHistory"
+import { PriceHistoryModal } from "@/src/shared/components/PriceHistoryModal"
 
 export function SalesPage() {
   const { items, addItem, removeItem, updateQuantity, clearCart, getTotal, currency, setCurrency, getTotalInCurrency } = useCartStore()
@@ -36,6 +38,8 @@ export function SalesPage() {
   const [quantityInput, setQuantityInput] = useState("")
   const [confirmModalSelectedButton, setConfirmModalSelectedButton] = useState<"accept" | "cancel">("accept")
   const [paymentModalSelectedButton, setPaymentModalSelectedButton] = useState<"cancel" | "confirm">("confirm")
+
+  const priceHistory = usePriceHistory()
   
   const barcodeInputRef = useRef<HTMLInputElement>(null)
   const searchInputRef = useRef<HTMLInputElement>(null)
@@ -87,6 +91,15 @@ export function SalesPage() {
               setSelectedRowIndex(Math.max(0, items.length - 2))
             }
           }
+        }
+      }
+
+      if (e.key === "Escape") {
+        if (priceHistory.open) return
+        if (showProductModal) {
+          setShowProductModal(false)
+          setSearchQuery("")
+          barcodeInputRef.current?.focus()
         }
       }
 
@@ -296,11 +309,25 @@ export function SalesPage() {
         handleAddProduct(selectedProduct)
       }
     }
+    if (e.key === "F8") {
+      e.preventDefault()
+      const selectedProduct = filteredProducts[selectedProductIndex]
+      if (selectedProduct) {
+        priceHistory.openFor(selectedProduct.id, selectedProduct.name)
+      }
+    }
     if (e.key === "Escape") {
       e.preventDefault()
-      setShowProductModal(false)
-      setSearchQuery("")
-      barcodeInputRef.current?.focus()
+      if (priceHistory.open) {
+        priceHistory.close()
+        return
+      }
+      // Esc para cerrar modal de productos
+      if (showProductModal) {
+        setShowProductModal(false)
+        setSearchQuery("")
+        barcodeInputRef.current?.focus()
+      }
     }
   }
 
@@ -518,6 +545,7 @@ export function SalesPage() {
               <div className={styles.modalHints}>
                 <kbd>↑↓</kbd> Navegar
                 <kbd>Enter</kbd> Seleccionar
+                <kbd>F8</kbd> Último precio
                 <kbd>Esc</kbd> Cerrar
               </div>
             </div>
@@ -635,6 +663,14 @@ export function SalesPage() {
           </div>
         </div>
       )}
+
+      <PriceHistoryModal
+        open={priceHistory.open}
+        loading={priceHistory.loading}
+        history={priceHistory.history}
+        productName={priceHistory.productName}
+        onClose={priceHistory.close}
+      />
     </div>
   )
 }
