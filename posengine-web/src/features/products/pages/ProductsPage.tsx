@@ -9,17 +9,45 @@ import {
 } from "lucide-react"
 import { useAuthStore } from "@/src/features/auth/store/auth.store"
 import { formatCurrency } from "@/src/shared/hooks/useFormatCurrency"
-import type { Product, Category } from "@/src/shared/types"
+import type { Product, Category, UnitType } from "@/src/shared/types"
 import styles from "./ProductsPage.module.css"
 
 const API_BASE = process.env.NEXT_PUBLIC_BACKEND_URL
+
+const UNIT_OPTIONS: Array<{ value: UnitType; label: string; hint: string }> = [
+  { value: "UNIT", label: "Unidad", hint: "Solo cantidades enteras" },
+  { value: "KG", label: "Kilogramo (kg)", hint: "Permite decimales" },
+  { value: "G", label: "Gramo (g)", hint: "Permite decimales" },
+  { value: "L", label: "Litro (l)", hint: "Permite decimales" },
+  { value: "ML", label: "Mililitro (ml)", hint: "Permite decimales" },
+  { value: "MG", label: "Miligramo (mg)", hint: "Permite decimales" },
+]
+
+const UNIT_LABELS: Record<UnitType, string> = {
+  UNIT: "Unidad",
+  KG: "kg",
+  G: "g",
+  L: "l",
+  ML: "ml",
+  MG: "mg",
+}
+
+function isUnitType(unitType: UnitType) {
+  return unitType === "UNIT"
+}
+
+function formatStock(value: number, unitType: UnitType = "UNIT") {
+  const formatted = isUnitType(unitType) || value % 1 === 0
+    ? String(value)
+    : String(Number(value.toFixed(3)))
+  return `${formatted} ${UNIT_LABELS[unitType]}`
+}
 
 interface ProductWithRelations extends Product {
   category?: { id: string; name: string }
   subcategory?: { id: string; name: string } | null
   sku?: string
   taxRate?: number
-  unit?: string
   isActive: boolean
 }
 
@@ -58,7 +86,7 @@ export function ProductsPage() {
   const [formData, setFormData] = useState({
     name: "", barcode: "", categoryId: "", subcategoryId: "",
     price: "", cost: "", stock: "", stockMinimum: "", imageUrl: "",
-    stockNotes: "",
+    unitType: "UNIT" as UnitType, stockNotes: "",
   })
 
   // ─── Keyboard navigation refs ─────────────────────────────────────────────
@@ -68,6 +96,7 @@ export function ProductsPage() {
   const subcategoryRef = useRef<HTMLSelectElement>(null)
   const costRef        = useRef<HTMLInputElement>(null)
   const priceRef       = useRef<HTMLInputElement>(null)
+  const unitTypeRef    = useRef<HTMLSelectElement>(null)
   const stockRef       = useRef<HTMLInputElement>(null)
   const stockMinRef    = useRef<HTMLInputElement>(null)
   const submitRef      = useRef<HTMLButtonElement>(null)
@@ -131,7 +160,11 @@ export function ProductsPage() {
   )
 
   const resetForm = () => {
-    setFormData({ name: "", barcode: "", categoryId: "", subcategoryId: "", price: "", cost: "", stock: "", stockMinimum: "", imageUrl: "", stockNotes: "" })
+    setFormData({
+      name: "", barcode: "", categoryId: "", subcategoryId: "",
+      price: "", cost: "", stock: "", stockMinimum: "", imageUrl: "",
+      unitType: "UNIT", stockNotes: "",
+    })
     setEditingProduct(null)
     setSubmitError(null)
   }
@@ -146,6 +179,7 @@ export function ProductsPage() {
       price: product.price?.toString() || "0",
       cost: product.cost?.toString() || "0",
       stock: product.stock?.toString() || "0",
+      unitType: product.unitType ?? "UNIT",
       stockMinimum: product.stockMinimum?.toString() || "0",
       imageUrl: product.imageUrl || "",
       stockNotes: "",
@@ -204,19 +238,83 @@ export function ProductsPage() {
     }
   }
 
+  const parseFormNumber = (value: string, fallback = 0) => {
+    if (!value.trim()) return fallback
+    return Number.parseFloat(value)
+  }
+
+  const validateStockField = (value: number, label: string, unitType: UnitType) => {
+    if (!Number.isFinite(value)) return `${label} debe ser un número válido`
+    if (value < 0) return `${label} no puede ser negativo`
+    if (isUnitType(unitType) && !Number.isInteger(value)) {
+      return `${label} debe ser entero cuando la unidad de medida es "Unidad"`
+    }
+    return null
+  }
+
+  const validateForm = () => {
+    const name = formData.name.trim()
+    if (name.length < 2) {
+      nameRef.current?.focus()
+      return "El nombre debe tener al menos 2 caracteres"
+    }
+
+    if (!formData.categoryId) {
+      categoryRef.current?.focus()
+      return "Seleccioná una categoría"
+    }
+
+    const price = parseFormNumber(formData.price, Number.NaN)
+    if (!Number.isFinite(price) || price < 0) {
+      priceRef.current?.focus()
+      return "El precio de venta debe ser un número válido"
+    }
+
+    const cost = parseFormNumber(formData.cost)
+    if (!Number.isFinite(cost) || cost < 0) {
+      costRef.current?.focus()
+      return "El precio de costo debe ser un número válido"
+    }
+
+    const stock = parseFormNumber(formData.stock, Number.NaN)
+    const stockError = validateStockField(stock, "El stock actual", formData.unitType)
+    if (stockError) {
+      stockRef.current?.focus()
+      return stockError
+    }
+
+    const stockMinimum = parseFormNumber(formData.stockMinimum)
+    const stockMinimumError = validateStockField(stockMinimum, "El stock mínimo", formData.unitType)
+    if (stockMinimumError) {
+      stockMinRef.current?.focus()
+      return stockMinimumError
+    }
+
+    return null
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    const formError = validateForm()
+    if (formError) {
+      setSubmitError(formError)
+      return
+    }
+
     setSubmitting(true)
     setSubmitError(null)
+    const stock = parseFormNumber(formData.stock)
+    const stockMinimum = parseFormNumber(formData.stockMinimum)
     const payload = {
-      name: formData.name,
+      name: formData.name.trim(),
       barcode: formData.barcode || undefined,
       categoryId: formData.categoryId,
       subcategoryId: formData.subcategoryId || undefined,
       price: Number.parseFloat(formData.price),
       cost: formData.cost ? Number.parseFloat(formData.cost) : undefined,
-      stock: Number.parseInt(formData.stock || "0"),
-      stockMinimum: Number.parseInt(formData.stockMinimum || "0"),
+      stock,
+      unitType: formData.unitType,
+      stockMinimum,
       imageUrl: formData.imageUrl || undefined,
       stockNotes: formData.stockNotes || undefined,
     }
@@ -321,6 +419,7 @@ export function ProductsPage() {
                   <th className={styles.tableHeaderCell}>Producto</th>
                   <th className={styles.tableHeaderCell}>SKU / Código</th>
                   <th className={styles.tableHeaderCell}>Categoría</th>
+                  <th className={styles.tableHeaderCell}>Unidad</th>
                   <th className={`${styles.tableHeaderCell} ${styles.tableHeaderCellRight}`}>Costo</th>
                   <th className={`${styles.tableHeaderCell} ${styles.tableHeaderCellRight}`}>Precio</th>
                   <th className={`${styles.tableHeaderCell} ${styles.tableHeaderCellRight}`}>Stock</th>
@@ -330,7 +429,7 @@ export function ProductsPage() {
               <tbody>
                 {filteredProducts.length === 0 ? (
                   <tr>
-                    <td colSpan={7}>
+                    <td colSpan={8}>
                       <div className={styles.emptyState}>
                         <Package size={32} className={styles.emptyStateIcon} />
                         <p>No se encontraron productos</p>
@@ -383,6 +482,11 @@ export function ProductsPage() {
                           {product.subcategory && <span className={styles.subcategoryText}>{product.subcategory.name}</span>}
                         </div>
                       </td>
+                      <td className={styles.tableCell}>
+                        <span className={styles.unitPill}>
+                          {UNIT_LABELS[product.unitType ?? "UNIT"]}
+                        </span>
+                      </td>
                       <td className={`${styles.tableCell} ${styles.tableCellRight}`}>
                         <span className={styles.costText}>{product.cost != null ? formatCurrency(product.cost) : "—"}</span>
                       </td>
@@ -391,8 +495,14 @@ export function ProductsPage() {
                       </td>
                       <td className={`${styles.tableCell} ${styles.tableCellRight}`}>
                         <div className={styles.stockCell}>
-                          <span className={isLowStock(product) ? styles.stockWarning : styles.stockOk}>{product.stock}</span>
-                          {product.stockMinimum > 0 && <span className={styles.stockMin}>/ mín {product.stockMinimum}</span>}
+                          <span className={isLowStock(product) ? styles.stockWarning : styles.stockOk}>
+                            {formatStock(product.stock, product.unitType ?? "UNIT")}
+                          </span>
+                          {product.stockMinimum > 0 && (
+                            <span className={styles.stockMin}>
+                              mín {formatStock(product.stockMinimum, product.unitType ?? "UNIT")}
+                            </span>
+                          )}
                         </div>
                       </td>
                       <td className={`${styles.tableCell} ${styles.tableCellRight}`}>
@@ -447,7 +557,7 @@ export function ProductsPage() {
                 {editingProduct ? "Modificá los datos del producto" : "Completá los datos — usá Enter para avanzar entre campos"}
               </p>
             </div>
-            <form onSubmit={handleSubmit}>
+            <form onSubmit={handleSubmit} noValidate>
               <div className={styles.modalContent}>
                 {submitError && (
                   <div className={styles.errorBanner}>
@@ -466,7 +576,7 @@ export function ProductsPage() {
                       </div>
                     ) : (
                       <label className={styles.uploadArea}>
-                        <input type="file" accept="image/*" className={styles.hiddenInput} onChange={handleImageUpload} disabled={uploadingImage} />
+                        <input type="file" accept="image/png, image/jpeg, image/webp" className={styles.hiddenInput} onChange={handleImageUpload} disabled={uploadingImage} />
                         <div className={styles.uploadContent}>
                           {uploadingImage
                             ? <><Loader2 size={24} className={styles.spinner} /><span>Subiendo...</span></>
@@ -524,27 +634,51 @@ export function ProductsPage() {
                     <label className={styles.label}>Precio de venta *</label>
                     <input ref={priceRef} className={styles.input} type="number" value={formData.price}
                       onChange={(e) => setFormData({ ...formData, price: e.target.value })}
-                      onKeyDown={(e) => handleEnterKey(e, stockRef)} placeholder="0" min="0" required />
+                      onKeyDown={(e) => handleEnterKey(e, unitTypeRef)} placeholder="0" min="0" required />
                   </div>
+                </div>
+                <div className={styles.formGroup}>
+                  <label className={styles.label}>Unidad de medida *</label>
+                  <select
+                    ref={unitTypeRef}
+                    className={styles.select}
+                    value={formData.unitType}
+                    onChange={(e) => setFormData({ ...formData, unitType: e.target.value as UnitType })}
+                    onKeyDown={(e) => handleEnterKey(e, stockRef)}
+                  >
+                    {UNIT_OPTIONS.map((unit) => (
+                      <option key={unit.value} value={unit.value}>{unit.label}</option>
+                    ))}
+                  </select>
+                  <span className={styles.fieldHint}>
+                    {UNIT_OPTIONS.find((unit) => unit.value === formData.unitType)?.hint}
+                  </span>
                 </div>
                 <div className={styles.formRow}>
                   <div className={styles.formGroup}>
                     <label className={styles.label}>Stock actual *</label>
                     <input ref={stockRef} className={styles.input} type="number" value={formData.stock}
                       onChange={(e) => setFormData({ ...formData, stock: e.target.value })}
-                      onKeyDown={(e) => handleEnterKey(e, stockMinRef)} placeholder="0" min="0" required />
+                      onKeyDown={(e) => handleEnterKey(e, stockMinRef)}
+                      placeholder={isUnitType(formData.unitType) ? "0" : "0.000"}
+                      min="0"
+                      step={isUnitType(formData.unitType) ? "1" : "0.001"}
+                      required />
                   </div>
                   <div className={styles.formGroup}>
                     <label className={styles.label}>Stock mínimo</label>
                     <input ref={stockMinRef} className={styles.input} type="number" value={formData.stockMinimum}
                       onChange={(e) => setFormData({ ...formData, stockMinimum: e.target.value })}
-                      onKeyDown={(e) => handleEnterKey(e, submitRef)} placeholder="0" min="0" />
+                      onKeyDown={(e) => handleEnterKey(e, submitRef)}
+                      placeholder={isUnitType(formData.unitType) ? "0" : "0.000"}
+                      min="0"
+                      step={isUnitType(formData.unitType) ? "1" : "0.001"} />
                     <span className={styles.fieldHint}>Alerta de reposición</span>
                   </div>
                 </div>
 
                 {/* ── Nota de ajuste — solo visible al editar si el stock cambió ── */}
-                {editingProduct && Number.parseInt(formData.stock || "0") !== editingProduct.stock && (
+                {editingProduct && parseFormNumber(formData.stock) !== editingProduct.stock && (
                   <div className={styles.formGroup}>
                     <label className={styles.label}>Motivo del ajuste de stock</label>
                     <input
@@ -555,7 +689,7 @@ export function ProductsPage() {
                       maxLength={300}
                     />
                     <span className={styles.fieldHint}>
-                      Stock actual: {editingProduct.stock} → nuevo: {formData.stock || "0"}
+                      Stock actual: {formatStock(editingProduct.stock, editingProduct.unitType ?? "UNIT")} → nuevo: {formatStock(parseFormNumber(formData.stock), formData.unitType)}
                     </span>
                   </div>
                 )}

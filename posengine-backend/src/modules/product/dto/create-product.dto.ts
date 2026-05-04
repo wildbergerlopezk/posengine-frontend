@@ -5,13 +5,13 @@ import {
   IsNumber,
   IsBoolean,
   IsEnum,
-  IsInt,
   Min,
   MinLength,
   MaxLength,
 } from 'class-validator';
 import { Transform, Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { UnitType } from '../../../generated/prisma/enums';
 
 export class CreateProductDto {
   @ApiProperty({ example: 'Cadena 428H x 120 eslabones' })
@@ -71,24 +71,26 @@ export class CreateProductDto {
   @Type(() => Number)
   cost?: number;
 
-  @ApiPropertyOptional({ example: 10, description: 'Porcentaje de IVA, ej: 10' })
+  @ApiPropertyOptional({
+    enum: UnitType,
+    default: UnitType.UNIT,
+    description: 'Unidad de medida del producto. UNIT = enteros, resto = decimales permitidos',
+  })
   @IsOptional()
-  @IsNumber()
-  @Min(0)
-  @Type(() => Number)
-  taxRate?: number;
+  @IsEnum(UnitType, { message: 'Unidad de medida inválida' })
+  unitType?: UnitType;
 
-  @ApiPropertyOptional({ example: 50 })
+  @ApiPropertyOptional({ example: 50, description: 'Para UNIT debe ser entero, para KG/L/etc acepta decimales' })
   @IsOptional()
-  @IsInt()
-  @Min(0)
+  @IsNumber({}, { message: 'El stock debe ser un número' })
+  @Min(0, { message: 'El stock no puede ser negativo' })
   @Type(() => Number)
   stock?: number;
 
-  @ApiPropertyOptional({ example: 5, description: 'Stock mínimo para alerta de reposición' })
+  @ApiPropertyOptional({ example: 5 })
   @IsOptional()
-  @IsInt()
-  @Min(0)
+  @IsNumber({}, { message: 'El stock mínimo debe ser un número' })
+  @Min(0, { message: 'El stock mínimo no puede ser negativo' })
   @Type(() => Number)
   stockMinimum?: number;
 

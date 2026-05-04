@@ -263,6 +263,20 @@
   color: var(--color-muted-foreground);
 }
 
+.unitPill {
+  display: inline-flex;
+  align-items: center;
+  min-height: 1.5rem;
+  padding: 0.2rem 0.55rem;
+  border-radius: 0.375rem;
+  background-color: color-mix(in srgb, var(--color-primary) 8%, transparent);
+  border: 1px solid color-mix(in srgb, var(--color-primary) 18%, var(--color-border));
+  color: var(--color-foreground);
+  font-size: 0.75rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
 /* ── Price / Stock ───────────────────────────────────────────────────────── */
 .costText {
   font-size: 0.8rem;

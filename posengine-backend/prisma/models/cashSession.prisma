@@ -1,0 +1,30 @@
+enum CashSessionStatus {
+  OPEN
+  CLOSED
+}
+
+model CashSession {
+  id       String @id @default(uuid())
+  tenantId String
+
+  openedAt DateTime  @default(now())
+  closedAt DateTime?
+
+  openingAmount  Float
+  closingAmount  Float?
+  expectedAmount Float?
+  totalSales     Float  @default(0)
+  totalPurchases Float  @default(0)
+  difference     Float?
+
+  status      CashSessionStatus @default(OPEN)
+  forcedClose Boolean           @default(false)
+
+  openedBy String 
+
+  tenant    Tenant     @relation(fields: [tenantId], references: [id])
+  sales     Sale[]
+  purchases Purchase[]
+
+  @@map("cash_sessions")
+}

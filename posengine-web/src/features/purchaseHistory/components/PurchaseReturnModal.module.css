@@ -1,0 +1,346 @@
+.overlay {
+  position: fixed;
+  inset: 0;
+  background-color: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10000;
+  padding: 1.5rem;
+  animation: fadeIn 0.2s ease-out;
+}
+
+.modal {
+  background-color: var(--color-card);
+  border-radius: 1rem;
+  width: 100%;
+  max-width: 850px;
+  max-height: 90vh;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.3);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid var(--color-border);
+  animation: scaleIn 0.2s ease-out;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1.25rem 1.5rem;
+  background-color: var(--color-muted);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.headerTitle {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.headerIcon {
+  color: #f59e0b;
+}
+
+.headerTitle h3 {
+  margin: 0;
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: var(--color-foreground);
+}
+
+.headerTitle p {
+  margin: 0.1rem 0 0;
+  font-size: 0.8rem;
+  color: var(--color-muted-foreground);
+}
+
+.closeBtn {
+  background: transparent;
+  border: none;
+  color: var(--color-muted-foreground);
+  cursor: pointer;
+  padding: 0.5rem;
+  border-radius: 0.5rem;
+  transition: all 0.2s;
+}
+
+.closeBtn:hover {
+  background-color: var(--color-accent);
+  color: var(--color-foreground);
+}
+
+.body {
+  padding: 1.5rem;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.errorBanner {
+  background-color: color-mix(in srgb, #ef4444 10%, transparent);
+  border: 1px solid #ef4444;
+  color: #ef4444;
+  padding: 0.75rem 1rem;
+  border-radius: 0.5rem;
+  font-size: 0.875rem;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.infoBox {
+  background-color: color-mix(in srgb, var(--color-primary) 10%, transparent);
+  border: 1px solid var(--color-primary);
+  color: var(--color-primary);
+  padding: 0.75rem 1rem;
+  border-radius: 0.5rem;
+  font-size: 0.875rem;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.infoBox p {
+  margin: 0;
+  font-weight: 500;
+}
+
+.tableWrapper {
+  border: 1px solid var(--color-border);
+  border-radius: 0.75rem;
+  overflow: hidden;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+}
+
+.table th {
+  background-color: var(--color-muted);
+  padding: 0.75rem 1rem;
+  text-align: left;
+  font-weight: 600;
+  color: var(--color-muted-foreground);
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.table td {
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid var(--color-border);
+  vertical-align: middle;
+}
+
+.center { text-align: center; }
+.right { text-align: right; }
+
+.rowDisabled {
+  opacity: 0.6;
+  background-color: var(--color-muted);
+}
+
+.productInfo {
+  display: flex;
+  flex-direction: column;
+}
+
+.productName {
+  font-weight: 600;
+  color: var(--color-foreground);
+}
+
+.productSku {
+  font-size: 0.75rem;
+  color: var(--color-muted-foreground);
+}
+
+.qtyInfo {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.qtyMain {
+  font-weight: 600;
+  color: var(--color-foreground);
+}
+
+.qtySub {
+  font-size: 0.7rem;
+  color: #f59e0b;
+}
+
+.stockValue {
+  font-weight: 600;
+  background-color: var(--color-muted);
+  padding: 0.2rem 0.5rem;
+  border-radius: 0.375rem;
+}
+
+.stockWarning {
+  color: #ef4444;
+  background-color: color-mix(in srgb, #ef4444 10%, transparent);
+}
+
+.qtyInput {
+  width: 4.5rem;
+  height: 2.25rem;
+  padding: 0 0.5rem;
+  border: 2px solid var(--color-border);
+  border-radius: 0.5rem;
+  background-color: var(--color-background);
+  color: var(--color-foreground);
+  text-align: center;
+  font-weight: 700;
+  transition: border-color 0.2s;
+}
+
+.qtyInput:focus {
+  outline: none;
+  border-color: #f59e0b;
+}
+
+.qtyInput:disabled {
+  background-color: var(--color-muted);
+  cursor: not-allowed;
+}
+
+.itemTotal {
+  font-weight: 700;
+  color: var(--color-foreground);
+}
+
+.formFooter {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  margin-top: 0.5rem;
+}
+
+.inputsRow {
+  display: grid;
+  grid-template-columns: 1fr 2fr;
+  gap: 1rem;
+}
+
+.inputGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.inputGroup label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--color-muted-foreground);
+  text-transform: uppercase;
+}
+
+.inputGroup input {
+  height: 2.75rem;
+  padding: 0 1rem;
+  border: 1.5px solid var(--color-border);
+  border-radius: 0.625rem;
+  background-color: var(--color-background);
+  color: var(--color-foreground);
+  font-size: 0.875rem;
+  transition: border-color 0.2s;
+}
+
+.inputGroup input:focus {
+  outline: none;
+  border-color: var(--color-primary);
+}
+
+.summaryBox {
+  background-color: var(--color-muted);
+  padding: 1.25rem;
+  border-radius: 0.75rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border: 1px solid var(--color-border);
+}
+
+.summaryRow {
+  display: flex;
+  flex-direction: column;
+}
+
+.summaryRow span:first-child {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--color-muted-foreground);
+  text-transform: uppercase;
+}
+
+.summaryTotal {
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: #f59e0b;
+}
+
+.submitBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 1.5rem;
+  background-color: #f59e0b;
+  color: white;
+  border: none;
+  border-radius: 0.625rem;
+  font-size: 0.95rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.submitBtn:hover:not(:disabled) {
+  background-color: #d97706;
+  transform: translateY(-1px);
+}
+
+.submitBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.spinner {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes scaleIn {
+  from { opacity: 0; transform: scale(0.95); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+.errorList {
+  margin: 0.5rem 0 0;
+  padding-left: 1.5rem;
+  list-style-type: disc;
+}
+
+.errorList li {
+  margin-bottom: 0.25rem;
+}
+
+.rowError {
+  background-color: color-mix(in srgb, #ef4444 5%, transparent);
+}

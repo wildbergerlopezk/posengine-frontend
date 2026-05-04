@@ -1,586 +1,661 @@
 "use client"
 
 import type React from "react"
-import { useState, useRef, useEffect } from "react"
+import { useState, useRef, useEffect, useCallback } from "react"
 import {
   Search,
-  Barcode,
   Trash2,
-  CreditCard,
-  Banknote,
-  ArrowRightLeft,
   ShoppingCart,
   Check,
   X,
   AlertCircle,
+  Plus,
+  Package,
+  Loader2,
 } from "lucide-react"
 import { Header } from "@/src/shared/components/Header"
-import { mockProducts, mockCategories } from "@/src/shared/api/mock-data"
-import { useCartStore, type Currency } from "../store/cart.store"
 import { formatCurrency } from "@/src/shared/hooks/useFormatCurrency"
-import type { PaymentMethod } from "../types"
+import { useRouter } from "next/navigation"
+import { useCashSession } from "@/src/features/cash-session/hooks/useCashSession"
+import { useAuthStore } from "@/src/features/auth/store/auth.store"
 import styles from "./SalesPage.module.css"
-import { usePriceHistory } from "@/src/shared/hooks/usePriceHistory"
-import { PriceHistoryModal } from "@/src/shared/components/PriceHistoryModal"
+import tableStyles from "@/src/features/products/pages/ProductsPage.module.css"
+
+const API_BASE = process.env.NEXT_PUBLIC_BACKEND_URL
+
+// ─── Tipos ────────────────────────────────────────────────────────────────────
+
+interface Product {
+  id: string
+  name: string
+  barcode?: string
+  sku?: string
+  price: number
+  stock: number
+  unitType: "UNIT" | "KG" | "G" | "L" | "ML" | "MG"
+}
+
+interface SaleItem {
+  product: Product
+  quantity: number
+  unitPrice: number
+}
+
+function readApiError(body: unknown): string {
+  if (!body || typeof body !== "object") return "Error en la solicitud"
+  const b = body as { message?: unknown; error?: string }
+  if (Array.isArray(b.message)) return b.message.map(String).join(" · ")
+  if (typeof b.message === "string") return b.message
+  if (typeof b.error === "string") return b.error
+  return "Error en la solicitud"
+}
+
+function isUnitType(unitType: string) {
+  return unitType === "UNIT"
+}
+
+function formatQuantity(qty: number, unitType: string) {
+  if (isUnitType(unitType)) return String(qty)
+  return qty % 1 === 0 ? String(qty) : qty.toFixed(3)
+}
+
+// ─── Componente ───────────────────────────────────────────────────────────────
 
 export function SalesPage() {
-  const { items, addItem, removeItem, updateQuantity, clearCart, getTotal, currency, setCurrency, getTotalInCurrency } = useCartStore()
-  const [showProductModal, setShowProductModal] = useState(false)
-  const [searchQuery, setSearchQuery] = useState("")
-  const [barcodeInput, setBarcodeInput] = useState("")
-  const [showPaymentModal, setShowPaymentModal] = useState(false)
-  const [showConfirmModal, setShowConfirmModal] = useState(false)
-  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("cash")
-  const [saleComplete, setSaleComplete] = useState(false)
-  const [selectedProductIndex, setSelectedProductIndex] = useState(0)
-  const [selectedRowIndex, setSelectedRowIndex] = useState(0)
-  const [editingQuantity, setEditingQuantity] = useState(false)
-  const [quantityInput, setQuantityInput] = useState("")
-  const [confirmModalSelectedButton, setConfirmModalSelectedButton] = useState<"accept" | "cancel">("accept")
-  const [paymentModalSelectedButton, setPaymentModalSelectedButton] = useState<"cancel" | "confirm">("confirm")
+  const { accessToken } = useAuthStore()
+  const router = useRouter()
+  const { session, loading: sessionLoading } = useCashSession()
+  const canOperate = !!session
+  const salesDisabled = !session && !sessionLoading
 
-  const priceHistory = usePriceHistory()
-  
-  const barcodeInputRef = useRef<HTMLInputElement>(null)
-  const searchInputRef = useRef<HTMLInputElement>(null)
-  const quantityInputRef = useRef<HTMLInputElement>(null)
+  const authHeaders = {
+    "Content-Type": "application/json",
+    Authorization: `Bearer ${accessToken}`,
+  }
+
+  // ── Items ──────────────────────────────────────────────────────────────────
+  const [items, setItems] = useState<SaleItem[]>([])
+
+  // ── Edición inline ─────────────────────────────────────────────────────────
+  const [editingRowIndex, setEditingRowIndex] = useState<number | null>(null)
+  const [editingField, setEditingField] = useState<"quantity" | "unitPrice" | null>(null)
+  const [editingValue, setEditingValue] = useState("")
+
+  // ── Modal de productos ─────────────────────────────────────────────────────
+  const [showProductModal, setShowProductModal] = useState(false)
+  const [productSearch, setProductSearch] = useState("")
+  const [products, setProducts] = useState<Product[]>([])
+  const [loadingProducts, setLoadingProducts] = useState(false)
+  const [selectedProductIndex, setSelectedProductIndex] = useState(0)
+
+  // ── Submit ─────────────────────────────────────────────────────────────────
+  const [submitting, setSubmitting] = useState(false)
+  const [submitError, setSubmitError] = useState<string | null>(null)
+  const [success, setSuccess] = useState(false)
+  const [showConfirmModal, setShowConfirmModal] = useState(false)
+  const [confirmSelectedBtn, setConfirmSelectedBtn] = useState<"accept" | "cancel">("accept")
+
+  // ── Barcode scanner ────────────────────────────────────────────────────────
+  const [barcodeBuffer, setBarcodeBuffer] = useState("")
+  const [barcodeError, setBarcodeError] = useState<string | null>(null)
+  const barcodeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  // ── Refs ───────────────────────────────────────────────────────────────────
+  const productSearchRef = useRef<HTMLInputElement>(null)
+  const editingInputRef = useRef<HTMLInputElement>(null)
   const confirmAcceptRef = useRef<HTMLButtonElement>(null)
   const confirmCancelRef = useRef<HTMLButtonElement>(null)
-  const paymentConfirmRef = useRef<HTMLButtonElement>(null)
-  const paymentCancelRef = useRef<HTMLButtonElement>(null)
 
-  const parentCategories = mockCategories.filter((c) => !c.parentId)
+  // ── Totales ────────────────────────────────────────────────────────────────
+  const total = items.reduce((acc, i) => acc + i.quantity * i.unitPrice, 0)
 
-  const filteredProducts = mockProducts.filter((product) => {
-    const matchesSearch =
-      searchQuery === "" ||
-      product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      product.barcode?.includes(searchQuery)
-    return matchesSearch && product.isActive
-  })
-
-  // Manejar teclas globales
-  useEffect(() => {
-    const handleGlobalKeyDown = (e: KeyboardEvent) => {
-      // F2 - Abrir búsqueda de productos
-      if (e.key === "F2") {
-        e.preventDefault()
-        if (!showProductModal && !showPaymentModal && !showConfirmModal) {
-          setShowProductModal(true)
-          setSelectedProductIndex(0)
-        }
+  // ── Fetch productos para el modal ──────────────────────────────────────────
+  const fetchProducts = useCallback(async (search: string) => {
+    setLoadingProducts(true)
+    try {
+      const params = new URLSearchParams({ limit: "30", isActive: "true" })
+      if (search.trim()) params.set("search", search.trim())
+      const res = await fetch(`${API_BASE}/product?${params}`, { headers: authHeaders })
+      if (res.ok) {
+        const data = await res.json()
+        setProducts(data.items ?? data)
+        setSelectedProductIndex(0)
       }
-
-      // F12 - Finalizar venta
-      if (e.key === "F12") {
-        e.preventDefault()
-        if (items.length > 0 && !showProductModal && !showPaymentModal && !showConfirmModal) {
-          setShowConfirmModal(true)
-          setConfirmModalSelectedButton("accept")
-        }
-      }
-
-      // Ctrl+E - Eliminar producto seleccionado
-      if (e.ctrlKey && e.key === "e") {
-        e.preventDefault()
-        if (items.length > 0 && !showProductModal && !showPaymentModal && !showConfirmModal && !editingQuantity) {
-          const selectedItem = items[selectedRowIndex]
-          if (selectedItem) {
-            removeItem(selectedItem.product.id)
-            if (selectedRowIndex >= items.length - 1) {
-              setSelectedRowIndex(Math.max(0, items.length - 2))
-            }
-          }
-        }
-      }
-
-      if (e.key === "Escape") {
-        if (priceHistory.open) return
-        if (showProductModal) {
-          setShowProductModal(false)
-          setSearchQuery("")
-          barcodeInputRef.current?.focus()
-        }
-      }
-
-      // Flechas arriba/abajo para navegar en la tabla
-      if (!showProductModal && !showPaymentModal && !showConfirmModal && !editingQuantity && items.length > 0) {
-        if (e.key === "ArrowUp") {
-          e.preventDefault()
-          setSelectedRowIndex(prev => Math.max(0, prev - 1))
-        }
-        if (e.key === "ArrowDown") {
-          e.preventDefault()
-          setSelectedRowIndex(prev => Math.min(items.length - 1, prev + 1))
-        }
-      }
-    }
-
-    window.addEventListener("keydown", handleGlobalKeyDown)
-    return () => window.removeEventListener("keydown", handleGlobalKeyDown)
-  }, [items, selectedRowIndex, showProductModal, showPaymentModal, showConfirmModal, editingQuantity, removeItem])
-
-  // Manejar navegación en modal de confirmación
-  useEffect(() => {
-    if (!showConfirmModal) return
-
-    const handleConfirmModalKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "ArrowLeft" || e.key === "ArrowRight") {
-        e.preventDefault()
-        setConfirmModalSelectedButton(prev => prev === "accept" ? "cancel" : "accept")
-      }
-      if (e.key === "Enter") {
-        e.preventDefault()
-        if (confirmModalSelectedButton === "accept") {
-          handleCompleteSale()
-        } else {
-          setShowConfirmModal(false)
-          barcodeInputRef.current?.focus()
-        }
-      }
-      if (e.key === "Escape") {
-        e.preventDefault()
-        setShowConfirmModal(false)
-        barcodeInputRef.current?.focus()
-      }
-    }
-
-    window.addEventListener("keydown", handleConfirmModalKeyDown)
-    return () => window.removeEventListener("keydown", handleConfirmModalKeyDown)
-  }, [showConfirmModal, confirmModalSelectedButton])
-
-  // Manejar navegación en modal de pago
-  useEffect(() => {
-    if (!showPaymentModal || saleComplete) return
-
-    const handlePaymentModalKeyDown = (e: KeyboardEvent) => {
-      // Navegación entre métodos de pago
-      if (e.key === "ArrowLeft") {
-        e.preventDefault()
-        if (paymentMethod === "card") setPaymentMethod("cash")
-        else if (paymentMethod === "transfer") setPaymentMethod("card")
-      }
-      if (e.key === "ArrowRight") {
-        e.preventDefault()
-        if (paymentMethod === "cash") setPaymentMethod("card")
-        else if (paymentMethod === "card") setPaymentMethod("transfer")
-      }
-      
-      // Navegación entre botones de cancelar/confirmar
-      if (e.key === "ArrowUp" || e.key === "ArrowDown") {
-        e.preventDefault()
-        setPaymentModalSelectedButton(prev => prev === "confirm" ? "cancel" : "confirm")
-      }
-      
-      if (e.key === "Enter") {
-        e.preventDefault()
-        if (paymentModalSelectedButton === "confirm") {
-          handleFinalizeSale()
-        } else {
-          setShowPaymentModal(false)
-          barcodeInputRef.current?.focus()
-        }
-      }
-      if (e.key === "Escape") {
-        e.preventDefault()
-        setShowPaymentModal(false)
-        barcodeInputRef.current?.focus()
-      }
-    }
-
-    window.addEventListener("keydown", handlePaymentModalKeyDown)
-    return () => window.removeEventListener("keydown", handlePaymentModalKeyDown)
-  }, [showPaymentModal, saleComplete, paymentMethod, paymentModalSelectedButton])
-
-  // Enfocar input de cantidad cuando se activa edición
-  useEffect(() => {
-    if (editingQuantity && quantityInputRef.current) {
-      quantityInputRef.current.focus()
-      quantityInputRef.current.select()
-    }
-  }, [editingQuantity])
-
-  // Enfocar botón correcto en modal de confirmación
-  useEffect(() => {
-    if (showConfirmModal) {
-      setTimeout(() => {
-        if (confirmModalSelectedButton === "accept") {
-          confirmAcceptRef.current?.focus()
-        } else {
-          confirmCancelRef.current?.focus()
-        }
-      }, 100)
-    }
-  }, [showConfirmModal, confirmModalSelectedButton])
-
-  // Enfocar botón correcto en modal de pago
-  useEffect(() => {
-    if (showPaymentModal && !saleComplete) {
-      setTimeout(() => {
-        if (paymentModalSelectedButton === "confirm") {
-          paymentConfirmRef.current?.focus()
-        } else {
-          paymentCancelRef.current?.focus()
-        }
-      }, 100)
-    }
-  }, [showPaymentModal, paymentModalSelectedButton, saleComplete])
-
-  // Resetear índice seleccionado cuando cambian los items
-  useEffect(() => {
-    if (selectedRowIndex >= items.length && items.length > 0) {
-      setSelectedRowIndex(items.length - 1)
-    }
-  }, [items.length, selectedRowIndex])
-
-  const handleBarcodeSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
-    const product = mockProducts.find((p) => p.barcode === barcodeInput)
-    if (product) {
-      addItem(product)
-      setBarcodeInput("")
-      
-      // Activar edición de cantidad para cada producto agregado
-      setTimeout(() => {
-        setSelectedRowIndex(items.length)
-        setEditingQuantity(true)
-        setQuantityInput("1")
-      }, 50)
-    }
-  }
-
-  const handleAddProduct = (product: any) => {
-    addItem(product)
-    setShowProductModal(false)
-    setSearchQuery("")
-    
-    // Activar edición de cantidad para cada producto agregado
-    setTimeout(() => {
-      setSelectedRowIndex(items.length)
-      setEditingQuantity(true)
-      setQuantityInput("1")
-    }, 50)
-  }
-
-  const handleQuantitySubmit = () => {
-    const selectedItem = items[selectedRowIndex]
-    if (selectedItem && quantityInput) {
-      const newQuantity = parseInt(quantityInput)
-      if (newQuantity > 0) {
-        updateQuantity(selectedItem.product.id, newQuantity)
-      }
-    }
-    setEditingQuantity(false)
-    setQuantityInput("")
-    barcodeInputRef.current?.focus()
-  }
-
-  const handleCompleteSale = () => {
-    setShowConfirmModal(false)
-    setShowPaymentModal(true)
-    setPaymentModalSelectedButton("confirm")
-  }
-
-  const handleFinalizeSale = () => {
-    setSaleComplete(true)
-    setTimeout(() => {
-      clearCart()
-      setSaleComplete(false)
-      setShowPaymentModal(false)
-      setSelectedRowIndex(0)
-      barcodeInputRef.current?.focus()
-    }, 500)
-  }
-
-  // Manejar navegación en modal de productos
-  const handleProductModalKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "ArrowDown") {
-      e.preventDefault()
-      setSelectedProductIndex(prev => Math.min(filteredProducts.length - 1, prev + 1))
-    }
-    if (e.key === "ArrowUp") {
-      e.preventDefault()
-      setSelectedProductIndex(prev => Math.max(0, prev - 1))
-    }
-    if (e.key === "Enter") {
-      e.preventDefault()
-      const selectedProduct = filteredProducts[selectedProductIndex]
-      if (selectedProduct) {
-        handleAddProduct(selectedProduct)
-      }
-    }
-    if (e.key === "F8") {
-      e.preventDefault()
-      const selectedProduct = filteredProducts[selectedProductIndex]
-      if (selectedProduct) {
-        priceHistory.openFor(selectedProduct.id, selectedProduct.name)
-      }
-    }
-    if (e.key === "Escape") {
-      e.preventDefault()
-      if (priceHistory.open) {
-        priceHistory.close()
-        return
-      }
-      // Esc para cerrar modal de productos
-      if (showProductModal) {
-        setShowProductModal(false)
-        setSearchQuery("")
-        barcodeInputRef.current?.focus()
-      }
-    }
-  }
-
-  // Manejar click en cantidad (solo con mouse)
-  const handleQuantityClick = (index: number) => {
-    if (!editingQuantity) {
-      setSelectedRowIndex(index)
-      setEditingQuantity(true)
-      const item = items[index]
-      setQuantityInput(item.quantity.toString())
-    }
-  }
+    } catch { /* silent */ }
+    finally { setLoadingProducts(false) }
+  }, [accessToken])
 
   useEffect(() => {
-    if (!showProductModal && !editingQuantity) {
-      barcodeInputRef.current?.focus()
-    }
-  }, [showProductModal, editingQuantity])
+    if (!showProductModal) return
+    const t = setTimeout(() => fetchProducts(productSearch), 250)
+    return () => clearTimeout(t)
+  }, [productSearch, showProductModal, fetchProducts])
 
   useEffect(() => {
     if (showProductModal) {
-      setTimeout(() => searchInputRef.current?.focus(), 100)
+      setTimeout(() => productSearchRef.current?.focus(), 80)
+      fetchProducts("")
     }
   }, [showProductModal])
 
-  const total = getTotal()
+  // ── Edición inline ─────────────────────────────────────────────────────────
+  const cancelEdit = useCallback(() => {
+    setEditingRowIndex(null)
+    setEditingField(null)
+    setEditingValue("")
+  }, [])
+
+  const startEdit = useCallback((index: number, field: "quantity" | "unitPrice", current: number) => {
+    setEditingRowIndex(index)
+    setEditingField(field)
+    setEditingValue(String(current))
+  }, [])
+
+  useEffect(() => {
+    if (editingRowIndex !== null && editingField !== null) {
+      const t = setTimeout(() => {
+        editingInputRef.current?.focus()
+        editingInputRef.current?.select()
+      }, 30)
+      return () => clearTimeout(t)
+    }
+  }, [editingRowIndex, editingField])
+
+  const commitEdit = useCallback(() => {
+    if (editingRowIndex === null || editingField === null) return
+    const val = parseFloat(editingValue)
+    if (isNaN(val) || val <= 0) { cancelEdit(); return }
+
+    setItems(prev => prev.map((item, idx) => {
+      if (idx !== editingRowIndex) return item
+
+      if (editingField === "quantity") {
+        const product = item.product
+        // Si es UNIT, forzar entero
+        const qty = isUnitType(product.unitType) ? Math.round(val) : val
+        return { ...item, quantity: qty }
+      }
+
+      if (editingField === "unitPrice") {
+        // No se puede bajar del precio base
+        const safePrice = Math.max(val, item.product.price)
+        return { ...item, unitPrice: safePrice }
+      }
+
+      return item
+    }))
+
+    cancelEdit()
+  }, [editingRowIndex, editingField, editingValue, cancelEdit])
+
+  const removeItem = (index: number) => {
+    setItems(prev => prev.filter((_, i) => i !== index))
+    cancelEdit()
+  }
+
+  // ── Agregar producto ───────────────────────────────────────────────────────
+  const addProduct = useCallback((product: Product) => {
+    setShowProductModal(false)
+    setProductSearch("")
+
+    setItems(prev => {
+      const existing = prev.findIndex(i => i.product.id === product.id)
+      if (existing >= 0) {
+        const newQty = isUnitType(product.unitType)
+          ? prev[existing].quantity + 1
+          : prev[existing].quantity + 1
+        setTimeout(() => startEdit(existing, "quantity", newQty), 50)
+        return prev.map((item, idx) =>
+          idx === existing ? { ...item, quantity: newQty } : item
+        )
+      }
+      const newIndex = prev.length
+      setTimeout(() => startEdit(newIndex, "quantity", 1), 50)
+      return [...prev, { product, quantity: 1, unitPrice: product.price }]
+    })
+  }, [startEdit])
+
+  // ── Barcode scanner ────────────────────────────────────────────────────────
+  const handleBarcodeAdd = useCallback(async (code: string) => {
+    try {
+      const res = await fetch(
+        `${API_BASE}/product/barcode/${encodeURIComponent(code)}`,
+        { headers: { Authorization: `Bearer ${accessToken}` } }
+      )
+      if (!res.ok) {
+        setBarcodeError(`No se encontró ningún producto con el código "${code}"`)
+        return
+      }
+      const product: Product = await res.json()
+      addProduct(product)
+    } catch {
+      setBarcodeError(`Error al buscar el producto con código "${code}"`)
+    }
+  }, [accessToken, addProduct])
+
+  // ── Submit ─────────────────────────────────────────────────────────────────
+  const handleSubmit = async () => {
+    if (!canOperate) { setSubmitError("Abrí caja antes de registrar ventas"); return }
+    if (items.length === 0) { setSubmitError("Agregá al menos un producto"); return }
+
+    setSubmitting(true)
+    setSubmitError(null)
+
+    try {
+      const payload = {
+        items: items.map(i => ({
+          productId: i.product.id,
+          quantity: i.quantity,
+          unitPrice: i.unitPrice,
+        })),
+      }
+
+      const res = await fetch(`${API_BASE}/sales`, {
+        method: "POST",
+        headers: authHeaders,
+        body: JSON.stringify(payload),
+      })
+
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}))
+        throw new Error(readApiError(body))
+      }
+
+      setSuccess(true)
+      setTimeout(() => {
+        setItems([])
+        setSuccess(false)
+      }, 1200)
+    } catch (err: unknown) {
+      setSubmitError(err instanceof Error ? err.message : "Error al guardar la venta")
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  // ── Teclado global ─────────────────────────────────────────────────────────
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      const activeTag = document.activeElement?.tagName
+      const isTyping = activeTag === "INPUT" || activeTag === "TEXTAREA"
+
+      // Barcode scanner — solo cuando no hay modal ni edición activa
+      if (!showProductModal && !showConfirmModal && !isTyping) {
+        if (e.key === "Enter" && barcodeBuffer.trim()) {
+          e.preventDefault()
+          const code = barcodeBuffer.trim()
+          setBarcodeBuffer("")
+          if (barcodeTimerRef.current) clearTimeout(barcodeTimerRef.current)
+          void handleBarcodeAdd(code)
+          return
+        }
+        if (e.key.length === 1 && !e.ctrlKey && !e.altKey && !e.metaKey) {
+          if (barcodeTimerRef.current) clearTimeout(barcodeTimerRef.current)
+          setBarcodeBuffer(prev => prev + e.key)
+          barcodeTimerRef.current = setTimeout(() => setBarcodeBuffer(""), 100)
+          return
+        }
+      }
+
+      if (e.key === "Escape") {
+        if (barcodeError) { setBarcodeError(null); return }
+        if (showProductModal) {
+          setShowProductModal(false)
+          setProductSearch("")
+          return
+        }
+      }
+      if (e.key === "F2" && !showProductModal) {
+        e.preventDefault()
+        setShowProductModal(true)
+      }
+      if (e.key === "F12" && !showProductModal && items.length > 0 && !showConfirmModal) {
+        e.preventDefault()
+        setShowConfirmModal(true)
+        setConfirmSelectedBtn("accept")
+      }
+    }
+    window.addEventListener("keydown", handler)
+    return () => window.removeEventListener("keydown", handler)
+  }, [showProductModal, showConfirmModal, barcodeBuffer, barcodeError, items, handleBarcodeAdd])
+
+  // ── Confirm modal teclado ──────────────────────────────────────────────────
+  useEffect(() => {
+    if (!showConfirmModal) return
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === "ArrowLeft" || e.key === "ArrowRight") {
+        e.preventDefault()
+        setConfirmSelectedBtn(prev => prev === "accept" ? "cancel" : "accept")
+      }
+      if (e.key === "Enter") {
+        e.preventDefault()
+        if (confirmSelectedBtn === "accept") { setShowConfirmModal(false); handleSubmit() }
+        else { setShowConfirmModal(false) }
+      }
+      if (e.key === "Escape") { e.preventDefault(); setShowConfirmModal(false) }
+    }
+    window.addEventListener("keydown", handler)
+    return () => window.removeEventListener("keydown", handler)
+  }, [showConfirmModal, confirmSelectedBtn])
+
+  useEffect(() => {
+    if (showConfirmModal) {
+      setTimeout(() => {
+        if (confirmSelectedBtn === "accept") confirmAcceptRef.current?.focus()
+        else confirmCancelRef.current?.focus()
+      }, 80)
+    }
+  }, [showConfirmModal, confirmSelectedBtn])
+
+  // ── Product modal teclado ──────────────────────────────────────────────────
+  const handleProductModalKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "ArrowDown") { e.preventDefault(); setSelectedProductIndex(p => Math.min(products.length - 1, p + 1)) }
+    if (e.key === "ArrowUp") { e.preventDefault(); setSelectedProductIndex(p => Math.max(0, p - 1)) }
+    if (e.key === "Enter") { e.preventDefault(); const p = products[selectedProductIndex]; if (p) addProduct(p) }
+    if (e.key === "Escape") { setShowProductModal(false); setProductSearch("") }
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────────
 
   return (
     <div className={styles.page}>
-      <Header title="Punto de Venta" />
+      <Header title="Nueva venta" />
 
       <div className={styles.container}>
-        {/* Header Minimalista */}
-        <div className={styles.salesHeader}>
-          <div className={styles.headerContent}>
-           
-            <div className={styles.totalSection}>
-              <span className={styles.totalLabel}>TOTAL</span>
-              <span className={styles.totalAmount}>{formatCurrency(total)}</span>
-            </div>
 
-            <div className={styles.currencySection}>
-              <button
-                className={`${styles.currencyBtn} ${currency === "GS" ? styles.currencyBtnActive : ""}`}
-                onClick={() => setCurrency("GS")}
-              >
-                <span className={styles.currencySymbol}>₲</span>
-                <div className={styles.currencyInfo}>
-                  <span className={styles.currencyName}>Guaraní</span>
-                  <span className={styles.currencyValue}>{formatCurrency(getTotalInCurrency("GS") * 1)}</span>
-                </div>
+        {/* Bloqueo sin caja */}
+        {salesDisabled && (
+          <div className={styles.blockNotice}>
+            <div>
+              <AlertCircle size={32} className={styles.noticeIcon} />
+              <h2>No hay caja abierta</h2>
+              <p>Abrí caja antes de comenzar a registrar ventas.</p>
+              <button className={styles.openCashLink} onClick={() => router.push("/dashboard/cash")}>
+                Abrir caja
               </button>
             </div>
           </div>
-        </div>
+        )}
 
-        {/* Barcode Input */}
-        <div className={styles.barcodeSection}>
-          <form onSubmit={handleBarcodeSubmit} className={styles.barcodeForm}>
-            <div className={styles.barcodeWrapper}>
-              <Barcode size={20} className={styles.barcodeIcon} />
-              <input
-                ref={barcodeInputRef}
-                placeholder="Escanear código de barras..."
-                value={barcodeInput}
-                onChange={(e) => setBarcodeInput(e.target.value)}
-                className={styles.barcodeInput}
-                disabled={editingQuantity}
-              />
-            </div>
-          </form>
-          <div className={styles.shortcuts}>
-            <span className={styles.shortcut}><kbd>F2</kbd> Buscar</span>
-            <span className={styles.shortcut}><kbd>Ctrl+E</kbd> Eliminar</span>
-            <span className={styles.shortcut}><kbd>F12</kbd> Cobrar</span>
-            <span className={styles.shortcut}><kbd>↑↓</kbd> Navegar</span>
+        {/* Error banner */}
+        {submitError && (
+          <div className={tableStyles.errorBanner}>
+            <AlertCircle size={16} />
+            {submitError}
+            <button type="button" className={styles.bannerClose} onClick={() => setSubmitError(null)}>
+              <X size={14} />
+            </button>
           </div>
-        </div>
+        )}
 
-        {/* Tabla de Productos */}
-        <div className={styles.tableContainer}>
-          <table className={styles.table}>
-            <thead className={styles.tableHead}>
+        {/* ══ TABLA DE ITEMS ═══════════════════════════════════════════════════ */}
+        <div className={`${tableStyles.tableCard} ${salesDisabled ? styles.disabledArea : ""}`}>
+
+          {/* Toolbar */}
+          <div className={styles.itemsToolbar}>
+            <span className={styles.itemsTitle}>
+              Productos <span className={styles.itemsCount}>{items.length}</span>
+            </span>
+            <div className={styles.itemsActions}>
+              <span className={styles.shortcutHint}><kbd>F2</kbd> Agregar</span>
+              <span className={styles.shortcutHint}><kbd>F12</kbd> Cobrar</span>
+              <button
+                type="button"
+                className={tableStyles.newButton}
+                onClick={() => setShowProductModal(true)}
+              >
+                <Plus size={15} /> Agregar producto
+              </button>
+            </div>
+          </div>
+
+          <table className={tableStyles.table}>
+            <thead className={tableStyles.tableHeader}>
               <tr>
-                <th className={styles.tableHeader} style={{ width: "50px" }}>#</th>
-                <th className={styles.tableHeader} style={{ width: "130px" }}>Código</th>
-                <th className={styles.tableHeader}>Descripción</th>
-                <th className={styles.tableHeader} style={{ width: "120px" }}>Cantidad</th>
-                <th className={styles.tableHeader} style={{ width: "130px" }}>Precio</th>
-                <th className={styles.tableHeader} style={{ width: "150px" }}>SubTotal</th>
+                <th className={tableStyles.tableHeaderCell} style={{ width: 40 }}>#</th>
+                <th className={tableStyles.tableHeaderCell} style={{ width: 130 }}>Código</th>
+                <th className={tableStyles.tableHeaderCell}>Descripción</th>
+                <th className={`${tableStyles.tableHeaderCell} ${tableStyles.tableHeaderCellRight}`} style={{ width: 110 }}>Cant.</th>
+                <th className={`${tableStyles.tableHeaderCell} ${tableStyles.tableHeaderCellRight}`} style={{ width: 140 }}>Precio unit.</th>
+                <th className={`${tableStyles.tableHeaderCell} ${tableStyles.tableHeaderCellRight}`} style={{ width: 140 }}>SubTotal</th>
+                <th className={tableStyles.tableHeaderCell} style={{ width: 44 }} />
               </tr>
             </thead>
-            <tbody className={styles.tableBody}>
+            <tbody>
               {items.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className={styles.emptyRow}>
-                    <div className={styles.emptyState}>
-                      <ShoppingCart size={48} className={styles.emptyIcon} />
-                      <p>No hay productos en la venta</p>
-                      <p className={styles.emptyHint}>
-                        Escanea código de barras o presiona <kbd>F2</kbd> para buscar
-                      </p>
+                  <td colSpan={7}>
+                    <div className={tableStyles.emptyState}>
+                      <ShoppingCart size={36} className={tableStyles.emptyStateIcon} />
+                      <p className={tableStyles.emptyStateTitle}>Sin productos</p>
+                      <p>Escaneá un código de barras o presioná <kbd className={styles.kbdInline}>F2</kbd> para buscar</p>
                     </div>
                   </td>
                 </tr>
               ) : (
-                items.map((item, index) => (
-                  <tr 
-                    key={item.product.id} 
-                    className={`${styles.tableRow} ${selectedRowIndex === index ? styles.tableRowSelected : ""}`}
-                    onClick={() => setSelectedRowIndex(index)}
-                  >
-                    <td className={styles.tableCell}>{index + 1}</td>
-                    <td className={styles.tableCell}>
-                      <span className={styles.codeText}>{item.product.barcode || item.product.id}</span>
+                items.map((item, idx) => (
+                  <tr key={item.product.id} className={tableStyles.tableRow}>
+
+                    <td className={tableStyles.tableCell}>
+                      <span className={styles.rowNum}>{idx + 1}</span>
                     </td>
-                    <td className={styles.tableCell}>
-                      <div className={styles.productInfo}>
-                        <span className={styles.productName}>{item.product.name}</span>
-                      </div>
+
+                    <td className={tableStyles.tableCell}>
+                      <span className={styles.codeChip}>{item.product.barcode || item.product.sku || "—"}</span>
                     </td>
-                    <td className={styles.tableCell}>
-                      {editingQuantity && selectedRowIndex === index ? (
-                        <input
-                          ref={quantityInputRef}
-                          type="number"
-                          value={quantityInput}
-                          onChange={(e) => setQuantityInput(e.target.value)}
-                          onKeyDown={(e) => {
-                            if (e.key === "Enter") {
-                              e.preventDefault()
-                              handleQuantitySubmit()
-                            }
-                            if (e.key === "Escape") {
-                              setEditingQuantity(false)
-                              setQuantityInput("")
-                              barcodeInputRef.current?.focus()
-                            }
-                          }}
-                          className={styles.quantityInputEditing}
-                          min="1"
-                        />
-                      ) : (
-                        <div 
-                          className={styles.quantityDisplay}
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            handleQuantityClick(index)
-                          }}
-                        >
-                          <span className={styles.quantityValue}>{item.quantity}</span>
-                        </div>
+
+                    <td className={tableStyles.tableCell}>
+                      <span style={{ fontWeight: 500 }}>{item.product.name}</span>
+                      {item.product.unitType !== "UNIT" && (
+                        <span className={styles.unitBadge}>{item.product.unitType}</span>
                       )}
                     </td>
-                    <td className={styles.tableCell}>
-                      <span className={styles.priceText}>{formatCurrency(item.product.price)}</span>
+
+                    {/* Cantidad — editable inline */}
+                    <td className={`${tableStyles.tableCell} ${tableStyles.tableCellRight}`}>
+                      {editingRowIndex === idx && editingField === "quantity" ? (
+                        <input
+                          ref={editingInputRef}
+                          className={styles.inlineInput}
+                          type="number"
+                          value={editingValue}
+                          onChange={e => setEditingValue(e.target.value)}
+                          onKeyDown={e => {
+                            if (e.key === "Enter" || e.key === "Tab") { e.preventDefault(); commitEdit() }
+                            if (e.key === "Escape") cancelEdit()
+                          }}
+                          onBlur={commitEdit}
+                          min={isUnitType(item.product.unitType) ? "1" : "0.001"}
+                          step={isUnitType(item.product.unitType) ? "1" : "0.001"}
+                        />
+                      ) : (
+                        <button
+                          type="button"
+                          className={styles.editableCell}
+                          onClick={() => startEdit(idx, "quantity", item.quantity)}
+                          title="Clic para editar"
+                        >
+                          {formatQuantity(item.quantity, item.product.unitType)}
+                        </button>
+                      )}
                     </td>
-                    <td className={styles.tableCell}>
-                      <strong className={styles.subtotalText}>
-                        {formatCurrency(item.product.price * item.quantity)}
-                      </strong>
+
+                    {/* Precio unitario — editable inline */}
+                    <td className={`${tableStyles.tableCell} ${tableStyles.tableCellRight}`}>
+                      {editingRowIndex === idx && editingField === "unitPrice" ? (
+                        <input
+                          ref={editingInputRef}
+                          className={styles.inlineInput}
+                          type="number"
+                          value={editingValue}
+                          onChange={e => setEditingValue(e.target.value)}
+                          onKeyDown={e => {
+                            if (e.key === "Enter" || e.key === "Tab") { e.preventDefault(); commitEdit() }
+                            if (e.key === "Escape") cancelEdit()
+                          }}
+                          onBlur={commitEdit}
+                          min={item.product.price}
+                          step="any"
+                        />
+                      ) : (
+                        <button
+                          type="button"
+                          className={`${styles.editableCell} ${item.unitPrice > item.product.price ? styles.editableCellModified : ""}`}
+                          onClick={() => startEdit(idx, "unitPrice", item.unitPrice)}
+                          title={`Precio base: ${formatCurrency(item.product.price)}. Clic para modificar (solo se puede subir)`}
+                        >
+                          {formatCurrency(item.unitPrice)}
+                        </button>
+                      )}
                     </td>
+
+                    <td className={`${tableStyles.tableCell} ${tableStyles.tableCellRight}`}>
+                      <strong>{formatCurrency(item.quantity * item.unitPrice)}</strong>
+                    </td>
+
+                    <td className={tableStyles.tableCell}>
+                      <button
+                        type="button"
+                        className={styles.removeBtn}
+                        onClick={() => removeItem(idx)}
+                        title="Eliminar"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    </td>
+
                   </tr>
                 ))
               )}
             </tbody>
           </table>
-        </div>
 
+          {/* Footer totales */}
+          {items.length > 0 && (
+            <div className={styles.tableFooter}>
+              <div className={styles.totalsBlock}>
+                <div className={`${styles.totalRow} ${styles.totalRowFinal}`}>
+                  <span className={styles.totalLabel}>Total</span>
+                  <span className={styles.totalValueFinal}>{formatCurrency(total)}</span>
+                </div>
+              </div>
+              <div className={styles.footerActions}>
+                <button
+                  type="button"
+                  className={tableStyles.cancelButton}
+                  onClick={() => { setItems([]); cancelEdit() }}
+                  disabled={submitting}
+                >
+                  Limpiar
+                </button>
+                <button
+                  type="button"
+                  className={tableStyles.submitButton}
+                  onClick={() => { setShowConfirmModal(true); setConfirmSelectedBtn("accept") }}
+                  disabled={submitting || success}
+                >
+                  {success
+                    ? <><Check size={15} /> Guardado</>
+                    : submitting
+                      ? <><Loader2 size={15} className={tableStyles.spinner} /> Guardando…</>
+                      : <><Check size={15} /> Cobrar <kbd className={styles.kbdWhite}>F12</kbd></>
+                  }
+                </button>
+              </div>
+            </div>
+          )}
+
+        </div>
       </div>
 
-      {/* Product Search Modal */}
+      {/* ══ MODAL BÚSQUEDA DE PRODUCTOS (F2) ═════════════════════════════════ */}
       {showProductModal && (
-        <div className={styles.modalOverlay} onClick={() => setShowProductModal(false)}>
-          <div className={styles.productModal} onClick={(e) => e.stopPropagation()}>
+        <div className={tableStyles.modalOverlay} onClick={() => { setShowProductModal(false); setProductSearch("") }}>
+          <div className={styles.productModal} onClick={e => e.stopPropagation()}>
+
             <div className={styles.modalHeader}>
-              <h2 className={styles.modalTitle}>Buscar Producto</h2>
-              <button className={styles.closeBtn} onClick={() => setShowProductModal(false)}>
-                <X size={20} />
+              <h2 className={styles.modalTitle}>Agregar producto</h2>
+              <button type="button" className={styles.modalCloseBtn} onClick={() => { setShowProductModal(false); setProductSearch("") }}>
+                <X size={18} />
               </button>
             </div>
 
-            <div className={styles.modalSearch}>
-              <Search size={20} className={styles.searchIcon} />
+            <div className={styles.modalSearchBox}>
+              <Search size={16} className={styles.modalSearchIcon} />
               <input
-                ref={searchInputRef}
-                placeholder="Buscar por nombre o código..."
-                value={searchQuery}
-                onChange={(e) => {
-                  setSearchQuery(e.target.value)
-                  setSelectedProductIndex(0)
-                }}
-                onKeyDown={handleProductModalKeyDown}
+                ref={productSearchRef}
                 className={styles.modalSearchInput}
+                placeholder="Buscar por nombre, código o SKU…"
+                value={productSearch}
+                onChange={e => { setProductSearch(e.target.value); setSelectedProductIndex(0) }}
+                onKeyDown={handleProductModalKeyDown}
               />
             </div>
 
             <div className={styles.productList}>
-              {filteredProducts.map((product, index) => (
-                <button
-                  key={product.id}
-                  onClick={() => handleAddProduct(product)}
-                  className={`${styles.productRow} ${selectedProductIndex === index ? styles.productRowSelected : ""}`}
-                  onMouseEnter={() => setSelectedProductIndex(index)}
-                >
-                  <div className={styles.productRowCode}>{product.barcode || product.id}</div>
-                  <div className={styles.productRowName}>{product.name}</div>
-                  <div className={styles.productRowStock}>Stock: {product.stock}</div>
-                  <div className={styles.productRowPrice}>{formatCurrency(product.price)}</div>
-                </button>
-              ))}
+              {loadingProducts ? (
+                <div className={styles.productListEmpty}>
+                  <Loader2 size={24} className={tableStyles.spinner} />
+                </div>
+              ) : products.length === 0 ? (
+                <div className={styles.productListEmpty}>
+                  <Package size={28} style={{ opacity: 0.3 }} />
+                  <p>Sin resultados</p>
+                </div>
+              ) : (
+                products.map((product, idx) => (
+                  <button
+                    key={product.id}
+                    type="button"
+                    className={`${styles.productRow} ${selectedProductIndex === idx ? styles.productRowSelected : ""}`}
+                    onClick={() => addProduct(product)}
+                    onMouseEnter={() => setSelectedProductIndex(idx)}
+                  >
+                    <span className={styles.productRowCode}>{product.barcode || product.sku || "—"}</span>
+                    <span className={styles.productRowName}>{product.name}</span>
+                    <span className={styles.productRowUnit}>{product.unitType !== "UNIT" ? product.unitType : ""}</span>
+                    <span className={styles.productRowStock}>Stock: {product.stock}</span>
+                    <span className={styles.productRowPrice}>{formatCurrency(product.price)}</span>
+                  </button>
+                ))
+              )}
             </div>
 
-            <div className={styles.modalFooter}>
-              <div className={styles.modalHints}>
-                <kbd>↑↓</kbd> Navegar
-                <kbd>Enter</kbd> Seleccionar
-                <kbd>F8</kbd> Último precio
-                <kbd>Esc</kbd> Cerrar
-              </div>
+            <div className={styles.modalHints}>
+              <span><kbd>↑↓</kbd> Navegar</span>
+              <span><kbd>Enter</kbd> Seleccionar</span>
+              <span><kbd>Esc</kbd> Cerrar</span>
             </div>
+
           </div>
         </div>
       )}
 
-      {/* Confirm Modal */}
+      {/* ══ MODAL CONFIRMAR VENTA ════════════════════════════════════════════ */}
       {showConfirmModal && (
         <div className={styles.modalOverlay}>
           <div className={styles.confirmModal}>
             <div className={styles.confirmIcon}>
               <AlertCircle size={40} />
             </div>
-            <h2 className={styles.confirmTitle}>¿Finalizar venta?</h2>
+            <h2 className={styles.confirmTitle}>¿Confirmar venta?</h2>
             <p className={styles.confirmDescription}>
               Total: <strong>{formatCurrency(total)}</strong>
             </p>
             <div className={styles.confirmButtons}>
               <button
                 ref={confirmCancelRef}
-                className={`${styles.confirmCancel} ${confirmModalSelectedButton === "cancel" ? styles.buttonFocused : ""}`}
-                onClick={() => {
-                  setShowConfirmModal(false)
-                  barcodeInputRef.current?.focus()
-                }}
+                className={`${styles.confirmCancel} ${confirmSelectedBtn === "cancel" ? styles.buttonFocused : ""}`}
+                onClick={() => setShowConfirmModal(false)}
               >
                 Cancelar
               </button>
               <button
                 ref={confirmAcceptRef}
-                className={`${styles.confirmAccept} ${confirmModalSelectedButton === "accept" ? styles.buttonFocused : ""}`}
-                onClick={handleCompleteSale}
+                className={`${styles.confirmAccept} ${confirmSelectedBtn === "accept" ? styles.buttonFocused : ""}`}
+                onClick={() => { setShowConfirmModal(false); handleSubmit() }}
               >
-                Aceptar
+                Confirmar
               </button>
             </div>
             <div className={styles.confirmHint}>
@@ -590,87 +665,28 @@ export function SalesPage() {
         </div>
       )}
 
-      {/* Payment Modal */}
-      {showPaymentModal && (
-        <div className={styles.modalOverlay}>
-          <div className={styles.paymentModal}>
-            {saleComplete ? (
-              <div className={styles.successState}>
-                <div className={styles.successIcon}>
-                  <Check size={32} />
-                </div>
-                <h2 className={styles.successTitle}>Venta completada</h2>
-              </div>
-            ) : (
-              <>
-                <div className={styles.paymentHeader}>
-                  <h2 className={styles.paymentTitle}>Finalizar venta</h2>
-                  <p className={styles.paymentTotal}>Total a cobrar: <strong>{formatCurrency(total)}</strong></p>
-                </div>
-
-                <div className={styles.paymentContent}>
-                  <p className={styles.paymentLabel}>Método de pago</p>
-                  <div className={styles.paymentOptions}>
-                    <button
-                      className={`${styles.paymentOption} ${paymentMethod === "cash" ? styles.paymentOptionActive : ""}`}
-                      onClick={() => setPaymentMethod("cash")}
-                    >
-                      <Banknote size={28} />
-                      <span>Efectivo</span>
-                    </button>
-                    <button
-                      className={`${styles.paymentOption} ${paymentMethod === "card" ? styles.paymentOptionActive : ""}`}
-                      onClick={() => setPaymentMethod("card")}
-                    >
-                      <CreditCard size={28} />
-                      <span>Tarjeta</span>
-                    </button>
-                    <button
-                      className={`${styles.paymentOption} ${paymentMethod === "transfer" ? styles.paymentOptionActive : ""}`}
-                      onClick={() => setPaymentMethod("transfer")}
-                    >
-                      <ArrowRightLeft size={28} />
-                      <span>Transferencia</span>
-                    </button>
-                  </div>
-                </div>
-
-                <div className={styles.paymentFooter}>
-                  <button 
-                    ref={paymentCancelRef}
-                    className={`${styles.paymentCancel} ${paymentModalSelectedButton === "cancel" ? styles.buttonFocused : ""}`}
-                    onClick={() => {
-                      setShowPaymentModal(false)
-                      barcodeInputRef.current?.focus()
-                    }}
-                  >
-                    Cancelar
-                  </button>
-                  <button 
-                    ref={paymentConfirmRef}
-                    className={`${styles.paymentConfirm} ${paymentModalSelectedButton === "confirm" ? styles.buttonFocused : ""}`}
-                    onClick={handleFinalizeSale}
-                  >
-                    Confirmar venta
-                  </button>
-                </div>
-
-                <div className={styles.paymentHint}>
-                  <kbd>←→</kbd> Cambiar método <kbd>↑↓</kbd> Cambiar botón <kbd>Enter</kbd> Confirmar <kbd>Esc</kbd> Cancelar
-                </div>
-              </>
-            )}
+      {/* ══ MODAL BARCODE ERROR ══════════════════════════════════════════════ */}
+      {barcodeError && (
+        <div className={styles.modalOverlay} onClick={() => setBarcodeError(null)}>
+          <div className={styles.confirmModal} onClick={e => e.stopPropagation()}>
+            <div className={styles.confirmIcon} style={{ background: "rgba(239,68,68,0.1)", color: "#ef4444" }}>
+              <AlertCircle size={40} />
+            </div>
+            <h2 className={styles.confirmTitle}>Producto no encontrado</h2>
+            <p className={styles.confirmDescription}>{barcodeError}</p>
+            <div className={styles.confirmButtons}>
+              <button
+                className={styles.confirmAccept}
+                onClick={() => setBarcodeError(null)}
+                autoFocus
+              >
+                Aceptar
+              </button>
+            </div>
+            <div className={styles.confirmHint}><kbd>Enter</kbd> o <kbd>Esc</kbd> para cerrar</div>
           </div>
         </div>
       )}
-
-      <PriceHistoryModal
-        open={priceHistory.open}
-        loading={priceHistory.loading}
-        history={priceHistory.history}
-        productName={priceHistory.productName}
-        onClose={priceHistory.close}
-      />
     </div>
   )
 }

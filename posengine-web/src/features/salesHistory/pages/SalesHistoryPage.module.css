@@ -1,0 +1,623 @@
+/* SaleHistoryPage.module.css */
+
+.page { min-height: 100vh; }
+
+.container {
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.bannerClose {
+  margin-left: auto;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: inherit;
+  display: flex;
+  align-items: center;
+  opacity: 0.7;
+  padding: 0;
+}
+.bannerClose:hover { opacity: 1; }
+
+/* ── Filters ─────────────────────────────────────────────────────────────── */
+.filtersBar {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.filtersRow {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.clearFiltersBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.35rem 0.75rem;
+  border: 1px solid var(--color-border);
+  border-radius: 0.375rem;
+  background: transparent;
+  font-size: 0.78rem;
+  font-weight: 500;
+  color: var(--color-muted-foreground);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background-color 0.15s, color 0.15s;
+}
+.clearFiltersBtn:hover { background: var(--color-accent); color: var(--color-foreground); }
+
+.searchWrapper {
+  position: relative;
+  flex: 1;
+  min-width: 260px;
+  max-width: 400px;
+}
+
+.searchIcon {
+  position: absolute;
+  left: 0.75rem;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--color-muted-foreground);
+  pointer-events: none;
+}
+
+.searchInput {
+  width: 100%;
+  height: 2.5rem;
+  padding: 0 2.25rem 0 2.25rem;
+  border: 1.5px solid var(--color-border);
+  border-radius: 0.5rem;
+  background: var(--color-background);
+  font-size: 0.875rem;
+  color: var(--color-foreground);
+  box-sizing: border-box;
+  transition: border-color 0.15s;
+}
+.searchInput:focus {
+  outline: none;
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-primary) 15%, transparent);
+}
+
+.searchClear {
+  position: absolute;
+  right: 0.6rem;
+  top: 50%;
+  transform: translateY(-50%);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: var(--color-muted-foreground);
+  display: flex;
+  align-items: center;
+  padding: 0.2rem;
+  border-radius: 0.25rem;
+}
+.searchClear:hover { color: var(--color-foreground); }
+
+.statusTabs {
+  display: flex;
+  gap: 0.35rem;
+  background: var(--color-muted);
+  border: 1px solid var(--color-border);
+  border-radius: 0.5rem;
+  padding: 0.25rem;
+}
+
+.statusTab {
+  border: none;
+  background: transparent;
+  padding: 0.35rem 0.85rem;
+  font-size: 0.8rem;
+  font-weight: 500;
+  border-radius: 0.35rem;
+  cursor: pointer;
+  color: var(--color-muted-foreground);
+  transition: background-color 0.15s, color 0.15s;
+  white-space: nowrap;
+}
+.statusTab:hover:not(.statusTabActive) { background: var(--color-background); color: var(--color-foreground); }
+.statusTabActive {
+  background: var(--color-background);
+  color: var(--color-foreground);
+  font-weight: 600;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+}
+
+.dateRange {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.dateInput {
+  height: 2.1rem;
+  padding: 0 0.6rem;
+  border: 1.5px solid var(--color-border);
+  border-radius: 0.375rem;
+  background: var(--color-background);
+  font-size: 0.8rem;
+  color: var(--color-foreground);
+  cursor: pointer;
+  transition: border-color 0.15s;
+}
+.dateInput:focus { outline: none; border-color: var(--color-primary); }
+
+.dateSeparator {
+  font-size: 0.8rem;
+  color: var(--color-muted-foreground);
+}
+
+/* ── Table toolbar ───────────────────────────────────────────────────────── */
+.tableToolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.875rem 1rem;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.tableTitle {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--color-foreground);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.tableCount {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.4rem;
+  height: 1.4rem;
+  padding: 0 0.35rem;
+  border-radius: 9999px;
+  background: var(--color-primary);
+  color: white;
+  font-size: 0.7rem;
+  font-weight: 700;
+}
+
+.historyTable td {
+  padding-top: 0.35rem !important;
+  padding-bottom: 0.35rem !important;
+}
+
+.headerCellOverride {
+  padding-top: 0.5rem !important;
+  padding-bottom: 0.5rem !important;
+}
+
+/* ── Table cells ─────────────────────────────────────────────────────────── */
+.saleIdChip {
+  font-family: ui-monospace, monospace;
+  font-size: 0.78rem;
+  font-weight: 600;
+  background: var(--color-muted);
+  padding: 0.15rem 0.5rem;
+  border-radius: 0.35rem;
+  color: var(--color-foreground);
+}
+
+.dateText {
+  font-size: 0.8rem;
+  color: var(--color-muted-foreground);
+}
+
+.itemsCount {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--color-foreground);
+}
+
+.statusBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.7rem;
+  font-weight: 600;
+  padding: 0.15rem 0.5rem;
+  border-radius: 9999px;
+}
+
+.statusCompleted {
+  background: color-mix(in srgb, #22c55e 15%, transparent);
+  color: #16a34a;
+}
+
+.statusCancelled {
+  background: color-mix(in srgb, #ef4444 12%, transparent);
+  color: #dc2626;
+}
+
+.totalAmount {
+  font-size: 0.925rem;
+  font-weight: 700;
+  color: var(--color-foreground);
+}
+
+.viewBtn {
+  width: 2rem;
+  height: 2rem;
+  border: none;
+  background: transparent;
+  border-radius: 0.375rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-muted-foreground);
+  transition: background-color 0.15s, color 0.15s;
+}
+.viewBtn:hover {
+  background: color-mix(in srgb, var(--color-primary) 10%, transparent);
+  color: var(--color-primary);
+}
+
+/* ── Pagination ──────────────────────────────────────────────────────────── */
+.pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.875rem 1.25rem;
+  border-top: 1px solid var(--color-border);
+  background: var(--color-muted);
+  border-radius: 0 0 0.75rem 0.75rem;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.paginationInfo {
+  font-size: 0.8rem;
+  color: var(--color-muted-foreground);
+}
+
+.paginationControls {
+  display: flex;
+  gap: 0.25rem;
+  align-items: center;
+}
+
+.pageBtn {
+  min-width: 2rem;
+  height: 2rem;
+  padding: 0 0.5rem;
+  border: 1px solid var(--color-border);
+  border-radius: 0.375rem;
+  background: var(--color-background);
+  font-size: 0.8rem;
+  font-weight: 500;
+  cursor: pointer;
+  color: var(--color-foreground);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background-color 0.15s, color 0.15s, border-color 0.15s;
+}
+.pageBtn:hover:not(:disabled):not(.pageBtnActive) { background: var(--color-accent); }
+.pageBtn:disabled { opacity: 0.4; cursor: not-allowed; }
+.pageBtnActive { background: var(--color-primary); color: white; border-color: var(--color-primary); }
+.pageDots { padding: 0 0.25rem; font-size: 0.8rem; color: var(--color-muted-foreground); }
+
+/* ── Detail modal ────────────────────────────────────────────────────────── */
+.detailModal {
+  background: var(--color-card);
+  border-radius: 0.875rem;
+  width: 100%;
+  max-width: 780px;
+  max-height: 88vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 25px 50px -12px rgba(0,0,0,0.28);
+  overflow: hidden;
+}
+
+.detailModalHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.875rem 1.25rem;
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-muted);
+  flex-shrink: 0;
+}
+
+.detailModalHeaderLeft {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.detailModalIcon { color: var(--color-primary); }
+
+.detailModalTitle {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--color-foreground);
+  margin: 0;
+}
+
+.detailModalSubtitle {
+  font-size: 0.78rem;
+  font-family: ui-monospace, monospace;
+  color: var(--color-muted-foreground);
+  margin: 0.1rem 0 0;
+}
+
+.modalCloseBtn {
+  width: 2rem;
+  height: 2rem;
+  border: none;
+  border-radius: 0.375rem;
+  background: transparent;
+  color: var(--color-muted-foreground);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background-color 0.15s, color 0.15s;
+}
+.modalCloseBtn:hover { background: var(--color-accent); color: var(--color-foreground); }
+
+.detailModalBody {
+  overflow-y: auto;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ── Receipt header ──────────────────────────────────────────────────────── */
+.receiptHeader {
+  padding: 0.875rem 1.25rem;
+  border-bottom: 1px solid var(--color-border);
+  background: color-mix(in srgb, var(--color-muted) 50%, transparent);
+}
+
+.receiptHeaderGrid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.25rem;
+  justify-content: space-between;
+}
+
+.receiptInfoBlock { display: flex; flex-direction: column; }
+.receiptInfoBlockFull { width: 100%; margin-top: 0.25rem; }
+
+.receiptInfoRow {
+  display: flex;
+  gap: 0.5rem;
+  align-items: flex-start;
+}
+
+.receiptInfoIcon { color: var(--color-primary); margin-top: 0.2rem; flex-shrink: 0; }
+
+.receiptInfoLabel {
+  display: block;
+  font-size: 0.65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-muted-foreground);
+  margin-bottom: 0.1rem;
+}
+
+.receiptInfoValue {
+  display: block;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--color-foreground);
+  line-height: 1.2;
+}
+
+.receiptIdValue {
+  font-family: ui-monospace, monospace;
+  font-size: 0.72rem;
+  color: var(--color-muted-foreground);
+}
+
+/* ── Items section ───────────────────────────────────────────────────────── */
+.receiptItemsSection {
+  flex: 1;
+  padding: 1.25rem 1.5rem 0;
+}
+
+.receiptItemsTitle {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--color-muted-foreground);
+  margin-bottom: 0.875rem;
+}
+
+.receiptItemsCount {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.3rem;
+  height: 1.3rem;
+  padding: 0 0.3rem;
+  border-radius: 9999px;
+  background: var(--color-primary);
+  color: white;
+  font-size: 0.68rem;
+  font-weight: 700;
+}
+
+.receiptTable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+}
+
+.receiptTable thead tr { border-bottom: 2px solid var(--color-border); }
+.receiptTable thead th {
+  padding: 0.5rem 0.75rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-muted-foreground);
+  text-align: left;
+  white-space: nowrap;
+}
+.receiptTable tbody tr {
+  border-bottom: 1px solid var(--color-border);
+  transition: background-color 0.1s;
+}
+.receiptTable tbody tr:hover { background: var(--color-accent); }
+.receiptTable tbody tr:last-child { border-bottom: none; }
+.receiptTable tbody td { padding: 0.65rem 0.75rem; vertical-align: middle; }
+
+.receiptTableNum {
+  font-size: 0.75rem;
+  color: var(--color-muted-foreground);
+  font-weight: 600;
+  text-align: center;
+}
+
+.receiptTableName {
+  font-weight: 500;
+  color: var(--color-foreground);
+  line-height: 1.35;
+}
+
+.receiptTableRight {
+  text-align: right !important;
+  color: var(--color-muted-foreground);
+  font-size: 0.875rem;
+}
+
+.receiptTableSubtotal {
+  font-weight: 700;
+  color: var(--color-foreground) !important;
+}
+
+.unitLabel {
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: var(--color-primary);
+}
+
+.codeChip {
+  display: inline-block;
+  font-family: ui-monospace, monospace;
+  font-size: 0.75rem;
+  background: var(--color-muted);
+  padding: 0.18rem 0.45rem;
+  border-radius: 0.3rem;
+  color: var(--color-muted-foreground);
+  max-width: 110px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ── Total footer ────────────────────────────────────────────────────────── */
+.receiptTotalFooter {
+  padding: 1rem 1.5rem 1rem;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.5rem;
+  flex-shrink: 0;
+}
+
+.receiptTotalDivider {
+  width: 100%;
+  height: 2px;
+  background: repeating-linear-gradient(
+    90deg,
+    var(--color-border) 0, var(--color-border) 6px,
+    transparent 6px, transparent 10px
+  );
+  margin-bottom: 0.5rem;
+}
+
+.receiptTotalRow {
+  display: flex;
+  align-items: baseline;
+  gap: 2rem;
+}
+
+.receiptTotalLabel {
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--color-muted-foreground);
+}
+
+.receiptTotalValue {
+  font-size: 1.75rem;
+  font-weight: 800;
+  color: var(--color-primary);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Loading / error inside modal ────────────────────────────────────────── */
+.detailLoading,
+.detailError {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  padding: 2.5rem 1rem;
+  font-size: 0.875rem;
+  color: var(--color-muted-foreground);
+}
+.detailError { color: var(--color-destructive); }
+
+/* ── Modal actions ───────────────────────────────────────────────────────── */
+.cancelError {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0 1.5rem;
+  padding: 0.6rem 0.75rem;
+  background: color-mix(in srgb, #ef4444 10%, transparent);
+  border: 1px solid color-mix(in srgb, #ef4444 30%, transparent);
+  border-radius: 0.5rem;
+  font-size: 0.8rem;
+  color: #dc2626;
+}
+
+.modalActions {
+  display: flex;
+  justify-content: flex-end;
+  padding: 0.875rem 1.5rem;
+  border-top: 1px solid var(--color-border);
+  background: var(--color-muted);
+  flex-shrink: 0;
+}
+
+.cancelBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1.125rem;
+  border: 1px solid #ef4444;
+  background: transparent;
+  color: #ef4444;
+  border-radius: 0.5rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.cancelBtn:hover:not(:disabled) { background: #ef4444; color: white; }
+.cancelBtn:disabled { opacity: 0.5; cursor: not-allowed; }

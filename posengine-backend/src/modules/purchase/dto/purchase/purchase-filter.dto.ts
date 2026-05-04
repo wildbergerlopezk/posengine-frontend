@@ -9,6 +9,11 @@ export class PurchaseFilterDto extends PaginationQueryDto {
   @IsOptional() 
   @IsString() 
   search?: string; 
+
+  @ApiPropertyOptional({ description: 'Filtrar por ID de proveedor' })
+  @IsOptional()
+  @IsString()
+  supplierId?: string;
  
   @ApiPropertyOptional({ enum: PurchaseStatus }) 
   @IsOptional() 

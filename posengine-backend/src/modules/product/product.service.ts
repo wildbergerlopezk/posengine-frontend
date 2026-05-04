@@ -2,6 +2,7 @@ import {
   Injectable,
   NotFoundException,
   ConflictException,
+  BadRequestException,
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CreateProductDto } from './dto/create-product.dto';
@@ -9,7 +10,7 @@ import { UpdateProductDto } from './dto/update-product.dto';
 import { ProductFilterDto } from './dto/product-filter.dto';
 import { Prisma } from '../../generated/prisma/client';
 import { StockMovementService } from '../../stock-movement/stock-movement.service';
-import { StockMovementType } from '../../generated/prisma/enums';
+import { StockMovementType, UnitType } from '../../generated/prisma/enums';
 
 @Injectable()
 export class ProductService {
@@ -17,7 +18,49 @@ export class ProductService {
     private readonly prisma: PrismaService,
     private readonly stockMovementService: StockMovementService,
   ) { }
-  
+
+  // ── Validación de cantidad según unitType ────────────────────────────────
+  // Se exporta como método público para que SaleService y PurchaseService
+  // puedan reutilizarlo sin duplicar lógica
+  validateQuantity(quantity: number, unitType: UnitType, productName: string) {
+    this.validateQuantityForUnit(quantity, unitType, productName, 'La cantidad', false)
+  }
+
+  validateStockQuantity(
+    quantity: number,
+    unitType: UnitType,
+    productName: string,
+    fieldLabel: string,
+  ) {
+    this.validateQuantityForUnit(quantity, unitType, productName, fieldLabel, true)
+  }
+
+  private validateQuantityForUnit(
+    quantity: number,
+    unitType: UnitType,
+    productName: string,
+    fieldLabel: string,
+    allowZero: boolean,
+  ) {
+    if (!Number.isFinite(quantity)) {
+      throw new BadRequestException(
+        `${fieldLabel} de "${productName}" debe ser un número válido`,
+      )
+    }
+
+    if (quantity < 0 || (!allowZero && quantity === 0)) {
+      const suffix = allowZero ? 'no puede ser negativo' : 'debe ser mayor a 0'
+      throw new BadRequestException(`${fieldLabel} de "${productName}" ${suffix}`)
+    }
+
+    if (unitType === UnitType.UNIT && !Number.isInteger(quantity)) {
+      throw new BadRequestException(
+        `"${productName}" usa unidades. ${fieldLabel} no permite decimales (recibido: ${quantity})`,
+      )
+    }
+  }
+
+  // ── SKU generator ────────────────────────────────────────────────────────
   private async generateSku(tenantId: string, categoryId: string): Promise<string> {
     const category = await this.prisma.category.findUnique({
       where: { id: categoryId },
@@ -26,7 +69,7 @@ export class ProductService {
 
     const prefix = (category?.name ?? 'PRD')
       .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '') // quita tildes
+      .replace(/[\u0300-\u036f]/g, '')
       .replace(/[^a-zA-Z]/g, '')
       .slice(0, 3)
       .toUpperCase();
@@ -37,32 +80,30 @@ export class ProductService {
     return `${prefix}-${sequential}`;
   }
 
+  // ── Create ───────────────────────────────────────────────────────────────
   async create(tenantId: string, dto: CreateProductDto) {
-    // ── Validate category ──────────────────────────────────────────────────
+    // Validate category
     const category = await this.prisma.category.findFirst({
       where: { id: dto.categoryId, tenantId },
     });
-
     if (!category) {
       throw new NotFoundException(`Categoría con id "${dto.categoryId}" no encontrada`);
     }
 
-    // ── Validate subcategory ───────────────────────────────────────────────
+    // Validate subcategory
     if (dto.subcategoryId) {
       const subcategory = await this.prisma.subcategory.findFirst({
         where: { id: dto.subcategoryId, categoryId: dto.categoryId },
       });
-
       if (!subcategory) {
         throw new NotFoundException(`Subcategoría con id "${dto.subcategoryId}" no encontrada`);
       }
     }
 
-    // ── Unique checks ──────────────────────────────────────────────────────
+    // Unique checks
     const nameConflict = await this.prisma.product.findFirst({
       where: { name: dto.name, tenantId },
     });
-
     if (nameConflict) {
       throw new ConflictException(`Ya existe un producto con el nombre "${dto.name}"`);
     }
@@ -71,7 +112,6 @@ export class ProductService {
       const barcodeConflict = await this.prisma.product.findFirst({
         where: { barcode: dto.barcode, tenantId },
       });
-
       if (barcodeConflict) {
         throw new ConflictException(`Ya existe un producto con el código de barras "${dto.barcode}"`);
       }
@@ -83,13 +123,19 @@ export class ProductService {
       const skuConflict = await this.prisma.product.findFirst({
         where: { sku, tenantId },
       });
-
       if (skuConflict) {
         throw new ConflictException(`Ya existe un producto con el SKU "${sku}"`);
       }
     }
 
-    // ── Create product + initial stock movement ────────────────────────────
+    // Validar stock inicial según unitType
+    const unitType = dto.unitType ?? UnitType.UNIT
+    const initialStock = dto.stock ?? 0
+    const stockMinimum = dto.stockMinimum ?? 0
+    this.validateStockQuantity(initialStock, unitType, dto.name, 'El stock inicial')
+    this.validateStockQuantity(stockMinimum, unitType, dto.name, 'El stock mínimo')
+
+    // Create product
     const product = await this.prisma.product.create({
       data: {
         tenantId,
@@ -102,15 +148,14 @@ export class ProductService {
         imageUrl: dto.imageUrl,
         price: dto.price,
         cost: dto.cost ?? 0,
-        stock: dto.stock ?? 0,
-        stockMinimum: dto.stockMinimum ?? 0,
+        stock: initialStock,
+        unitType,
+        stockMinimum,
         isActive: dto.isActive ?? true,
       },
     });
 
-    // Register INITIAL stock movement if stock > 0
-    // Uses StockMovementSourceType.MANUAL — PRODUCT is not a valid sourceType
-    await this.stockMovementService.registerInitial(tenantId, product.id, dto.stock ?? 0);
+    await this.stockMovementService.registerInitial(tenantId, product.id, initialStock);
 
     return this.prisma.product.findUnique({
       where: { id: product.id },
@@ -121,6 +166,7 @@ export class ProductService {
     });
   }
 
+  // ── FindAll ──────────────────────────────────────────────────────────────
   async findAll(tenantId: string, query: ProductFilterDto) {
     const { search, categoryId, subcategoryId, isActive, lowStock, limit, skip, page } = query;
 
@@ -153,8 +199,8 @@ export class ProductService {
       this.prisma.product.count({ where }),
     ]);
 
-    // lowStock: stock <= stockMinimum — se filtra en memoria porque Prisma no soporta
-    // comparación entre dos columnas en el mismo modelo sin raw queries
+    // lowStock: stock <= stockMinimum — filtrado en memoria porque Prisma no soporta
+    // comparación entre dos columnas del mismo modelo sin raw queries
     const data = lowStock ? items.filter((p) => p.stock <= p.stockMinimum) : items;
 
     return {
@@ -165,6 +211,7 @@ export class ProductService {
     };
   }
 
+  // ── FindOne ──────────────────────────────────────────────────────────────
   async findOne(id: string, tenantId: string) {
     const product = await this.prisma.product.findFirst({
       where: { id, tenantId },
@@ -181,6 +228,7 @@ export class ProductService {
     return product;
   }
 
+  // ── FindByBarcode ────────────────────────────────────────────────────────
   async findByBarcode(barcode: string, tenantId: string) {
     const product = await this.prisma.product.findFirst({
       where: { barcode, tenantId, isActive: true },
@@ -197,100 +245,145 @@ export class ProductService {
     return product;
   }
 
-  async getPriceHistory(productId: string, tenantId: string) {
-    await this.findOne(productId, tenantId); // valida existencia
+  // ── GetPriceHistory ──────────────────────────────────────────────────────
+  async getPriceHistory(productId: string, tenantId: string, page = 1, limit = 10) {
+    await this.findOne(productId, tenantId);
 
-    const items = await this.prisma.purchaseItem.findMany({
-      where: {
-        productId,
-        purchase: {
-          tenantId,
-          status: 'RECEIVED', // solo compras confirmadas
-        },
-      },
-      include: {
-        purchase: {
-          select: {
-            invoiceNumber: true,
-            purchaseDate: true,
-            supplier: { select: { id: true, name: true } },
+    const skip = (page - 1) * limit;
+
+    const where: Prisma.PurchaseItemWhereInput = {
+      productId,
+      purchase: { tenantId, status: 'RECEIVED' },
+    };
+
+    const [items, total] = await Promise.all([
+      this.prisma.purchaseItem.findMany({
+        where,
+        include: {
+          purchase: {
+            select: {
+              invoiceNumber: true,
+              purchaseDate: true,
+              supplier: { select: { id: true, name: true } },
+            },
           },
         },
-      },
-      orderBy: {
-        purchase: { purchaseDate: 'desc' },
-      },
-    });
+        orderBy: { purchase: { purchaseDate: 'desc' } },
+        take: limit,
+        skip,
+      }),
+      this.prisma.purchaseItem.count({ where }),
+    ]);
 
-    return items.map((item) => ({
-      date: item.purchase.purchaseDate,
-      invoiceNumber: item.purchase.invoiceNumber,
-      supplier: item.purchase.supplier,
-      quantity: item.quantity,
-      unitCost: item.unitCost,
-    }));
+    return {
+      items: items.map((item) => ({
+        date: item.purchase.purchaseDate,
+        invoiceNumber: item.purchase.invoiceNumber,
+        supplier: item.purchase.supplier,
+        quantity: item.quantity,
+        unitCost: item.unitCost,
+      })),
+      total,
+      page,
+      limit,
+    };
   }
 
+  // ── Update ───────────────────────────────────────────────────────────────
   async update(id: string, tenantId: string, dto: UpdateProductDto, stockNotes?: string) {
-  const current = await this.findOne(id, tenantId);
+    const current = await this.findOne(id, tenantId);
 
-  if (dto.name) {
-    const conflict = await this.prisma.product.findFirst({
-      where: { name: dto.name, tenantId, NOT: { id } },
-    });
-    if (conflict) {
-      throw new ConflictException(`Ya existe otro producto con el nombre "${dto.name}"`);
+    if (dto.name) {
+      const conflict = await this.prisma.product.findFirst({
+        where: { name: dto.name, tenantId, NOT: { id } },
+      });
+      if (conflict) {
+        throw new ConflictException(`Ya existe otro producto con el nombre "${dto.name}"`);
+      }
     }
-  }
 
-  if (dto.barcode) {
-    const conflict = await this.prisma.product.findFirst({
-      where: { barcode: dto.barcode, tenantId, NOT: { id } },
-    });
-    if (conflict) {
-      throw new ConflictException(`Ya existe otro producto con el código de barras "${dto.barcode}"`);
+    if (dto.barcode) {
+      const conflict = await this.prisma.product.findFirst({
+        where: { barcode: dto.barcode, tenantId, NOT: { id } },
+      });
+      if (conflict) {
+        throw new ConflictException(`Ya existe otro producto con el código de barras "${dto.barcode}"`);
+      }
     }
-  }
 
-  if (dto.sku) {
-    const conflict = await this.prisma.product.findFirst({
-      where: { sku: dto.sku, tenantId, NOT: { id } },
-    });
+    if (dto.sku) {
+      const conflict = await this.prisma.product.findFirst({
+        where: { sku: dto.sku, tenantId, NOT: { id } },
+      });
       if (conflict) {
         throw new ConflictException(`Ya existe otro producto con el SKU "${dto.sku}"`);
       }
-  }
+    }
 
-  // ── Si cambió el stock, registrar movimiento MANUAL ──────────────────────
-  if (dto.stock !== undefined && dto.stock !== current.stock) {
-    const delta = dto.stock - current.stock;
+    // El unitType efectivo es el nuevo si se manda, sino el actual del producto
+    const effectiveUnitType = dto.unitType ?? current.unitType
+    const effectiveName = dto.name ?? current.name
+    const effectiveStock = dto.stock ?? current.stock
+    const effectiveStockMinimum = dto.stockMinimum ?? current.stockMinimum
 
-    await this.stockMovementService.registerManual(tenantId, {
-      productId: id,
-      type: StockMovementType.MANUAL,
-      quantity: delta,
-      notes: stockNotes?.trim() || 'Ajuste manual desde edición de producto',
-    });
+    this.validateStockQuantity(effectiveStock, effectiveUnitType, effectiveName, 'El stock')
+    this.validateStockQuantity(effectiveStockMinimum, effectiveUnitType, effectiveName, 'El stock mínimo')
 
-    // registerManual ya actualizó el stock en la BD,
-    // así que lo sacamos del update para no pisarlo
-    const { stock: _stock, ...restDto } = dto;
+    // ── Si cambió el stock, validar cantidad y registrar movimiento MANUAL ──
+    if (dto.stock !== undefined && dto.stock !== current.stock) {
+      const delta = dto.stock - current.stock;
 
+      await this.stockMovementService.registerManual(tenantId, {
+        productId: id,
+        type: StockMovementType.MANUAL,
+        quantity: delta,
+        notes: stockNotes?.trim() || 'Ajuste manual desde edición de producto',
+      });
+
+      // registerManual ya actualizó el stock en la BD,
+      // así que lo sacamos del update para no pisarlo
+      const { stock: _stock, ...restDto } = dto;
+
+      return this.prisma.product.update({
+        where: { id },
+        data: {
+          ...(restDto.categoryId && { categoryId: restDto.categoryId }),
+          ...(restDto.subcategoryId !== undefined && { subcategoryId: restDto.subcategoryId }),
+          ...(restDto.name && { name: restDto.name }),
+          ...(restDto.description !== undefined && { description: restDto.description }),
+          ...(restDto.sku && { sku: restDto.sku }),
+          ...(restDto.barcode !== undefined && { barcode: restDto.barcode }),
+          ...(restDto.imageUrl !== undefined && { imageUrl: restDto.imageUrl }),
+          ...(restDto.price !== undefined && { price: restDto.price }),
+          ...(restDto.cost !== undefined && { cost: restDto.cost }),
+          ...(restDto.unitType !== undefined && { unitType: restDto.unitType }),
+          ...(restDto.stockMinimum !== undefined && { stockMinimum: restDto.stockMinimum }),
+          ...(restDto.isActive !== undefined && { isActive: restDto.isActive }),
+        },
+        include: {
+          category: { select: { id: true, name: true } },
+          subcategory: { select: { id: true, name: true } },
+        },
+      });
+    }
+
+    // ── Sin cambio de stock — update normal ───────────────────────────────
     return this.prisma.product.update({
       where: { id },
       data: {
-        ...(restDto.categoryId && { categoryId: restDto.categoryId }),
-        ...(restDto.subcategoryId !== undefined && { subcategoryId: restDto.subcategoryId }),
-        ...(restDto.name && { name: restDto.name }),
-        ...(restDto.description !== undefined && { description: restDto.description }),
-        ...(restDto.sku && { sku: restDto.sku }),
-        ...(restDto.barcode !== undefined && { barcode: restDto.barcode }),
-        ...(restDto.imageUrl !== undefined && { imageUrl: restDto.imageUrl }),
-        ...(restDto.price !== undefined && { price: restDto.price }),
-        ...(restDto.cost !== undefined && { cost: restDto.cost }),
-        ...(restDto.taxRate !== undefined && { taxRate: restDto.taxRate }),
-        ...(restDto.stockMinimum !== undefined && { stockMinimum: restDto.stockMinimum }),
-        ...(restDto.isActive !== undefined && { isActive: restDto.isActive }),
+        ...(dto.categoryId && { categoryId: dto.categoryId }),
+        ...(dto.subcategoryId !== undefined && { subcategoryId: dto.subcategoryId }),
+        ...(dto.name && { name: dto.name }),
+        ...(dto.description !== undefined && { description: dto.description }),
+        ...(dto.sku && { sku: dto.sku }),
+        ...(dto.barcode !== undefined && { barcode: dto.barcode }),
+        ...(dto.imageUrl !== undefined && { imageUrl: dto.imageUrl }),
+        ...(dto.price !== undefined && { price: dto.price }),
+        ...(dto.cost !== undefined && { cost: dto.cost }),
+        ...(dto.unitType !== undefined && { unitType: dto.unitType }),
+        ...(dto.stock !== undefined && { stock: dto.stock }),
+        ...(dto.stockMinimum !== undefined && { stockMinimum: dto.stockMinimum }),
+        ...(dto.isActive !== undefined && { isActive: dto.isActive }),
       },
       include: {
         category: { select: { id: true, name: true } },
@@ -299,31 +392,7 @@ export class ProductService {
     });
   }
 
-  // ── Sin cambio de stock — update normal ───────────────────────────────────
-  return this.prisma.product.update({
-    where: { id },
-    data: {
-      ...(dto.categoryId && { categoryId: dto.categoryId }),
-      ...(dto.subcategoryId !== undefined && { subcategoryId: dto.subcategoryId }),
-      ...(dto.name && { name: dto.name }),
-      ...(dto.description !== undefined && { description: dto.description }),
-      ...(dto.sku && { sku: dto.sku }),
-      ...(dto.barcode !== undefined && { barcode: dto.barcode }),
-      ...(dto.imageUrl !== undefined && { imageUrl: dto.imageUrl }),
-      ...(dto.price !== undefined && { price: dto.price }),
-      ...(dto.cost !== undefined && { cost: dto.cost }),
-      ...(dto.taxRate !== undefined && { taxRate: dto.taxRate }),
-      ...(dto.stock !== undefined && { stock: dto.stock }),
-      ...(dto.stockMinimum !== undefined && { stockMinimum: dto.stockMinimum }),
-      ...(dto.isActive !== undefined && { isActive: dto.isActive }),
-    },
-    include: {
-      category: { select: { id: true, name: true } },
-      subcategory: { select: { id: true, name: true } },
-    },
-  });
-}
-
+  // ── Deactivate ───────────────────────────────────────────────────────────
   async deactivate(id: string, tenantId: string) {
     await this.findOne(id, tenantId);
 
@@ -334,6 +403,7 @@ export class ProductService {
     });
   }
 
+  // ── Activate ─────────────────────────────────────────────────────────────
   async activate(id: string, tenantId: string) {
     await this.findOne(id, tenantId);
 
@@ -344,6 +414,7 @@ export class ProductService {
     });
   }
 
+  // ── Remove ───────────────────────────────────────────────────────────────
   async remove(id: string, tenantId: string) {
     await this.findOne(id, tenantId);
 

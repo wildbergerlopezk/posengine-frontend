@@ -1,35 +1,108 @@
 "use client"
 
 import { Header } from "@/src/shared/components/Header"
-import { DollarSign, ShoppingCart, AlertTriangle, TrendingUp, ArrowUpRight } from "lucide-react"
-import { mockDashboardStats, mockProducts, mockSales } from "@/src/shared/api/mock-data"
+import { DollarSign, ShoppingCart, AlertTriangle, TrendingUp, ArrowUpRight, Loader2 } from "lucide-react"
 import { useAuthStore } from "@/src/features/auth/store/auth.store"
 import { formatCurrency } from "@/src/shared/hooks/useFormatCurrency"
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar } from "recharts"
 import styles from "./DashboardPage.module.css"
-
-const salesData = [
-  { name: "Lun", ventas: 12500 },
-  { name: "Mar", ventas: 18200 },
-  { name: "Mie", ventas: 15800 },
-  { name: "Jue", ventas: 21400 },
-  { name: "Vie", ventas: 28600 },
-  { name: "Sab", ventas: 35200 },
-  { name: "Dom", ventas: 22800 },
-]
-
-const categoryData = [
-  { name: "Bebidas", ventas: 45 },
-  { name: "Snacks", ventas: 32 },
-  { name: "Lácteos", ventas: 28 },
-  { name: "Panadería", ventas: 18 },
-  { name: "Limpieza", ventas: 12 },
-]
+import { useEffect, useState } from "react"
+import { getDashboardData } from "../api/dashboard.api"
+import type { DashboardDataResponse, WeeklySalesData, CategorySalesData } from "../api/dashboard.api"
 
 export function DashboardPage() {
-  const { user } = useAuthStore()
-  const stats = mockDashboardStats
-  const lowStockProducts = mockProducts.filter((p) => p.stock <= p.stockMinimum)
+  const { user, accessToken } = useAuthStore()
+  const [dashboardData, setDashboardData] = useState<DashboardDataResponse | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (!accessToken) return
+
+    const fetchData = async () => {
+      try {
+        setLoading(true)
+        setError(null)
+        const data = await getDashboardData(accessToken)
+        setDashboardData(data)
+      } catch (err) {
+        console.error("Error loading dashboard data:", err)
+        setError("No se pudieron cargar los datos del dashboard")
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchData()
+  }, [accessToken])
+
+  if (loading) {
+    return (
+      <div className={styles.page}>
+        <Header title="Dashboard" />
+        <div className={styles.loadingContainer}>
+          <Loader2 size={40} className={styles.spinner} />
+          <p>Cargando datos...</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className={styles.page}>
+        <Header title="Dashboard" />
+        <div className={styles.errorContainer}>
+          <AlertTriangle size={40} />
+          <p>{error}</p>
+          <button
+            onClick={() => {
+              setLoading(true)
+              setError(null)
+              const fetchData = async () => {
+                try {
+                  const data = await getDashboardData(accessToken!)
+                  setDashboardData(data)
+                } catch (err) {
+                  console.error("Error loading dashboard data:", err)
+                  setError("No se pudieron cargar los datos del dashboard. Verifica que el servidor esté en línea.")
+                } finally {
+                  setLoading(false)
+                }
+              }
+              fetchData()
+            }}
+            className={styles.retryButton}
+          >
+            Reintentar
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  if (!dashboardData) {
+    return (
+      <div className={styles.page}>
+        <Header title="Dashboard" />
+        <div className={styles.errorContainer}>
+          <AlertTriangle size={40} />
+          <p>No se pudieron cargar los datos</p>
+        </div>
+      </div>
+    )
+  }
+
+  const stats = {
+    todaySales: dashboardData.todaySales,
+    todayRevenue: dashboardData.todayRevenue,
+    monthRevenue: dashboardData.monthRevenue,
+    lowStockProducts: dashboardData.lowStockProducts.length,
+  }
+  const lowStockProducts = dashboardData.lowStockProducts
+  const recentSales = dashboardData.recentSales
+  const salesData = dashboardData.weeklySalesData
+  const categoryData = dashboardData.categorySalesData
 
   return (
     <div className={styles.page}>
@@ -47,7 +120,7 @@ export function DashboardPage() {
             <div className={styles.statValue}>{stats.todaySales}</div>
             <div className={styles.statChange}>
               <TrendingUp size={12} />
-              <span>+12% vs ayer</span>
+              <span>Ventas registradas</span>
             </div>
           </div>
 
@@ -61,7 +134,7 @@ export function DashboardPage() {
             <div className={styles.statValue}>{formatCurrency(stats.todayRevenue)}</div>
             <div className={styles.statChange}>
               <ArrowUpRight size={12} />
-              <span>+8% vs ayer</span>
+              <span>Total recaudado</span>
             </div>
           </div>
 
@@ -75,7 +148,7 @@ export function DashboardPage() {
             <div className={styles.statValue}>{formatCurrency(stats.monthRevenue)}</div>
             <div className={styles.statChange}>
               <ArrowUpRight size={12} />
-              <span>+15% vs mes anterior</span>
+              <span>Período actual</span>
             </div>
           </div>
 
@@ -194,30 +267,37 @@ export function DashboardPage() {
             </div>
             <div className={styles.cardContent}>
               <div className={styles.salesList}>
-                {mockSales.slice(0, 5).map((sale) => (
-                  <div key={sale.id} className={styles.saleItem}>
-                    <div className={styles.saleInfo}>
-                      <span className={styles.saleTitle}>
-                        {sale.items.length} producto{sale.items.length > 1 ? "s" : ""}
-                      </span>
-                      <span className={styles.saleTime}>
-                        {new Date(sale.createdAt).toLocaleString("es-AR", {
-                          hour: "2-digit",
-                          minute: "2-digit",
-                        })}
-                      </span>
+                {recentSales && recentSales.length > 0 ? (
+                  recentSales.map((sale) => (
+                    <div key={sale.id} className={styles.saleItem}>
+                      <div className={styles.saleInfo}>
+                        <span className={styles.saleTitle}>
+                          {sale.items?.length || 0} producto{(sale.items?.length || 0) > 1 ? "s" : ""}
+                        </span>
+                        <span className={styles.saleTime}>
+                          {new Date(sale.createdAt).toLocaleString("es-AR", {
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          })}
+                        </span>
+                      </div>
+                      <div className={styles.saleAmount}>
+                        <span className={styles.saleMethod}>
+                          {sale.paymentMethod === "CASH"
+                            ? "Efectivo"
+                            : sale.paymentMethod === "CARD"
+                              ? "Tarjeta"
+                              : sale.paymentMethod === "TRANSFER"
+                                ? "Transferencia"
+                                : sale.paymentMethod}
+                        </span>
+                        <span className={styles.saleTotal}>{formatCurrency(sale.total)}</span>
+                      </div>
                     </div>
-                    <div className={styles.saleAmount}>
-                      <span className={styles.saleMethod}>
-                        {sale.paymentMethod === "cash"
-                          ? "Efectivo"
-                          : sale.paymentMethod === "card"
-                            ? "Tarjeta"
-                            : "Transferencia"}
-                      </span>
-                    </div>
-                  </div>
-                ))}
+                  ))
+                ) : (
+                  <p className={styles.emptyState}>No hay ventas registradas</p>
+                )}
               </div>
             </div>
           </div>

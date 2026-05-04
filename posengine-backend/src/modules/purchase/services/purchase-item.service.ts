@@ -27,10 +27,10 @@ export class PurchaseItemService {
       throw new NotFoundException(`Compra con id "${purchaseId}" no encontrada`);
     }
 
-    // 2. Solo se pueden cargar items en compras PENDING
-    if (purchase.status !== PurchaseStatus.PENDING) {
+    // 2. Solo se pueden cargar items en compras que no han sido recibidas (aunque ahora se reciben al crear)
+    if (purchase.status === PurchaseStatus.RECEIVED) {
       throw new BadRequestException(
-        'Solo se pueden agregar items a compras en estado PENDING',
+        'No se pueden agregar items a una compra ya registrada (RECEIVED).',
       );
     }
 
@@ -134,9 +134,9 @@ export class PurchaseItemService {
       throw new NotFoundException(`Compra con id "${purchaseId}" no encontrada`);
     }
 
-    if (purchase.status !== PurchaseStatus.PENDING) {
+    if (purchase.status === PurchaseStatus.RECEIVED) {
       throw new BadRequestException(
-        'Solo se pueden eliminar items de compras en estado PENDING',
+        'No se pueden eliminar items de una compra ya registrada (RECEIVED).',
       );
     }
 

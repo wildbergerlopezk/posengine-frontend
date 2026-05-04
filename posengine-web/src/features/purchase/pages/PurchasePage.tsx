@@ -3,13 +3,14 @@
 import type React from "react"
 import { useState, useEffect, useLayoutEffect, useRef, useCallback } from "react"
 import { Header } from "@/src/shared/components/Header"
-import { usePathname } from "next/navigation"
+import { usePathname, useRouter } from "next/navigation"
 import {
     Search, Plus, Trash2, Package, AlertCircle,
     Loader2, Check, X, ChevronDown,
 } from "lucide-react"
 import { useAuthStore } from "@/src/features/auth/store/auth.store"
 import { formatCurrency } from "@/src/shared/hooks/useFormatCurrency"
+import { useCashSession } from "@/src/features/cash-session/hooks/useCashSession"
 import styles from "./PurchasePage.module.css"
 import tableStyles from "@/src/features/products/pages/ProductsPage.module.css"
 import {
@@ -42,6 +43,7 @@ interface Product {
     cost?: number
     price: number
     stock: number
+    unitType: "UNIT" | "KG" | "G" | "L" | "ML" | "MG"
 }
 
 interface PurchaseItem {
@@ -61,11 +63,24 @@ function readApiError(body: unknown): string {
     return "Error en la solicitud"
 }
 
+function isUnitType(unitType?: string) {
+    return !unitType || unitType === "UNIT"
+}
+
+function formatQuantity(qty: number, unitType?: string) {
+    if (isUnitType(unitType)) return String(qty)
+    return qty % 1 === 0 ? String(qty) : String(Number(qty.toFixed(3)))
+}
+
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export function PurchasePage() {
     const { accessToken } = useAuthStore()
+    const router = useRouter()
     const pathname = usePathname()
+    const { session, loading: sessionLoading } = useCashSession()
+    const canOperate = !!session
+    const purchaseDisabled = !session && !sessionLoading
     const authHeaders = {
         "Content-Type": "application/json",
         Authorization: `Bearer ${accessToken}`,
@@ -98,7 +113,7 @@ export function PurchasePage() {
     const [submitting, setSubmitting] = useState(false)
     const [submitError, setSubmitError] = useState<string | null>(null)
     const [success, setSuccess] = useState(false)
-    const [submitStep, setSubmitStep] = useState<"purchase" | "items" | "receiving" | null>(null)
+    const [submitStep, setSubmitStep] = useState<"saving" | null>(null)
     const [showConfirmModal, setShowConfirmModal] = useState(false)
     const [confirmModalSelectedButton, setConfirmModalSelectedButton] = useState<"accept" | "cancel">("accept")
 
@@ -214,9 +229,13 @@ export function PurchasePage() {
     const commitEdit = useCallback(() => {
         if (editingRowIndex === null || editingField === null) return
         const val = parseFloat(editingValue)
-        if (isNaN(val) || val < 0) { cancelEdit(); return }
+        if (isNaN(val) || val <= 0) { cancelEdit(); return }
         setItems(prev => prev.map((item, idx) => {
             if (idx !== editingRowIndex) return item
+            if (editingField === "quantity" && isUnitType(item.product.unitType) && !Number.isInteger(val)) {
+                setSubmitError(`"${item.product.name}" usa unidades. La cantidad debe ser entera.`)
+                return item
+            }
             const quantity = editingField === "quantity" ? val : item.quantity
             const unitCost = editingField === "unitCost" ? val : item.unitCost
             return { ...item, quantity, unitCost, subtotal: quantity * unitCost, total: quantity * unitCost }
@@ -233,6 +252,7 @@ export function PurchasePage() {
 
     // ── Submit ─────────────────────────────────────────────────────────────────
     const handleSubmit = async () => {
+        if (!canOperate) { setSubmitError("Abre caja antes de registrar compras"); return }
         if (!supplierId) { setSubmitError("Seleccioná un proveedor"); return }
         if (!invoiceNumber) { setSubmitError("El número de factura es requerido"); invoiceRef.current?.focus(); return }
         if (items.length === 0) { setSubmitError("Agregá al menos un producto"); return }
@@ -241,8 +261,8 @@ export function PurchasePage() {
         setSubmitError(null)
 
         try {
-            // ── 1. Crear cabecera de compra ──────────────────────────────
-            setSubmitStep("purchase")
+            // ── 1. Guardar compra (Cabecera + Items) ──────────────────────────────
+            setSubmitStep("saving")
 
             // Combinar la fecha seleccionada con la hora actual para evitar desfases de zona horaria
             // y reflejar la hora real de la transacción si es hoy.
@@ -257,6 +277,11 @@ export function PurchasePage() {
                 paymentType,
                 total,
                 notes: notes.trim() || undefined,
+                items: items.map(i => ({
+                    productId: i.product.id,
+                    quantity: i.quantity,
+                    unitCost: i.unitCost,
+                })),
             }
 
             const purchaseRes = await fetch(`${API_BASE}/purchases`, {
@@ -270,49 +295,7 @@ export function PurchasePage() {
                 throw new Error(readApiError(body))
             }
 
-            const purchase = await purchaseRes.json()
-
-            // ── 2. Cargar los items ──────────────────────────────────────
-            setSubmitStep("items")
-            const itemsPayload = {
-                items: items.map(i => ({
-                    productId: i.product.id,
-                    quantity: i.quantity,
-                    unitCost: i.unitCost,
-                    total: i.total,
-                })),
-            }
-
-            const itemsRes = await fetch(`${API_BASE}/purchases/${purchase.id}/items`, {
-                method: "POST",
-                headers: authHeaders,
-                body: JSON.stringify(itemsPayload),
-            })
-
-            if (!itemsRes.ok) {
-                // La compra ya fue creada — intentar cancelarla para no dejar basura
-                await fetch(`${API_BASE}/purchases/${purchase.id}/cancel`, {
-                    method: "PATCH",
-                    headers: authHeaders,
-                }).catch(() => { /* silent */ })
-
-                const body = await itemsRes.json().catch(() => ({}))
-                throw new Error(`Error al cargar productos: ${readApiError(body)}`)
-            }
-
-            // ── 3. Marcar como recibida (dispara el stock) ───────────────
-            setSubmitStep("receiving")
-            const receiveRes = await fetch(`${API_BASE}/purchases/${purchase.id}/receive`, {
-                method: "PATCH",
-                headers: authHeaders,
-            })
-
-            if (!receiveRes.ok) {
-                const body = await receiveRes.json().catch(() => ({}))
-                throw new Error(`Error al confirmar recepción: ${readApiError(body)}`)
-            }
-
-            // ── 4. Éxito ─────────────────────────────────────────────────
+            // ── 2. Éxito ─────────────────────────────────────────────────
             setSuccess(true)
             setSubmitStep(null)
             setTimeout(() => {
@@ -544,6 +527,19 @@ export function PurchasePage() {
 
             <div className={styles.container}>
 
+                {purchaseDisabled && (
+                    <div className={styles.blockNotice}>
+                        <div>
+                            <AlertCircle size={32} className={styles.noticeIcon} />
+                            <h2>No hay caja abierta</h2>
+                            <p>Abre caja en el módulo de Caja antes de registrar compras para mantener el control del efectivo.</p>
+                            <button className={styles.openCashLink} onClick={() => router.push('/dashboard/cash')}>
+                                Abrir caja
+                            </button>
+                        </div>
+                    </div>
+                )}
+
                 {/* ── Error banner ── */}
                 {submitError && (
                     <div className={tableStyles.errorBanner}>
@@ -556,7 +552,7 @@ export function PurchasePage() {
                 {/* ══════════════════════════════════════════════════
             HEADER CARD — datos de la compra
         ══════════════════════════════════════════════════ */}
-                <div className={styles.headerCard}>
+                <div className={`${styles.headerCard} ${purchaseDisabled ? styles.disabledArea : ''}`}>
                     <div className={styles.headerCardTitle}>Datos de la compra</div>
 
                     <div className={styles.headerGrid}>
@@ -727,7 +723,7 @@ export function PurchasePage() {
                 {/* ══════════════════════════════════════════════════
             ITEMS — tabla de productos
         ══════════════════════════════════════════════════ */}
-                <div className={tableStyles.tableCard}>
+                <div className={`${tableStyles.tableCard} ${purchaseDisabled ? styles.disabledArea : ''}`}>
 
                     {/* Toolbar de items */}
                     <div className={styles.itemsToolbar}>
@@ -741,8 +737,7 @@ export function PurchasePage() {
                                 type="button"
                                 className={tableStyles.newButton}
                                 onClick={() => setShowProductModal(true)}
-                            >
-                                <Plus size={15} /> Agregar producto
+                            ><Plus size={15} /> Agregar producto
                             </button>
                         </div>
                     </div>
@@ -787,6 +782,9 @@ export function PurchasePage() {
                                         {/* Descripción */}
                                         <td className={tableStyles.tableCell}>
                                             <span style={{ fontWeight: 500 }}>{item.product.name}</span>
+                                            {!isUnitType(item.product.unitType) && (
+                                                <span className={styles.unitBadge}>{item.product.unitType}</span>
+                                            )}
                                         </td>
 
                                         {/* Cantidad — editable inline */}
@@ -803,8 +801,8 @@ export function PurchasePage() {
                                                         if (e.key === "Escape") cancelEdit()
                                                     }}
                                                     onBlur={commitEdit}
-                                                    min="0.01"
-                                                    step="any"
+                                                    min={isUnitType(item.product.unitType) ? "1" : "0.001"}
+                                                    step={isUnitType(item.product.unitType) ? "1" : "0.001"}
                                                 />
                                             ) : (
                                                 <button
@@ -813,7 +811,7 @@ export function PurchasePage() {
                                                     onClick={() => startEdit(idx, "quantity", item.quantity)}
                                                     title="Clic para editar"
                                                 >
-                                                    {item.quantity}
+                                                    {formatQuantity(item.quantity, item.product.unitType)}
                                                 </button>
                                             )}
                                         </td>
@@ -903,11 +901,7 @@ export function PurchasePage() {
                                     {success
                                         ? <><Check size={15} /> Guardado</>
                                         : submitting
-                                            ? submitStep === "purchase"
-                                                ? <><Loader2 size={15} className={tableStyles.spinner} /> Creando compra…</>
-                                                : submitStep === "items"
-                                                    ? <><Loader2 size={15} className={tableStyles.spinner} /> Cargando productos…</>
-                                                    : <><Loader2 size={15} className={tableStyles.spinner} /> Actualizando stock…</>
+                                            ? <><Loader2 size={15} className={tableStyles.spinner} /> Guardando compra…</>
                                             : <><Check size={15} /> Finalizar compra <kbd className={styles.kbdWhite}>F12</kbd></>
                                     }
                                 </button>
@@ -925,8 +919,8 @@ export function PurchasePage() {
                 <div className={tableStyles.modalOverlay} onClick={() => { setShowProductModal(false); setProductSearch("") }}>
                     <div className={styles.productModal} onClick={e => e.stopPropagation()}>
 
-                        <div className={tableStyles.modalHeader}>
-                            <h2 className={tableStyles.modalTitle}>Agregar producto</h2>
+                        <div className={styles.modalHeader}>
+                            <h2 className={styles.modalTitle}>Agregar producto</h2>
                             <button type="button" className={styles.modalCloseBtn} onClick={() => { setShowProductModal(false); setProductSearch("") }}>
                                 <X size={18} />
                             </button>
@@ -967,7 +961,8 @@ export function PurchasePage() {
                                     >
                                         <span className={styles.productRowCode}>{product.barcode || product.sku || "—"}</span>
                                         <span className={styles.productRowName}>{product.name}</span>
-                                        <span className={styles.productRowStock}>Stock: {product.stock}</span>
+                                        <span className={styles.productRowUnit}>{!isUnitType(product.unitType) ? product.unitType : ""}</span>
+                                        <span className={styles.productRowStock}>Stock: {formatQuantity(product.stock, product.unitType)}</span>
                                         <span className={styles.productRowCost}>{product.cost != null ? formatCurrency(product.cost) : "—"}</span>
                                     </button>
                                 ))
@@ -1052,6 +1047,10 @@ export function PurchasePage() {
                 loading={priceHistory.loading}
                 history={priceHistory.history}
                 productName={priceHistory.productName}
+                page={priceHistory.page}
+                totalItems={priceHistory.totalItems}
+                limit={priceHistory.limit}
+                onPageChange={priceHistory.goToPage}
                 onClose={priceHistory.close}
             />
         </div>

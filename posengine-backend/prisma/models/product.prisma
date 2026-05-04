@@ -11,12 +11,12 @@ model Product {
   barcode     String?
   imageUrl    String?
 
-  price   Float
-  cost    Float
-  //taxRate Float @default(0)
+  price Float
+  cost  Float
 
-  stock        Int         @default(0)
-  stockMinimum Int         @default(0)
+  stock        Float    @default(0)
+  unitType     UnitType @default(UNIT)
+  stockMinimum Float    @default(0)
 
   isActive Boolean @default(true)
 
@@ -27,12 +27,22 @@ model Product {
   category    Category     @relation(fields: [categoryId], references: [id])
   subcategory Subcategory? @relation(fields: [subcategoryId], references: [id])
 
-  // saleItems        SaleItem[]
+  saleItems           SaleItem[]
   purchaseItems       PurchaseItem[]
   purchaseReturnItems PurchaseReturnItem[]
-  stockMovements StockMovement[]
+  stockMovements      StockMovement[]
+
   @@unique([name, tenantId])
   @@unique([sku, tenantId])
   @@unique([barcode, tenantId])
   @@map("products")
+}
+
+enum UnitType {
+  UNIT
+  KG
+  G
+  L
+  ML
+  MG
 }

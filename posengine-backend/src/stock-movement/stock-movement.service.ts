@@ -79,6 +79,134 @@ export class StockMovementService {
     return movement;
   }
 
+  // ── Called internally when a purchase is cancelled ────────────────────────
+  async registerPurchaseCancellation(
+    tenantId: string,
+    productId: string,
+    quantity: number,
+    referenceId: string, // purchaseItemId
+    tx?: Prisma.TransactionClient,
+  ) {
+    const prismaClient = tx ?? this.prisma;
+
+    const product = await prismaClient.product.findFirst({
+      where: { id: productId, tenantId },
+      select: { stock: true },
+    });
+
+    if (!product)
+      throw new NotFoundException(`Producto "${productId}" no encontrado`);
+
+    const before = product.stock;
+    const after = before - quantity;
+
+    const movement = await prismaClient.stockMovement.create({
+      data: {
+        tenantId,
+        productId,
+        type: StockMovementType.MANUAL,
+        quantity: -quantity,
+        before,
+        after,
+        referenceId,
+        notes: 'Cancelación de compra',
+        sourceType: StockMovementSourceType.MANUAL,
+      },
+    });
+
+    await prismaClient.product.update({
+      where: { id: productId },
+      data: { stock: after },
+    });
+
+    return movement;
+  }
+
+  async registerSale(
+    tenantId: string,
+    productId: string,
+    quantity: number,
+    referenceId: string, // saleItemId
+    tx?: Prisma.TransactionClient,
+  ) {
+    const prismaClient = tx ?? this.prisma;
+
+    const product = await prismaClient.product.findFirst({
+      where: { id: productId, tenantId },
+      select: { stock: true },
+    });
+
+    if (!product)
+      throw new NotFoundException(`Producto "${productId}" no encontrado`);
+
+    const before = product.stock;
+    const after = before - quantity;
+
+    const movement = await prismaClient.stockMovement.create({
+      data: {
+        tenantId,
+        productId,
+        type: StockMovementType.SALE,
+        quantity: -quantity,
+        before,
+        after,
+        referenceId,
+        notes: 'Venta',
+        sourceType: StockMovementSourceType.SALE,
+      },
+    });
+
+    await prismaClient.product.update({
+      where: { id: productId },
+      data: { stock: after },
+    });
+
+    return movement;
+  }
+
+  // ── Called internally when a sale is cancelled ────────────────────────────
+  async registerSaleCancellation(
+    tenantId: string,
+    productId: string,
+    quantity: number,
+    referenceId: string, // saleItemId
+    tx?: Prisma.TransactionClient,
+  ) {
+    const prismaClient = tx ?? this.prisma;
+
+    const product = await prismaClient.product.findFirst({
+      where: { id: productId, tenantId },
+      select: { stock: true },
+    });
+
+    if (!product)
+      throw new NotFoundException(`Producto "${productId}" no encontrado`);
+
+    const before = product.stock;
+    const after = before + quantity;
+
+    const movement = await prismaClient.stockMovement.create({
+      data: {
+        tenantId,
+        productId,
+        type: StockMovementType.MANUAL,
+        quantity,
+        before,
+        after,
+        referenceId,
+        notes: 'Cancelación de venta',
+        sourceType: StockMovementSourceType.MANUAL,
+      },
+    });
+
+    await prismaClient.product.update({
+      where: { id: productId },
+      data: { stock: after },
+    });
+
+    return movement;
+  }
+
   // ── Manual adjustment (add or subtract) ───────────────────────────────────
   async registerManual(
     tenantId: string,

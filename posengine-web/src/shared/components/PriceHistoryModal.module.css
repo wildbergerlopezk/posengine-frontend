@@ -73,7 +73,6 @@
   overflow-y: auto; 
   flex: 1; 
 } 
- 
 .empty { 
   display: flex; 
   align-items: center; 
@@ -154,17 +153,59 @@
 } 
  
 .footer { 
-  padding: 0.6rem 1.25rem; 
+  padding: 0.75rem 1.25rem; 
   border-top: 1px solid var(--color-border); 
   background: var(--color-muted); 
   font-size: 0.75rem; 
   color: var(--color-muted-foreground); 
   display: flex; 
-  gap: 0.5rem; 
+  justify-content: space-between;
   align-items: center; 
   flex-shrink: 0; 
 } 
- 
+
+.pagination {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.pageBtn {
+  width: 2rem;
+  height: 2rem;
+  border: 1px solid var(--color-border);
+  border-radius: 0.375rem;
+  background: var(--color-background);
+  color: var(--color-foreground);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.pageBtn:hover:not(:disabled) {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+  background: color-mix(in srgb, var(--color-primary) 5%, transparent);
+}
+
+.pageBtn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.pageInfo {
+  font-weight: 600;
+  color: var(--color-foreground);
+}
+
+.footerRight {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
 .spinner { 
   animation: spin 1s linear infinite; 
 } 

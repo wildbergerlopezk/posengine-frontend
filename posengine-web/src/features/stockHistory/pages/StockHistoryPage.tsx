@@ -4,11 +4,11 @@ import { useCallback, useEffect, useMemo, useState } from "react"
 import { Header } from "@/src/shared/components/Header"
 import { useAuthStore } from "@/src/features/auth/store/auth.store"
 import tableStyles from "@/src/features/products/pages/ProductsPage.module.css"
-import { AlertCircle, ArrowDown, ArrowUp, Boxes, Loader2, Search, X } from "lucide-react"
+import { AlertCircle, ArrowDown, ArrowUp, Boxes, Loader2, Search, X, ChevronLeft, ChevronRight } from "lucide-react"
 import styles from "./StockHistoryPage.module.css"
 
 const API_BASE = process.env.NEXT_PUBLIC_BACKEND_URL
-const LIMIT = 20
+const LIMIT = 10
 
 type MovementType = "INITIAL" | "PURCHASE" | "SALE" | "MANUAL"
 type SourceType = "PURCHASE" | "SALE" | "MANUAL" | "RETURN"
@@ -209,16 +209,16 @@ export function StockHistoryPage() {
             </span>
           </div>
 
-          <table className={tableStyles.table}>
+          <table className={`${tableStyles.table} ${styles.historyTable}`}>
             <thead className={tableStyles.tableHeader}>
               <tr>
-                <th className={tableStyles.tableHeaderCell}>Fecha</th>
-                <th className={tableStyles.tableHeaderCell}>Producto</th>
-                <th className={tableStyles.tableHeaderCell}>Tipo</th>
-                <th className={`${tableStyles.tableHeaderCell} ${tableStyles.tableHeaderCellRight}`}>Cantidad</th>
-                <th className={`${tableStyles.tableHeaderCell} ${tableStyles.tableHeaderCellRight}`}>Antes</th>
-                <th className={`${tableStyles.tableHeaderCell} ${tableStyles.tableHeaderCellRight}`}>Después</th>
-                <th className={tableStyles.tableHeaderCell}>Detalle</th>
+                <th className={`${tableStyles.tableHeaderCell} ${styles.headerCellOverride}`} style={{ width: 140 }}>Fecha</th>
+                <th className={`${tableStyles.tableHeaderCell} ${styles.headerCellOverride}`}>Producto</th>
+                <th className={`${tableStyles.tableHeaderCell} ${styles.headerCellOverride}`} style={{ width: 100 }}>Tipo</th>
+                <th className={`${tableStyles.tableHeaderCell} ${tableStyles.tableHeaderCellRight} ${styles.headerCellOverride}`} style={{ width: 100 }}>Cantidad</th>
+                <th className={`${tableStyles.tableHeaderCell} ${tableStyles.tableHeaderCellRight} ${styles.headerCellOverride}`} style={{ width: 80 }}>Antes</th>
+                <th className={`${tableStyles.tableHeaderCell} ${tableStyles.tableHeaderCellRight} ${styles.headerCellOverride}`} style={{ width: 80 }}>Después</th>
+                <th className={`${tableStyles.tableHeaderCell} ${styles.headerCellOverride}`}>Detalle</th>
               </tr>
             </thead>
 
@@ -260,7 +260,7 @@ export function StockHistoryPage() {
                       </td>
                       <td className={`${tableStyles.tableCell} ${tableStyles.tableCellRight}`}>
                         <span className={`${styles.qty} ${isPositive ? styles.qtyIn : styles.qtyOut}`}>
-                          {isPositive ? <ArrowUp size={12} /> : <ArrowDown size={12} />}
+                          {isPositive ? <ArrowUp size={11} /> : <ArrowDown size={11} />}
                           {formatQty(Math.abs(item.quantity))}
                         </span>
                       </td>
@@ -271,7 +271,7 @@ export function StockHistoryPage() {
                         <span className={styles.stockValue}>{formatQty(item.after)}</span>
                       </td>
                       <td className={tableStyles.tableCell}>
-                        <span className={styles.noteText}>{item.notes || "Sin nota"}</span>
+                        <span className={styles.noteText}>{item.notes || "—"}</span>
                       </td>
                     </tr>
                   )
@@ -290,21 +290,40 @@ export function StockHistoryPage() {
                 <button
                   type="button"
                   className={styles.pageBtn}
-                  onClick={() => setPage((prev) => Math.max(1, prev - 1))}
+                  onClick={() => setPage(p => Math.max(1, p - 1))}
                   disabled={page === 1}
                 >
-                  Anterior
+                  <ChevronLeft size={15} />
                 </button>
-                <span className={styles.pageText}>
-                  Página {page} de {totalPages}
-                </span>
+                {Array.from({ length: totalPages }, (_, i) => i + 1)
+                  .filter(p => p === 1 || p === totalPages || Math.abs(p - page) <= 1)
+                  .reduce<(number | "...")[]>((acc, p, i, arr) => {
+                    if (i > 0 && p - (arr[i - 1] as number) > 1) acc.push("...")
+                    acc.push(p)
+                    return acc
+                  }, [])
+                  .map((p, i) =>
+                    p === "..." ? (
+                      <span key={`dots-${i}`} className={styles.pageDots}>…</span>
+                    ) : (
+                      <button
+                        key={p}
+                        type="button"
+                        className={`${styles.pageBtn} ${page === p ? styles.pageBtnActive : ""}`}
+                        onClick={() => setPage(p as number)}
+                      >
+                        {p}
+                      </button>
+                    )
+                  )
+                }
                 <button
                   type="button"
                   className={styles.pageBtn}
-                  onClick={() => setPage((prev) => Math.min(totalPages, prev + 1))}
+                  onClick={() => setPage(p => Math.min(totalPages, p + 1))}
                   disabled={page >= totalPages}
                 >
-                  Siguiente
+                  <ChevronRight size={15} />
                 </button>
               </div>
             </div>

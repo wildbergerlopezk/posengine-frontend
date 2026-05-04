@@ -2,13 +2,14 @@ model Purchase {
   id       String @id @default(uuid())
   tenantId String
 
-  supplierId    String 
-  invoiceNumber String 
+  supplierId    String
+  invoiceNumber String
   purchaseDate  DateTime
 
   paymentType PurchasePaymentType
 
-  total    Float
+  total         Float
+  cashSessionId String
 
   status PurchaseStatus @default(RECEIVED)
 
@@ -17,12 +18,13 @@ model Purchase {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  tenant   Tenant   @relation(fields: [tenantId], references: [id])
-  supplier Supplier @relation(fields: [supplierId], references: [id])
+  tenant      Tenant      @relation(fields: [tenantId], references: [id])
+  supplier    Supplier    @relation(fields: [supplierId], references: [id])
+  cashSession CashSession @relation(fields: [cashSessionId], references: [id])
 
-  items      PurchaseItem[]
-  creditPlan PurchaseCreditPlan?
-  returns    PurchaseReturn[]
+  items   PurchaseItem[]
+  // creditPlan PurchaseCreditPlan?
+  returns PurchaseReturn[]
 
   @@unique([invoiceNumber, tenantId])
   @@map("purchases")

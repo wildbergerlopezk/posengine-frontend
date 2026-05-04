@@ -15,6 +15,14 @@ import { extname } from 'path';
           cb(null, `${file.fieldname}-${uniqueSuffix}${ext}`);
         },
       }),
+      fileFilter: (req, file, cb) => {
+        const allowedMimeTypes = ['image/jpeg', 'image/png', 'image/webp'];
+        if (allowedMimeTypes.includes(file.mimetype)) {
+          cb(null, true);
+        } else {
+          cb(new Error('Formato de archivo no permitido. Solo se aceptan .jpg, .png y .webp'), false);
+        }
+      },
     }),
   ],
   controllers: [UploadController],

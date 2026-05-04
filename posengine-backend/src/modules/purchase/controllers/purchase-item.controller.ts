@@ -34,12 +34,12 @@ export class PurchaseItemController {
   @ApiOperation({
     summary: 'Bulk load items into a purchase',
     description:
-      'Adds one or more products to a PENDING purchase. Validates existence, duplicates, and total consistency.',
+      'Adds one or more products to a purchase. Only allowed if NOT RECEIVED.',
   })
   @ApiParam({ name: 'purchaseId', description: 'Purchase ID' })
   @ApiBody({ type: BulkCreatePurchaseItemsDto })
   @ApiResponse({ status: 201, description: 'Items loaded successfully' })
-  @ApiResponse({ status: 400, description: 'Validation error or purchase not PENDING' })
+  @ApiResponse({ status: 400, description: 'Validation error or purchase already RECEIVED' })
   @ApiResponse({ status: 404, description: 'Purchase or product not found' })
   @ApiResponse({ status: 409, description: 'Product already exists in this purchase' })
   bulkCreate(
@@ -66,11 +66,11 @@ export class PurchaseItemController {
   @Delete(':itemId')
   @Roles(UserRole.ADMIN, UserRole.SUPERADMIN)
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Remove an item from a PENDING purchase' })
+  @ApiOperation({ summary: 'Remove an item from a purchase' })
   @ApiParam({ name: 'purchaseId', description: 'Purchase ID' })
   @ApiParam({ name: 'itemId', description: 'Purchase Item ID' })
   @ApiResponse({ status: 200, description: 'Item removed successfully' })
-  @ApiResponse({ status: 400, description: 'Purchase is not PENDING' })
+  @ApiResponse({ status: 400, description: 'Purchase is already RECEIVED' })
   @ApiResponse({ status: 404, description: 'Purchase or item not found' })
   remove(
     @Param('purchaseId') purchaseId: string,

@@ -1,18 +1,21 @@
 model Tenant {
-    id     String  @id @default(uuid())
-    name   String
-    slug   String  @unique
-    active Boolean @default(true)
+  id     String  @id @default(uuid())
+  name   String
+  slug   String  @unique
+  active Boolean @default(true)
 
-    createdAt DateTime @default(now())
-    updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-    users         User[]
-    categories    Category[]
-    subcategories Subcategory[]
-    products      Product[]
-    suppliers     Supplier[]
-    purchases      Purchase[]
-    purchaseReturns PurchaseReturn[]
-    stockMovements StockMovement[]
+  users           User[]
+  categories      Category[]
+  subcategories   Subcategory[]
+  products        Product[]
+  suppliers       Supplier[]
+  purchases       Purchase[]
+  purchaseReturns PurchaseReturn[]
+  sales           Sale[]
+  stockMovements  StockMovement[]
+  customers       Customer[]
+  cashSessions    CashSession[]
 }

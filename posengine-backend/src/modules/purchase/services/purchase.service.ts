@@ -3,66 +3,95 @@ import {
   NotFoundException,
   ConflictException,
   BadRequestException,
-} from '@nestjs/common';
-import { PrismaService } from '../../../prisma/prisma.service';
-import { CreatePurchaseDto } from '../dto/purchase/create-purchase.dto';
-import { UpdatePurchaseDto } from '../dto/purchase/update-purchase.dto';
-import { PurchaseFilterDto } from '../dto/purchase/purchase-filter.dto';
-import { PurchaseStatus } from '../../../generated/prisma/enums';
-import { Prisma } from '../../../generated/prisma/client';
-import { StockMovementService } from '../../../stock-movement/stock-movement.service';
+} from '@nestjs/common'
+
+import { PrismaService } from '../../../prisma/prisma.service'
+import { CreatePurchaseDto } from '../dto/purchase/create-purchase.dto'
+import { UpdatePurchaseDto } from '../dto/purchase/update-purchase.dto'
+import { PurchaseFilterDto } from '../dto/purchase/purchase-filter.dto'
+import { PurchaseStatus } from '../../../generated/prisma/enums'
+import { Prisma } from '../../../generated/prisma/client'
+import { StockMovementService } from '../../../stock-movement/stock-movement.service'
+import { ProductService } from '../../product/product.service'
 
 @Injectable()
 export class PurchaseService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly stockMovementService: StockMovementService,
-  ) { }
+    private readonly productService: ProductService,
+  ) {}
 
   async generateInvoiceNumber(tenantId: string): Promise<{ invoiceNumber: string }> {
-    let invoiceNumber: string;
-    let isUnique = false;
+    let invoiceNumber: string
+    let isUnique = false
 
     do {
-      const randomNumber = Math.floor(Math.random() * 9_999_999) + 1;
-      const paddedNumber = String(randomNumber).padStart(7, '0');
-      invoiceNumber = `001-001-${paddedNumber}`;
+      const randomNumber = Math.floor(Math.random() * 9_999_999) + 1
+      const paddedNumber = String(randomNumber).padStart(7, '0')
+      invoiceNumber = `001-001-${paddedNumber}`
 
       const existing = await this.prisma.purchase.findUnique({
-        where: { invoiceNumber_tenantId: { invoiceNumber, tenantId } },
-      });
+        where: {
+          invoiceNumber_tenantId: {
+            invoiceNumber,
+            tenantId,
+          },
+        },
+      })
 
-      isUnique = !existing;
-    } while (!isUnique);
+      isUnique = !existing
+    } while (!isUnique)
 
-    return { invoiceNumber };
+    return { invoiceNumber }
   }
 
-  async create(tenantId: string, dto: CreatePurchaseDto) {
+  async create(tenantId: string, cashSessionId: string, dto: CreatePurchaseDto) {
     const existing = await this.prisma.purchase.findUnique({
-      where: { invoiceNumber_tenantId: { invoiceNumber: dto.invoiceNumber, tenantId } },
-    });
+      where: {
+        invoiceNumber_tenantId: {
+          invoiceNumber: dto.invoiceNumber,
+          tenantId,
+        },
+      },
+    })
 
     if (existing) {
-      throw new ConflictException(`Ya existe una compra con el número de factura "${dto.invoiceNumber}"`);
+      throw new ConflictException(
+        `Ya existe una compra con el número de factura "${dto.invoiceNumber}"`,
+      )
+    }
+
+    const productIds = dto.items.map((item) => item.productId)
+    const products = await this.prisma.product.findMany({
+      where: { id: { in: productIds }, tenantId },
+      select: { id: true, name: true, unitType: true },
+    })
+    const productMap = new Map(products.map((product) => [product.id, product]))
+
+    for (const item of dto.items) {
+      const product = productMap.get(item.productId)
+      if (!product) {
+        throw new NotFoundException(`Producto con id "${item.productId}" no encontrado`)
+      }
+      this.productService.validateQuantity(item.quantity, product.unitType, product.name)
     }
 
     return this.prisma.$transaction(async (tx) => {
       const purchase = await tx.purchase.create({
         data: {
           tenantId,
+          cashSessionId,
           supplierId: dto.supplierId,
           invoiceNumber: dto.invoiceNumber,
           purchaseDate: new Date(dto.purchaseDate),
           paymentType: dto.paymentType,
           total: dto.total,
           notes: dto.notes,
-          status: PurchaseStatus.RECEIVED, // ← siempre RECEIVED
+          status: PurchaseStatus.RECEIVED,
         },
-        include: { supplier: true },
-      });
+      })
 
-      // Los items se crean y el stock se registra en el mismo acto
       for (const item of dto.items) {
         const purchaseItem = await tx.purchaseItem.create({
           data: {
@@ -72,33 +101,54 @@ export class PurchaseService {
             unitCost: item.unitCost,
             total: item.quantity * item.unitCost,
           },
-        });
+        })
 
+        // Register stock movement immediately
         await this.stockMovementService.registerPurchase(
           tenantId,
           item.productId,
           item.quantity,
           purchaseItem.id,
           tx,
-        );
+        )
       }
 
-      return purchase;
-    });
+      return tx.purchase.findUnique({
+        where: { id: purchase.id },
+        include: {
+          supplier: true,
+          items: true,
+        },
+      })
+    })
   }
 
   async findAll(tenantId: string, query: PurchaseFilterDto) {
-    const { limit, skip, search, status, paymentType, dateFrom, dateTo } = query;
+    const { limit, skip, search, status, paymentType, dateFrom, dateTo, supplierId } = query
 
     const where: Prisma.PurchaseWhereInput = {
       tenantId,
       ...(status && { status }),
       ...(paymentType && { paymentType }),
+      ...(supplierId && { supplierId }),
       ...(search && {
         OR: [
-          { invoiceNumber: { contains: search, mode: Prisma.QueryMode.insensitive } },
-          { supplier: { name: { contains: search, mode: Prisma.QueryMode.insensitive } } },
-          { supplier: { RUC: { contains: search, mode: Prisma.QueryMode.insensitive } } },
+          {
+            invoiceNumber: {
+              contains: search,
+              mode: Prisma.QueryMode.insensitive,
+            },
+          },
+          {
+            supplier: {
+              name: { contains: search, mode: Prisma.QueryMode.insensitive },
+            },
+          },
+          {
+            supplier: {
+              RUC: { contains: search, mode: Prisma.QueryMode.insensitive },
+            },
+          },
         ],
       }),
       ...((dateFrom || dateTo) && {
@@ -118,9 +168,9 @@ export class PurchaseService {
         skip,
       }),
       this.prisma.purchase.count({ where }),
-    ]);
+    ])
 
-    return { items, total, page: query.page, limit: query.limit };
+    return { items, total, page: query.page, limit: query.limit }
   }
 
   async findOne(id: string, tenantId: string) {
@@ -128,120 +178,67 @@ export class PurchaseService {
       where: { id, tenantId },
       include: {
         supplier: true,
+        items: {
+          include: {
+            returnItems: {
+              select: { quantity: true },
+              where: { purchaseReturn: { status: 'CONFIRMED' } }
+            },
+            product: {
+              select: { id: true, name: true, barcode: true, sku: true, stock: true }
+            }
+          }
+        },
       },
-    });
+    })
 
     if (!purchase) {
-      throw new NotFoundException(`Compra con id "${id}" no encontrada`);
+      throw new NotFoundException(`Compra con id "${id}" no encontrada`)
     }
 
-    return purchase;
+    return purchase
   }
+  
+  async cancel(id: string, tenantId: string) {
+    const purchase = await this.prisma.purchase.findFirst({
+      where: { id, tenantId },
+      include: {
+        items: true,
+        returns: true,
+      },
+    })
 
-  async update(id: string, tenantId: string, dto: UpdatePurchaseDto) {
-    const purchase = await this.findOne(id, tenantId);
+    if (!purchase) {
+      throw new NotFoundException(`Compra con id "${id}" no encontrada`)
+    }
 
     if (purchase.status === PurchaseStatus.CANCELLED) {
-      throw new BadRequestException(
-        'No se puede modificar una compra cancelada',
-      );
+      throw new ConflictException('La compra ya está cancelada')
     }
 
-    if (dto.invoiceNumber && dto.invoiceNumber !== purchase.invoiceNumber) {
-      const conflict = await this.prisma.purchase.findFirst({
-        where: {
-          invoiceNumber: dto.invoiceNumber,
-          tenantId,
-          NOT: { id },
-        },
-      });
-
-      if (conflict) {
-        throw new ConflictException(
-          `Ya existe una compra con el número de factura "${dto.invoiceNumber}"`,
-        );
-      }
-    }
-
-    return this.prisma.purchase.update({
-      where: { id },
-      data: {
-        ...(dto.invoiceNumber !== undefined && { invoiceNumber: dto.invoiceNumber }),
-        ...(dto.supplierId !== undefined && { supplierId: dto.supplierId }),
-        ...(dto.purchaseDate && { purchaseDate: new Date(dto.purchaseDate) }),
-        ...(dto.paymentType !== undefined && { paymentType: dto.paymentType }),
-        ...(dto.total !== undefined && { total: dto.total }),
-        ...(dto.notes !== undefined && { notes: dto.notes }),
-      },
-      include: {
-        supplier: true,
-      },
-    });
-  }
-
-  async remove(id: string, tenantId: string) {
-    const purchase = await this.findOne(id, tenantId);
-
-    if (purchase.status !== PurchaseStatus.PENDING) {
+    if (purchase.returns.length > 0) {
       throw new BadRequestException(
-        'Solo se pueden eliminar compras en estado PENDING',
-      );
-    }
-
-    await this.prisma.purchase.delete({ where: { id } });
-
-    return { message: 'Compra eliminada correctamente' };
-  }
-
-  async markAsReceived(id: string, tenantId: string) {
-    const purchase = await this.findOne(id, tenantId);
-
-    if (purchase.status !== PurchaseStatus.PENDING) {
-      throw new BadRequestException(
-        'Solo se pueden recibir compras en estado PENDING',
-      );
-    }
-
-    const items = await this.prisma.purchaseItem.findMany({
-      where: { purchaseId: id },
-    });
-
-    if (items.length === 0) {
-      throw new BadRequestException(
-        'No se puede recibir una compra sin items',
-      );
+        'No se puede cancelar una compra que tiene devoluciones registradas',
+      )
     }
 
     return this.prisma.$transaction(async (tx) => {
-      for (const item of items) {
-        await this.stockMovementService.registerPurchase(
+      // Revert stock for each item
+      for (const item of purchase.items) {
+        await this.stockMovementService.registerPurchaseCancellation(
           tenantId,
           item.productId,
           item.quantity,
           item.id,
           tx,
-        );
+        )
       }
 
       return tx.purchase.update({
         where: { id },
-        data: { status: PurchaseStatus.RECEIVED },
+        data: { status: PurchaseStatus.CANCELLED },
         include: { supplier: true },
-      });
-    });
-  }
-
-  async cancel(id: string, tenantId: string) {
-    const purchase = await this.findOne(id, tenantId);
-
-    if (purchase.status === PurchaseStatus.CANCELLED) {
-      throw new ConflictException('La compra ya está cancelada');
-    }
-
-    return this.prisma.purchase.update({
-      where: { id },
-      data: { status: PurchaseStatus.CANCELLED },
-      include: { supplier: true },
-    });
+      })
+    })
   }
 }

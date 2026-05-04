@@ -89,11 +89,20 @@ export class ProductController {
   @Roles(UserRole.ADMIN, UserRole.SUPERADMIN)
   @ApiOperation({ summary: 'Historial de precios de compra de un producto' })
   @ApiParam({ name: 'id', description: 'Product ID' })
+  @ApiQuery({ name: 'page', required: false, type: Number, description: 'Página actual' })
+  @ApiQuery({ name: 'limit', required: false, type: Number, description: 'Cantidad de registros a obtener' })
   findPriceHistory(
     @Param('id') id: string,
     @CurrentUser('tenantId') tenantId: string,
+    @Query('page') page?: number,
+    @Query('limit') limit?: number,
   ) {
-    return this.productService.getPriceHistory(id, tenantId);
+    return this.productService.getPriceHistory(
+      id,
+      tenantId,
+      page ? Number(page) : 1,
+      limit ? Number(limit) : 10,
+    );
   }
 
   @Patch(':id')

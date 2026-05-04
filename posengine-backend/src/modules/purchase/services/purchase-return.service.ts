@@ -190,10 +190,35 @@ export class PurchaseReturnService {
         data: { status: PurchaseReturnStatus.CONFIRMED },
       })
 
-      await tx.purchase.update({
-        where: { id: purchaseReturn.purchaseId },
-        data: { status: PurchaseStatus.FULLY_RETURNED },
+      // 4. Determinar si la compra queda totalmente devuelta o sigue recibida (parcial)
+      // Obtenemos todos los items de la compra y comparamos con lo devuelto (incluyendo esta devolución)
+      const allPurchaseItems = await tx.purchaseItem.findMany({
+        where: { purchaseId: purchaseReturn.purchaseId },
+        include: {
+          returnItems: {
+            where: {
+              purchaseReturn: {
+                OR: [
+                  { status: PurchaseReturnStatus.CONFIRMED },
+                  { id: returnId } // Incluimos la actual que estamos confirmando
+                ]
+              }
+            }
+          }
+        }
       })
+
+      const isFullyReturned = allPurchaseItems.every(item => {
+        const returnedQty = item.returnItems.reduce((sum, r) => sum + r.quantity, 0)
+        return returnedQty >= item.quantity
+      })
+
+      if (isFullyReturned) {
+        await tx.purchase.update({
+          where: { id: purchaseReturn.purchaseId },
+          data: { status: PurchaseStatus.FULLY_RETURNED },
+        })
+      }
 
       return tx.purchaseReturn.findUnique({
         where: { id: returnId },

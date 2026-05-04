@@ -3,9 +3,9 @@ model PurchaseItem {
   purchaseId String
   productId  String
 
-  quantity  Float
-  unitCost  Float
-  total     Float
+  quantity Float
+  unitCost Float
+  total    Float
 
   purchase    Purchase             @relation(fields: [purchaseId], references: [id])
   product     Product              @relation(fields: [productId], references: [id])

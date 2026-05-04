@@ -1,4 +1,4 @@
-import { X, TrendingDown, TrendingUp, Minus, Loader2, Receipt } from "lucide-react" 
+import { X, TrendingDown, TrendingUp, Minus, Loader2, Receipt, ChevronLeft, ChevronRight } from "lucide-react" 
 import { formatCurrency } from "@/src/shared/hooks/useFormatCurrency" 
 import type { PriceHistoryEntry } from "@/src/shared/hooks/usePriceHistory" 
 import styles from "./PriceHistoryModal.module.css" 
@@ -9,6 +9,10 @@ interface Props {
   loading: boolean 
   productName: string 
   history: PriceHistoryEntry[] 
+  page: number
+  totalItems: number
+  limit: number
+  onPageChange: (page: number) => void
   onClose: () => void 
 } 
  
@@ -18,7 +22,10 @@ function formatDate(iso: string) {
   }) 
 } 
  
-export function PriceHistoryModal({ open, loading, productName, history, onClose }: Props) { 
+export function PriceHistoryModal({ 
+  open, loading, productName, history, 
+  page, totalItems, limit, onPageChange, onClose 
+}: Props) { 
   // ── Manejo de Escape propio, sin propagarse al modal padre ──────────────── 
   useEffect(() => { 
     if (!open) return 
@@ -32,8 +39,12 @@ export function PriceHistoryModal({ open, loading, productName, history, onClose
     window.addEventListener("keydown", handler, true) 
     return () => window.removeEventListener("keydown", handler, true) 
   }, [open, onClose]) 
-
+ 
   if (!open) return null 
+ 
+  const totalPages = Math.ceil(totalItems / limit)
+  const hasMore = page < totalPages
+  const hasLess = page > 1
  
   return ( 
     <div 
@@ -47,7 +58,7 @@ export function PriceHistoryModal({ open, loading, productName, history, onClose
           <div className={styles.headerLeft}> 
             <Receipt size={16} className={styles.headerIcon} /> 
             <div> 
-              <h2 className={styles.title}>Último precio</h2> 
+              <h2 className={styles.title}>Historial de precios</h2> 
               <p className={styles.subtitle}>{productName}</p> 
             </div> 
           </div> 
@@ -57,6 +68,7 @@ export function PriceHistoryModal({ open, loading, productName, history, onClose
         </div> 
  
         <div className={styles.body}> 
+
           {loading ? ( 
             <div className={styles.empty}> 
               <Loader2 size={22} className={styles.spinner} /> 
@@ -73,8 +85,7 @@ export function PriceHistoryModal({ open, loading, productName, history, onClose
                   <th>Factura</th> 
                   <th>Proveedor</th> 
                   <th style={{ textAlign: "right" }}>Cant.</th> 
-                  <th style={{ textAlign: "right" }}>Precio unit.</th> 
-                  <th style={{ textAlign: "right" }}>Var.</th> 
+                  <th style={{ textAlign: "right" }}>Precio de costo</th> 
                 </tr> 
               </thead> 
               <tbody> 
@@ -101,9 +112,11 @@ export function PriceHistoryModal({ open, loading, productName, history, onClose
                            <span className={styles.varDown}> 
                              <TrendingDown size={12} /> {formatCurrency(diff)} 
                            </span> 
-                        ) : ( 
+                        ) : diff === 0 ? (
                           <span className={styles.varNeutral}><Minus size={12} /></span> 
-                        )} 
+                        ) : (
+                          <span className={styles.varNeutral}><Minus size={12} /></span> 
+                        )}
                       </td> 
                     </tr> 
                   ) 
@@ -114,7 +127,26 @@ export function PriceHistoryModal({ open, loading, productName, history, onClose
         </div> 
  
         <div className={styles.footer}> 
-          <kbd>Esc</kbd> Cerrar 
+          <div className={styles.pagination}>
+            <button 
+              className={styles.pageBtn} 
+              disabled={!hasLess || loading} 
+              onClick={() => onPageChange(page - 1)}
+            >
+              <ChevronLeft size={16} />
+            </button>
+            <span className={styles.pageInfo}>Página {page} de {totalPages || 1}</span>
+            <button 
+              className={styles.pageBtn} 
+              disabled={!hasMore || loading} 
+              onClick={() => onPageChange(page + 1)}
+            >
+              <ChevronRight size={16} />
+            </button>
+          </div>
+          <div className={styles.footerRight}>
+            <kbd>Esc</kbd> Cerrar 
+          </div>
         </div> 
       </div> 
     </div> 

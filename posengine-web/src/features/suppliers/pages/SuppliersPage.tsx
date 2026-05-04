@@ -284,14 +284,19 @@ export function SuppliersPage() {
             </div>
           ) : (
             <>
-              <table className={tableStyles.table}>
+              <div className={styles.tableToolbar}>
+                <span className={styles.tableTitle}>
+                  Proveedores <span className={styles.tableCount}>{total}</span>
+                </span>
+              </div>
+              <table className={`${tableStyles.table} ${styles.suppliersTable}`}>
                 <thead className={tableStyles.tableHeader}>
                   <tr>
-                    <th className={tableStyles.tableHeaderCell}>Proveedor</th>
-                    <th className={tableStyles.tableHeaderCell}>RUC</th>
-                    <th className={tableStyles.tableHeaderCell}>Teléfono</th>
-                    <th className={tableStyles.tableHeaderCell}>Dirección</th>
-                    <th className={`${tableStyles.tableHeaderCell} ${tableStyles.tableHeaderCellRight}`}>Acciones</th>
+                    <th className={`${tableStyles.tableHeaderCell} ${styles.headerCellOverride}`}>Proveedor</th>
+                    <th className={`${tableStyles.tableHeaderCell} ${styles.headerCellOverride}`}>RUC</th>
+                    <th className={`${tableStyles.tableHeaderCell} ${styles.headerCellOverride}`}>Teléfono</th>
+                    <th className={`${tableStyles.tableHeaderCell} ${styles.headerCellOverride}`}>Dirección</th>
+                    <th className={`${tableStyles.tableHeaderCell} ${tableStyles.tableHeaderCellRight} ${styles.headerCellOverride}`}>Acciones</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -308,49 +313,39 @@ export function SuppliersPage() {
                     items.map((s) => (
                       <tr key={s.id} className={tableStyles.tableRow}>
                         <td className={tableStyles.tableCell}>
-                          <div className={styles.cellStack}>
+                          <div className={styles.supplierCell}>
                             <span className={styles.supplierName}>{s.name}</span>
                           </div>
                         </td>
                         <td className={tableStyles.tableCell}>
-                          {s.RUC ? <span className={styles.mono}>{s.RUC}</span> : <span className={styles.metaMuted}>—</span>}
+                          {s.RUC ? <span className={styles.rucChip}>{s.RUC}</span> : <span className={styles.metaMuted}>—</span>}
                         </td>
                         <td className={tableStyles.tableCell}>
-                          {s.phone ?? <span className={styles.metaMuted}>—</span>}
+                          <span className={styles.metaMuted}>{s.phone ?? "—"}</span>
                         </td>
                         <td className={tableStyles.tableCell}>
-                          {s.address ? (
-                            <span className={styles.metaMuted}>{s.address}</span>
-                          ) : (
-                            <span className={styles.metaMuted}>—</span>
-                          )}
+                          <span className={styles.metaMuted}>{s.address ?? "—"}</span>
                         </td>
                         <td className={`${tableStyles.tableCell} ${tableStyles.tableCellRight}`}>
-                          <div className={tableStyles.dropdown} ref={openDropdown === s.id ? dropdownRef : null}>
+                          <div className={styles.actionButtons}>
                             <button
                               type="button"
-                              className={tableStyles.actionButton}
-                              onClick={() => setOpenDropdown(openDropdown === s.id ? null : s.id)}
-                              aria-expanded={openDropdown === s.id}
-                              aria-label="Acciones"
+                              className={styles.actionBtn}
+                              onClick={() => handleEdit(s)}
+                              title="Editar"
+                              aria-label="Editar proveedor"
                             >
-                              <MoreHorizontal size={16} />
+                              <Pencil size={14} />
                             </button>
-                            {openDropdown === s.id && (
-                              <div className={tableStyles.dropdownMenu}>
-                                <button type="button" className={tableStyles.dropdownItem} onClick={() => handleEdit(s)}>
-                                  <Pencil size={14} /> Editar
-                                </button>
-                                <div className={tableStyles.dropdownDivider} />
-                                <button
-                                  type="button"
-                                  className={`${tableStyles.dropdownItem} ${tableStyles.dropdownItemDestructive}`}
-                                  onClick={() => handleDelete(s)}
-                                >
-                                  <Trash2 size={14} /> Eliminar
-                                </button>
-                              </div>
-                            )}
+                            <button
+                              type="button"
+                              className={`${styles.actionBtn} ${styles.actionBtnDestructive}`}
+                              onClick={() => handleDelete(s)}
+                              title="Eliminar"
+                              aria-label="Eliminar proveedor"
+                            >
+                              <Trash2 size={14} />
+                            </button>
                           </div>
                         </td>
                       </tr>
@@ -359,26 +354,26 @@ export function SuppliersPage() {
                 </tbody>
               </table>
               {total > 0 && (
-                <div className={styles.paginationBar}>
-                  <span>
-                    Página {page} de {totalPages} · {total} proveedor{total !== 1 ? "es" : ""}
+                <div className={styles.pagination}>
+                  <span className={styles.paginationInfo}>
+                    Mostrando {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, total)} de {total}
                   </span>
-                  <div className={styles.pageNav}>
+                  <div className={styles.paginationControls}>
                     <button
                       type="button"
-                      className={styles.navBtn}
-                      disabled={page <= 1}
+                      className={styles.pageBtn}
                       onClick={() => setPage((p) => Math.max(1, p - 1))}
+                      disabled={page === 1}
                     >
-                      Anterior
+                      ← Anterior
                     </button>
                     <button
                       type="button"
-                      className={styles.navBtn}
-                      disabled={page >= totalPages}
+                      className={styles.pageBtn}
                       onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                      disabled={page >= totalPages}
                     >
-                      Siguiente
+                      Siguiente →
                     </button>
                   </div>
                 </div>

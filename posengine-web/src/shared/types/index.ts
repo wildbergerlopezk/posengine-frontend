@@ -29,6 +29,8 @@ export interface Supplier {
   updatedAt: string
 }
 
+export type UnitType = "UNIT" | "KG" | "G" | "L" | "ML" | "MG"
+
 export interface Product {
   id: string
   tenantId: string
@@ -41,6 +43,7 @@ export interface Product {
   cost?: number
   price: number
   stock: number
+  unitType: UnitType
   stockMinimum: number
   imageUrl?: string
   isActive: boolean

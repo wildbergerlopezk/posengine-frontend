@@ -21,7 +21,7 @@ const navItems = [
     icon: ShoppingCart,
     subItems: [
       { href: "/dashboard/sales/pos", label: "Nueva venta", icon: PlusCircle },
-      { href: "/dashboard/sales/history", label: "Historial", icon: History },
+      { href: "/dashboard/sales/history", label: "Historial de ventas", icon: History },
     ],
   },
 
@@ -44,7 +44,6 @@ const navItems = [
     subItems: [
       { href: "/dashboard/purchases/new", label: "Registrar compra", icon: PlusCircle },
       { href: "/dashboard/purchases/history", label: "Historial de compras", icon: History },
-      { href: "/dashboard/purchases/returns", label: "Devoluciones", icon: RotateCcw },
     ],
   },
 
@@ -60,7 +59,11 @@ const navItems = [
 
   { href: "/dashboard/suppliers", label: "Proveedores", icon: Truck },
 
-  { href: "/dashboard/cash", label: "Caja", icon: Wallet },
+  {
+    href: "/dashboard/cash",
+    label: "Caja",
+    icon: Wallet,
+  },
 
   { href: "/dashboard/reports", label: "Reportes", icon: BarChart2 },
 

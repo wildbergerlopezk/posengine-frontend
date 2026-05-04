@@ -1,0 +1,16 @@
+model SaleItem {
+  id     String @id @default(uuid())
+  saleId String
+
+  productId String
+  quantity  Float
+  unitPrice Float
+  total     Float
+
+  sale    Sale    @relation(fields: [saleId], references: [id])
+  product Product @relation(fields: [productId], references: [id])
+
+  //returns SaleReturnItem[]
+
+  @@map("sale_items")
+}

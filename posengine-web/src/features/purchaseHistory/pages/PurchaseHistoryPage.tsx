@@ -7,18 +7,31 @@ import {
     Search, Eye, Package, AlertCircle, Loader2,
     X, ChevronLeft, ChevronRight, CheckCircle2,
     Clock, XCircle, CreditCard, Banknote, FileText,
-    Hash, Calendar, Building2, Receipt, Tag, RotateCcw
+    Hash, Calendar, Building2, Receipt, Tag, RotateCcw,
+    ChevronDown, Ban
 } from "lucide-react"
 import { useAuthStore } from "@/src/features/auth/store/auth.store"
 import { formatCurrency } from "@/src/shared/hooks/useFormatCurrency"
 import tableStyles from "@/src/features/products/pages/ProductsPage.module.css"
 import styles from "./PurchaseHistoryPage.module.css"
+import {
+    Combobox,
+    ComboboxEmpty,
+    ComboboxInput,
+    ComboboxItem,
+    ComboboxList,
+    ComboboxPopup,
+    ComboboxTrigger,
+    ComboboxValue,
+} from "@/components/ui/combobox"
+import { ConfirmDialog } from "@/src/shared/components/ConfirmDialog"
+import { PurchaseReturnModal } from "../components/PurchaseReturnModal"
 
 const API_BASE = process.env.NEXT_PUBLIC_BACKEND_URL
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-type PurchaseStatus = "PENDING" | "RECEIVED" | "FULLY_RETURNED" | "CANCELLED"
+type PurchaseStatus = "RECEIVED" | "FULLY_RETURNED" | "CANCELLED"
 type PurchasePaymentType = "CASH" | "CREDIT"
 
 interface Supplier {
@@ -32,6 +45,7 @@ interface Product {
     name: string
     barcode?: string
     sku?: string
+    stock: number
 }
 
 interface PurchaseItem {
@@ -41,6 +55,7 @@ interface PurchaseItem {
     unitCost: number
     total: number
     product: Product
+    returnItems?: { quantity: number }[]
 }
 
 interface Purchase {
@@ -66,11 +81,6 @@ interface PaginatedResponse {
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 const STATUS_CONFIG: Record<PurchaseStatus, { label: string; icon: React.ReactNode; className: string }> = {
-    PENDING: {
-        label: "Pendiente",
-        icon: <Clock size={12} />,
-        className: styles.statusPending,
-    },
     RECEIVED: {
         label: "Recibida",
         icon: <CheckCircle2 size={12} />,
@@ -119,12 +129,26 @@ export function PurchaseHistoryPage() {
     const [dateTo, setDateTo] = useState("")
     const [page, setPage] = useState(1)
     const [totalItems, setTotalItems] = useState(0)
-    const LIMIT = 15
+    const LIMIT = 10
+
+    // ── Supplier filter state ──────────────────────────────────────────────────
+    const [suppliers, setSuppliers] = useState<Supplier[]>([])
+    const [selectedSupplier, setSelectedSupplier] = useState<{ label: string; value: string } | null>(null)
+    const supplierId = selectedSupplier?.value || ""
+
+    const supplierItems = [
+        { label: "Todos los proveedores", value: "" },
+        ...suppliers.map(s => ({ label: s.name, value: s.id }))
+    ]
 
     // ── Detail modal state ─────────────────────────────────────────────────────
     const [selectedPurchase, setSelectedPurchase] = useState<Purchase | null>(null)
     const [loadingDetail, setLoadingDetail] = useState(false)
     const [detailError, setDetailError] = useState<string | null>(null)
+
+    const [showCancelConfirm, setShowCancelConfirm] = useState(false)
+    const [showReturnModal, setShowReturnModal] = useState(false)
+    const [cancelling, setCancelling] = useState(false)
 
     // ── Fetch list ─────────────────────────────────────────────────────────────
     const fetchPurchases = useCallback(async () => {
@@ -140,6 +164,7 @@ export function PurchaseHistoryPage() {
             if (paymentFilter !== "ALL") params.set("paymentType", paymentFilter)
             if (dateFrom)                params.set("dateFrom", dateFrom)
             if (dateTo)                  params.set("dateTo", dateTo)
+            if (supplierId)              params.set("supplierId", supplierId)
 
             const res = await fetch(`${API_BASE}/purchases?${params}`, { headers: authHeaders })
             if (!res.ok) throw new Error("Error al cargar compras")
@@ -151,14 +176,28 @@ export function PurchaseHistoryPage() {
         } finally {
             setLoading(false)
         }
-    }, [page, search, statusFilter, paymentFilter, dateFrom, dateTo, accessToken])
+    }, [page, search, statusFilter, paymentFilter, dateFrom, dateTo, supplierId, accessToken])
 
     useEffect(() => {
         void fetchPurchases()
     }, [fetchPurchases])
 
+    // Fetch suppliers once
+    useEffect(() => {
+        const fetchSuppliers = async () => {
+            try {
+                const res = await fetch(`${API_BASE}/suppliers?limit=100`, { headers: authHeaders })
+                if (res.ok) {
+                    const data = await res.json()
+                    setSuppliers(data.items || [])
+                }
+            } catch (err) { /* silent */ }
+        }
+        void fetchSuppliers()
+    }, [accessToken])
+
     // Reset page on filter/search change
-    useEffect(() => { setPage(1) }, [search, statusFilter, paymentFilter, dateFrom, dateTo])
+    useEffect(() => { setPage(1) }, [search, statusFilter, paymentFilter, dateFrom, dateTo, supplierId])
 
     // ── Helpers ────────────────────────────────────────────────────────────────
     const hasActiveFilters = statusFilter !== "ALL" || paymentFilter !== "ALL" || dateFrom || dateTo || search
@@ -169,6 +208,7 @@ export function PurchaseHistoryPage() {
         setPaymentFilter("ALL")
         setDateFrom("")
         setDateTo("")
+        setSelectedSupplier(null)
     }
 
     // ── Open detail modal ──────────────────────────────────────────────────────
@@ -178,11 +218,10 @@ export function PurchaseHistoryPage() {
         setDetailError(null)
 
         try {
-            // Load items
-            const itemsRes = await fetch(`${API_BASE}/purchases/${purchase.id}/items`, { headers: authHeaders })
-            if (!itemsRes.ok) throw new Error("Error al cargar los ítems")
-            const items: PurchaseItem[] = await itemsRes.json()
-            setSelectedPurchase(prev => prev ? { ...prev, items } : null)
+            const res = await fetch(`${API_BASE}/purchases/${purchase.id}`, { headers: authHeaders })
+            if (!res.ok) throw new Error("Error al cargar el detalle")
+            const data: Purchase = await res.json()
+            setSelectedPurchase(data)
         } catch (err) {
             setDetailError(err instanceof Error ? err.message : "Error al cargar detalle")
         } finally {
@@ -202,9 +241,38 @@ export function PurchaseHistoryPage() {
         return () => window.removeEventListener("keydown", handler)
     }, [])
 
-    const totalPages = Math.ceil(totalItems / LIMIT)
+    const handleCancelConfirm = async () => {
+        if (!selectedPurchase) return
+        
+        setCancelling(true)
+        try {
+            const res = await fetch(`${API_BASE}/purchases/${selectedPurchase.id}/cancel`, {
+                method: "PATCH",
+                headers: authHeaders,
+            })
 
-    // ─────────────────────────────────────────────────────────────────────────
+            if (!res.ok) {
+                const data = await res.json()
+                throw new Error(data.message || "Error al anular compra")
+            }
+
+            await fetchPurchases()
+            setShowCancelConfirm(false)
+            closeDetail()
+        } catch (err) {
+            alert(err instanceof Error ? err.message : "Error desconocido")
+        } finally {
+            setCancelling(false)
+        }
+    }
+
+    const handleReturnSuccess = () => {
+        setShowReturnModal(false)
+        void fetchPurchases()
+        closeDetail()
+    }
+
+    const totalPages = Math.ceil(totalItems / LIMIT)
 
     return (
         <div className={styles.page}>
@@ -223,12 +291,7 @@ export function PurchaseHistoryPage() {
                     </div>
                 )}
 
-                {/* ══════════════════════════════════════════════════
-                    FILTERS
-                ══════════════════════════════════════════════════ */}
                 <div className={styles.filtersBar}>
-
-                    {/* ── Fila 1: búsqueda + limpiar ── */}
                     <div className={styles.filtersRow}>
                         <div className={styles.searchWrapper}>
                             <Search size={15} className={styles.searchIcon} />
@@ -245,19 +308,40 @@ export function PurchaseHistoryPage() {
                             )}
                         </div>
 
-                        {hasActiveFilters && (
+                        {hasActiveFilters || supplierId ? (
                             <button type="button" className={styles.clearFiltersBtn} onClick={clearFilters}>
                                 <X size={13} /> Limpiar filtros
                             </button>
-                        )}
+                        ) : null}
                     </div>
 
-                    {/* ── Fila 2: filtros combinables ── */}
                     <div className={styles.filtersRow}>
+                        <div className={styles.supplierFilter}>
+                            <Combobox 
+                                items={supplierItems} 
+                                value={selectedSupplier} 
+                                onValueChange={setSelectedSupplier}
+                            >
+                                <ComboboxTrigger className={styles.supplierComboboxTrigger}>
+                                    <ComboboxValue placeholder="Todos los proveedores" />
+                                    <ChevronDown size={14} className={styles.comboboxIcon} />
+                                </ComboboxTrigger>
+                                <ComboboxPopup>
+                                    <ComboboxInput placeholder="Buscar proveedor..." />
+                                    <ComboboxList>
+                                        {(item) => (
+                                            <ComboboxItem key={item.value} value={item}>
+                                                {item.label}
+                                            </ComboboxItem>
+                                        )}
+                                    </ComboboxList>
+                                    <ComboboxEmpty>No se encontraron proveedores</ComboboxEmpty>
+                                </ComboboxPopup>
+                            </Combobox>
+                        </div>
 
-                        {/* Estado */}
                         <div className={styles.statusTabs}>
-                            {(["ALL", "PENDING", "RECEIVED", "FULLY_RETURNED", "CANCELLED"] as const).map(s => (
+                            {(["ALL", "RECEIVED", "FULLY_RETURNED", "CANCELLED"] as const).map(s => (
                                 <button
                                     key={s}
                                     type="button"
@@ -269,7 +353,6 @@ export function PurchaseHistoryPage() {
                             ))}
                         </div>
 
-                        {/* Tipo de pago */}
                         <div className={styles.statusTabs}>
                             {(["ALL", "CASH", "CREDIT"] as const).map(p => (
                                 <button
@@ -283,7 +366,6 @@ export function PurchaseHistoryPage() {
                             ))}
                         </div>
 
-                        {/* Rango de fechas */}
                         <div className={styles.dateRange}>
                             <input
                                 type="date"
@@ -301,31 +383,26 @@ export function PurchaseHistoryPage() {
                                 title="Hasta"
                             />
                         </div>
-
                     </div>
                 </div>
 
-                {/* ══════════════════════════════════════════════════
-                    TABLE
-                ══════════════════════════════════════════════════ */}
                 <div className={tableStyles.tableCard}>
-
                     <div className={styles.tableToolbar}>
                         <span className={styles.tableTitle}>
                             Compras <span className={styles.tableCount}>{totalItems}</span>
                         </span>
                     </div>
 
-                    <table className={tableStyles.table}>
+                    <table className={`${tableStyles.table} ${styles.historyTable}`}>
                         <thead className={tableStyles.tableHeader}>
                             <tr>
-                                <th className={tableStyles.tableHeaderCell} style={{ width: 180 }}>Nro. Factura</th>
-                                <th className={tableStyles.tableHeaderCell}>Proveedor</th>
-                                <th className={tableStyles.tableHeaderCell} style={{ width: 150 }}>Fecha</th>
-                                <th className={tableStyles.tableHeaderCell} style={{ width: 110 }}>Pago</th>
-                                <th className={tableStyles.tableHeaderCell} style={{ width: 120 }}>Estado</th>
-                                <th className={`${tableStyles.tableHeaderCell} ${tableStyles.tableHeaderCellRight}`} style={{ width: 150 }}>Total</th>
-                                <th className={tableStyles.tableHeaderCell} style={{ width: 70 }} />
+                                <th className={`${tableStyles.tableHeaderCell} ${styles.headerCellOverride}`} style={{ width: 180 }}>Nro. Factura</th>
+                                <th className={`${tableStyles.tableHeaderCell} ${styles.headerCellOverride}`}>Proveedor</th>
+                                <th className={`${tableStyles.tableHeaderCell} ${styles.headerCellOverride}`} style={{ width: 150 }}>Fecha</th>
+                                <th className={`${tableStyles.tableHeaderCell} ${styles.headerCellOverride}`} style={{ width: 110 }}>Pago</th>
+                                <th className={`${tableStyles.tableHeaderCell} ${styles.headerCellOverride}`} style={{ width: 120 }}>Estado</th>
+                                <th className={`${tableStyles.tableHeaderCell} ${tableStyles.tableHeaderCellRight} ${styles.headerCellOverride}`} style={{ width: 150 }}>Total</th>
+                                <th className={`${tableStyles.tableHeaderCell} ${styles.headerCellOverride}`} style={{ width: 70 }} />
                             </tr>
                         </thead>
                         <tbody>
@@ -400,7 +477,6 @@ export function PurchaseHistoryPage() {
                         </tbody>
                     </table>
 
-                    {/* ── Pagination ── */}
                     {totalPages > 1 && (
                         <div className={styles.pagination}>
                             <span className={styles.paginationInfo}>
@@ -451,14 +527,9 @@ export function PurchaseHistoryPage() {
                 </div>
             </div>
 
-            {/* ══════════════════════════════════════════════════
-                DETAIL MODAL — tipo factura
-            ══════════════════════════════════════════════════ */}
             {selectedPurchase && (
                 <div className={tableStyles.modalOverlay} onClick={closeDetail}>
                     <div className={styles.detailModal} onClick={e => e.stopPropagation()}>
-
-                        {/* ── Modal header ── */}
                         <div className={styles.detailModalHeader}>
                             <div className={styles.detailModalHeaderLeft}>
                                 <Receipt size={18} className={styles.detailModalIcon} />
@@ -472,11 +543,8 @@ export function PurchaseHistoryPage() {
                         </div>
 
                         <div className={styles.detailModalBody}>
-
-                            {/* ── Factura header — estilo boleta ── */}
                             <div className={styles.receiptHeader}>
                                 <div className={styles.receiptHeaderGrid}>
-
                                     <div className={styles.receiptInfoBlock}>
                                         <div className={styles.receiptInfoRow}>
                                             <Building2 size={14} className={styles.receiptInfoIcon} />
@@ -489,7 +557,6 @@ export function PurchaseHistoryPage() {
                                             </div>
                                         </div>
                                     </div>
-
                                     <div className={styles.receiptInfoBlock}>
                                         <div className={styles.receiptInfoRow}>
                                             <Hash size={14} className={styles.receiptInfoIcon} />
@@ -501,7 +568,6 @@ export function PurchaseHistoryPage() {
                                             </div>
                                         </div>
                                     </div>
-
                                     <div className={styles.receiptInfoBlock}>
                                         <div className={styles.receiptInfoRow}>
                                             <Calendar size={14} className={styles.receiptInfoIcon} />
@@ -511,20 +577,18 @@ export function PurchaseHistoryPage() {
                                             </div>
                                         </div>
                                     </div>
-
                                     <div className={styles.receiptInfoBlock}>
                                         <div className={styles.receiptInfoRow}>
                                             <Tag size={14} className={styles.receiptInfoIcon} />
                                             <div>
                                                 <span className={styles.receiptInfoLabel}>Estado</span>
-                                                <span className={`${styles.statusBadge} ${STATUS_CONFIG[selectedPurchase.status].className}`} style={{ marginTop: "0.2rem" }}>
+                                                <span className={`${styles.statusBadge} ${STATUS_CONFIG[selectedPurchase.status].className}`}>
                                                     {STATUS_CONFIG[selectedPurchase.status].icon}
                                                     {STATUS_CONFIG[selectedPurchase.status].label}
                                                 </span>
                                             </div>
                                         </div>
                                     </div>
-
                                     <div className={styles.receiptInfoBlock}>
                                         <div className={styles.receiptInfoRow}>
                                             {selectedPurchase.paymentType === "CASH"
@@ -539,7 +603,6 @@ export function PurchaseHistoryPage() {
                                             </div>
                                         </div>
                                     </div>
-
                                     {selectedPurchase.notes && (
                                         <div className={`${styles.receiptInfoBlock} ${styles.receiptInfoBlockFull}`}>
                                             <div className={styles.receiptInfoRow}>
@@ -554,7 +617,6 @@ export function PurchaseHistoryPage() {
                                 </div>
                             </div>
 
-                            {/* ── Items table ── */}
                             <div className={styles.receiptItemsSection}>
                                 <div className={styles.receiptItemsTitle}>
                                     <Package size={14} />
@@ -608,19 +670,65 @@ export function PurchaseHistoryPage() {
                                 )}
                             </div>
 
-                            {/* ── Total footer ── */}
                             {!loadingDetail && !detailError && (
-                                <div className={styles.receiptTotalFooter}>
-                                    <div className={styles.receiptTotalDivider} />
-                                    <div className={styles.receiptTotalRow}>
-                                        <span className={styles.receiptTotalLabel}>TOTAL A PAGAR</span>
-                                        <span className={styles.receiptTotalValue}>{formatCurrency(selectedPurchase.total)}</span>
+                                <>
+                                    <div className={styles.receiptTotalFooter}>
+                                        <div className={styles.receiptTotalDivider} />
+                                        <div className={styles.receiptTotalRow}>
+                                            <span className={styles.receiptTotalLabel}>TOTAL A PAGAR</span>
+                                            <span className={styles.receiptTotalValue}>{formatCurrency(selectedPurchase.total)}</span>
+                                        </div>
                                     </div>
-                                </div>
+
+                                    {selectedPurchase.status === "RECEIVED" && (
+                                        <div className={styles.modalActions}>
+                                            <button
+                                                type="button"
+                                                className={styles.cancelBtn}
+                                                onClick={() => setShowCancelConfirm(true)}
+                                                disabled={cancelling}
+                                            >
+                                                {cancelling ? <Loader2 size={16} className={tableStyles.spinner} /> : <Ban size={16} />}
+                                                Anular Factura
+                                            </button>
+
+                                            <button
+                                                type="button"
+                                                className={styles.returnBtn}
+                                                onClick={() => setShowReturnModal(true)}
+                                            >
+                                                <RotateCcw size={16} />
+                                                Registrar Devolución
+                                            </button>
+                                        </div>
+                                    )}
+                                </>
                             )}
                         </div>
                     </div>
                 </div>
+            )}
+
+            <ConfirmDialog
+                open={showCancelConfirm}
+                title="Anular Factura"
+                message="¿Estás seguro de que deseas anular esta compra? Esta acción revertirá completamente el stock de todos los productos ingresados y no se puede deshacer."
+                confirmText="Anular Factura"
+                cancelText="Cerrar"
+                type="danger"
+                loading={cancelling}
+                onConfirm={handleCancelConfirm}
+                onCancel={() => setShowCancelConfirm(false)}
+            />
+
+            {selectedPurchase && (
+                <PurchaseReturnModal
+                    open={showReturnModal}
+                    purchase={selectedPurchase}
+                    loading={false}
+                    onClose={() => setShowReturnModal(false)}
+                    onSuccess={handleReturnSuccess}
+                />
             )}
         </div>
     )

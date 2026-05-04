@@ -1,5 +1,4 @@
-import { UnderConstruction } from "@/src/shared/components/UnderConstruction/UnderConstruction"
-
+import { CustomersPage } from "@/src/features/customer"
 export default function Page() {
-  return <UnderConstruction moduleName="Clientes" />
+  return <CustomersPage />
 }
