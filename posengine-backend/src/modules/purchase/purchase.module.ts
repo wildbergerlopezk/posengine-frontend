@@ -7,7 +7,7 @@ import { PurchaseItemService } from './services/purchase-item.service';
 // import { PurchaseCreditService } from './services/purchase-credit.service';
 // import { PurchaseInstallmentService } from './services/purchase-installment.service';
 import { PurchaseReturnService } from './services/purchase-return.service';
-import { StockMovementModule } from '../../stock-movement/stock-movement.module';
+import { StockMovementModule } from '../stock-movement/stock-movement.module';
 import { ProductModule } from '../product/product.module';
 import { CashSessionGuard } from '../../common/guards/cash-session.guard';
 

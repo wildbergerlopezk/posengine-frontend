@@ -19,10 +19,10 @@ import {
 import { StockMovementService } from './stock-movement.service';
 import { CreateManualStockMovementDto } from './dto/create-stock-movement.dto';
 import { StockMovementFilterDto } from './dto/stock-movement-filter.dto';
-import { CurrentUser } from '../common/decorators/current-user.decorator';
-import { Roles } from '../common/decorators/roles.decorator';
-import { UserRole } from '../generated/prisma/enums';
-import { PaginationQueryDto } from '../common/dto/pagination-query.dto';
+import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { Roles } from '../../common/decorators/roles.decorator';
+import { UserRole } from '../../generated/prisma/enums';
+import { PaginationQueryDto } from '../../common/dto/pagination-query.dto';
 
 @ApiTags('Stock Movements')
 @ApiBearerAuth('access-token')

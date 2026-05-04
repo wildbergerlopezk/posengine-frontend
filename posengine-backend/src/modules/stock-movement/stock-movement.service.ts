@@ -3,12 +3,12 @@ import {
   NotFoundException,
   BadRequestException,
 } from '@nestjs/common';
-import { PrismaService} from '../prisma/prisma.service';
-import { StockMovementType, StockMovementSourceType } from '../../src/generated/prisma/enums';
+import { PrismaService} from '../../prisma/prisma.service';
+import { StockMovementType, StockMovementSourceType } from '../../../src/generated/prisma/enums';
 import { CreateManualStockMovementDto } from './dto/create-stock-movement.dto';
-import { PaginationQueryDto } from '../common/dto/pagination-query.dto';
+import { PaginationQueryDto } from '../../common/dto/pagination-query.dto';
 import { StockMovementFilterDto } from './dto/stock-movement-filter.dto';
-import { Prisma } from '../generated/prisma/client';
+import { Prisma } from '../../generated/prisma/client';
 
 @Injectable()
 export class StockMovementService {

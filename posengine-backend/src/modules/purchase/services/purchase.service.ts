@@ -11,7 +11,7 @@ import { UpdatePurchaseDto } from '../dto/purchase/update-purchase.dto'
 import { PurchaseFilterDto } from '../dto/purchase/purchase-filter.dto'
 import { PurchaseStatus } from '../../../generated/prisma/enums'
 import { Prisma } from '../../../generated/prisma/client'
-import { StockMovementService } from '../../../stock-movement/stock-movement.service'
+import { StockMovementService } from '../../stock-movement/stock-movement.service'
 import { ProductService } from '../../product/product.service'
 
 @Injectable()

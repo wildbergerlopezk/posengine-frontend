@@ -1,7 +1,7 @@
 import { IsOptional, IsEnum, IsString, IsDateString } from 'class-validator';
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { PaginationQueryDto } from '../../common/dto/pagination-query.dto';
-import { StockMovementType } from '../../generated/prisma/enums';
+import { PaginationQueryDto } from '../../../common/dto/pagination-query.dto';
+import { StockMovementType } from '../../../generated/prisma/enums';
 
 export class StockMovementFilterDto extends PaginationQueryDto {
   @ApiPropertyOptional({ description: 'Buscar por nombre de producto, SKU o notas' })

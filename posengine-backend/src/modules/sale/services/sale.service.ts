@@ -6,7 +6,7 @@ import {
   NotFoundException,
 } from '@nestjs/common'
 import { PrismaService } from '../../../prisma/prisma.service'
-import { StockMovementService } from '../../../stock-movement/stock-movement.service'
+import { StockMovementService } from '../../stock-movement/stock-movement.service'
 import { ProductService } from '../../product/product.service'
 import { CreateSaleDto } from './../dto/create-sale.dto'
 import { SaleFilterDto } from './../dto/sale-filter.dto'

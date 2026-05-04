@@ -9,7 +9,7 @@ import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
 import { ProductFilterDto } from './dto/product-filter.dto';
 import { Prisma } from '../../generated/prisma/client';
-import { StockMovementService } from '../../stock-movement/stock-movement.service';
+import { StockMovementService } from '../stock-movement/stock-movement.service';
 import { StockMovementType, UnitType } from '../../generated/prisma/enums';
 
 @Injectable()
