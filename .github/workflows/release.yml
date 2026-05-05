@@ -39,15 +39,50 @@ jobs:
         working-directory: posengine-desktop
         run: npm install
 
-      - name: Build Tauri (.msi)
-        uses: tauri-apps/tauri-action@v0
+      - name: Build Tauri .msi
+        working-directory: posengine-desktop
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: npm run build
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
         with:
-          projectPath: posengine-desktop
-          tagName: ${{ github.ref_name }}
-          releaseName: "PosEngine ${{ github.ref_name }}"
-          releaseBody: "Nueva versión de PosEngine"
-          releaseDraft: false
+          name: "PosEngine ${{ github.ref_name }}"
+          body: "Nueva versión de PosEngine"
+          draft: false
+          files: |
+            posengine-desktop/src-tauri/target/release/bundle/msi/*.msi
+            posengine-desktop/src-tauri/target/release/bundle/msi/*.msi.sig
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Generate latest.json
+        shell: bash
+        run: |
+          VERSION="${{ github.ref_name }}"
+          VERSION="${VERSION#v}"
+          MSI_FILE=$(ls posengine-desktop/src-tauri/target/release/bundle/msi/*.msi | head -1)
+          MSI_NAME=$(basename "$MSI_FILE")
+          SIG=$(cat posengine-desktop/src-tauri/target/release/bundle/msi/*.msi.sig)
+          cat > latest.json << EOF
+          {
+            "version": "$VERSION",
+            "notes": "Nueva versión de PosEngine",
+            "pub_date": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+            "platforms": {
+              "windows-x86_64": {
+                "signature": "$SIG",
+                "url": "https://github.com/wildbergerlopezk/posengine-frontend/releases/download/${{ github.ref_name }}/$MSI_NAME"
+              }
+            }
+          }
+          EOF
+
+      - name: Upload latest.json
+        uses: softprops/action-gh-release@v2
+        with:
+          files: latest.json
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
