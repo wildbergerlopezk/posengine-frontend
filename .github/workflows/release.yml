@@ -1,0 +1,56 @@
+# .github/workflows/release.yml
+name: Release PosEngine
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Setup Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Rust
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: posengine-desktop/src-tauri
+
+      # 1. Buildear Next.js → genera posengine-web/out/
+      - name: Install frontend deps
+        working-directory: posengine-web
+        run: npm install
+
+      - name: Build Next.js (static export)
+        working-directory: posengine-web
+        run: npm run build
+
+      # 2. Buildear Tauri → lee posengine-web/out/
+      - name: Install Tauri deps
+        working-directory: posengine-desktop
+        run: npm install
+
+      - name: Build Tauri (.msi)
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        with:
+          projectPath: posengine-desktop
+          tagName: ${{ github.ref_name }}
+          releaseName: "PosEngine ${{ github.ref_name }}"
+          releaseBody: "Nueva versión de PosEngine"
+          releaseDraft: false
+          releasePrerelease: false
