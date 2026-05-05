@@ -27,16 +27,14 @@ jobs:
         with:
           workspaces: posengine-desktop/src-tauri
 
-      # 1. Buildear Next.js → genera posengine-web/out/
       - name: Install frontend deps
         working-directory: posengine-web
         run: npm install
 
-      - name: Build Next.js (static export)
+      - name: Build Next.js
         working-directory: posengine-web
         run: npm run build
 
-      # 2. Buildear Tauri → lee posengine-web/out/
       - name: Install Tauri deps
         working-directory: posengine-desktop
         run: npm install
@@ -49,8 +47,8 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
           projectPath: posengine-desktop
+          tauriScript: npm run build    # ← le decís que use npm run build
           tagName: ${{ github.ref_name }}
           releaseName: "PosEngine ${{ github.ref_name }}"
           releaseBody: "Nueva versión de PosEngine"
           releaseDraft: false
-          releasePrerelease: false
