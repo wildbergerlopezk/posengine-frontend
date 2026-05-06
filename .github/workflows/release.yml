@@ -10,6 +10,9 @@ jobs:
     runs-on: windows-latest
     permissions:
       contents: write
+    env:
+      TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+      TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
 
     steps:
       - name: Checkout repo
@@ -49,11 +52,18 @@ jobs:
           jq ".version = \"$VERSION\"" posengine-desktop/src-tauri/tauri.conf.json > tmp.json
           mv tmp.json posengine-desktop/src-tauri/tauri.conf.json
 
+      - name: Check signing env
+        shell: bash
+        run: |
+          if [ -z "$TAURI_SIGNING_PRIVATE_KEY" ]; then
+            echo "NO KEY"
+            exit 1
+          else
+            echo "KEY OK"
+          fi
+
       - name: Build Tauri .msi
         working-directory: posengine-desktop
-        env:
-          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
-          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         run: npm run build
 
       - name: Listar bundles generados
