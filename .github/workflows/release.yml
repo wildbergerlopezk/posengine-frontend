@@ -62,8 +62,17 @@ jobs:
             echo "KEY OK"
           fi
 
+      - name: Debug signing env
+        shell: bash
+        run: |
+          echo "KEY length:"
+          echo "$TAURI_SIGNING_PRIVATE_KEY" | wc -c
+
       - name: Build Tauri .msi
         working-directory: posengine-desktop
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         run: npm run build
 
       - name: Listar bundles generados
