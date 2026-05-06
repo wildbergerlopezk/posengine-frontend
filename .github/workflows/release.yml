@@ -75,6 +75,16 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         run: npm run build
 
+      - name: Verificar firma MSI
+        shell: bash
+        run: |
+          MSI_SIG=$(rg --files posengine-desktop/src-tauri/target/release/bundle/msi -g "*.msi.sig" | head -n 1 || true)
+          if [ -z "$MSI_SIG" ]; then
+            echo "ERROR: No se generó ningún archivo .msi.sig"
+            exit 1
+          fi
+          echo "Firma generada en: $MSI_SIG"
+
       - name: Listar bundles generados
         working-directory: posengine-desktop/src-tauri/target/release/bundle
         run: dir /s /b
