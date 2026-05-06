@@ -16,7 +16,8 @@
         "width": 1280,
         "height": 720,
         "resizable": true,
-        "fullscreen": false
+        "fullscreen": false,
+        "devtools": true
       }
     ],
     "security": {
@@ -25,7 +26,7 @@
   },
   "bundle": {
     "active": true,
-    "targets": ["deb"],
+    "targets": ["msi"],
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
@@ -33,5 +34,15 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ]
+  },
+  "plugins": {
+    "updater": {
+      "active": true,
+      "endpoints": [
+        "https://github.com/wildbergerlopezk/posengine/releases/latest/download/latest.json"
+      ],
+      "dialog": false,
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEY3OEQ0NUJFQUZDODJEQTYKUldTbUxjaXZ2a1dOOTFmS1NZQnRGNE5hdnZuTmp6YUdrcXRQamVadWl3c1Z5SFRTY0h0S0cvM1gK"
+    }
   }
 }
