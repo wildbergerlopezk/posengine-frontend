@@ -1,4 +1,3 @@
-# .github/workflows/release.yml
 name: Release PosEngine
 
 on:
@@ -9,9 +8,8 @@ on:
 jobs:
   build-windows:
     runs-on: windows-latest
-
     permissions:
-      contents: write 
+      contents: write
 
     steps:
       - name: Checkout repo
@@ -77,21 +75,9 @@ jobs:
             SIG=$(cat "$SIG_FILE")
           else
             SIG=""
-            echo "WARNING: No .sig file found, updater signature will be empty"
           fi
-          cat > latest.json << EOF
-          {
-            "version": "$VERSION",
-            "notes": "Nueva versión de PosEngine",
-            "pub_date": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
-            "platforms": {
-              "windows-x86_64": {
-                "signature": "$SIG",
-                "url": "https://github.com/wildbergerlopezk/posengine-frontend/releases/download/${{ github.ref_name }}/$MSI_NAME"
-              }
-            }
-          }
-          EOF
+          echo "{\"version\":\"$VERSION\",\"notes\":\"Nueva version\",\"pub_date\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\",\"platforms\":{\"windows-x86_64\":{\"signature\":\"$SIG\",\"url\":\"https://github.com/wildbergerlopezk/posengine-frontend/releases/download/${{ github.ref_name }}/$MSI_NAME\"}}}" > latest.json
+          cat latest.json
 
       - name: Upload latest.json
         uses: softprops/action-gh-release@v2
