@@ -11,6 +11,8 @@ import { ProductFilterDto } from './dto/product-filter.dto';
 import { Prisma } from '../../generated/prisma/client';
 import { StockMovementService } from '../stock-movement/stock-movement.service';
 import { StockMovementType, UnitType } from '../../generated/prisma/enums';
+import * as fs from 'fs'
+import { join } from 'path'
 
 @Injectable()
 export class ProductService {
@@ -290,91 +292,122 @@ export class ProductService {
   }
 
   // ── Update ───────────────────────────────────────────────────────────────
-  async update(id: string, tenantId: string, dto: UpdateProductDto, stockNotes?: string) {
-    const current = await this.findOne(id, tenantId);
+  async update(
+    id: string,
+    tenantId: string,
+    dto: UpdateProductDto,
+    stockNotes?: string,
+  ) {
+    const current = await this.findOne(id, tenantId)
 
+    // ── UNIQUE VALIDATIONS ────────────────────────────────────────────────
     if (dto.name) {
       const conflict = await this.prisma.product.findFirst({
         where: { name: dto.name, tenantId, NOT: { id } },
-      });
+      })
       if (conflict) {
-        throw new ConflictException(`Ya existe otro producto con el nombre "${dto.name}"`);
+        throw new ConflictException(`Ya existe otro producto con el nombre "${dto.name}"`)
       }
     }
 
     if (dto.barcode) {
       const conflict = await this.prisma.product.findFirst({
         where: { barcode: dto.barcode, tenantId, NOT: { id } },
-      });
+      })
       if (conflict) {
-        throw new ConflictException(`Ya existe otro producto con el código de barras "${dto.barcode}"`);
+        throw new ConflictException(`Ya existe otro producto con el código de barras "${dto.barcode}"`)
       }
     }
 
     if (dto.sku) {
       const conflict = await this.prisma.product.findFirst({
         where: { sku: dto.sku, tenantId, NOT: { id } },
-      });
+      })
       if (conflict) {
-        throw new ConflictException(`Ya existe otro producto con el SKU "${dto.sku}"`);
+        throw new ConflictException(`Ya existe otro producto con el SKU "${dto.sku}"`)
       }
     }
 
-    // El unitType efectivo es el nuevo si se manda, sino el actual del producto
+    // ── VALIDACIÓN STOCK ──────────────────────────────────────────────────
     const effectiveUnitType = dto.unitType ?? current.unitType
     const effectiveName = dto.name ?? current.name
     const effectiveStock = dto.stock ?? current.stock
     const effectiveStockMinimum = dto.stockMinimum ?? current.stockMinimum
 
     this.validateStockQuantity(effectiveStock, effectiveUnitType, effectiveName, 'El stock')
-    this.validateStockQuantity(effectiveStockMinimum, effectiveUnitType, effectiveName, 'El stock mínimo')
+    this.validateStockQuantity(
+      effectiveStockMinimum,
+      effectiveUnitType,
+      effectiveName,
+      'El stock mínimo',
+    )
 
-    // ── Si cambió el stock, validar cantidad y registrar movimiento MANUAL ──
+    if (dto.imageUrl && current.imageUrl && dto.imageUrl !== current.imageUrl) {
+      const oldFilename = current.imageUrl.split('/uploads/')[1]
+
+      if (oldFilename) {
+        const filePath = join(process.cwd(), 'uploads', oldFilename)
+
+        if (fs.existsSync(filePath)) {
+          fs.unlinkSync(filePath)
+        }
+      }
+    }
+
+    // ── STOCK CHANGE LOGIC ────────────────────────────────────────────────
     if (dto.stock !== undefined && dto.stock !== current.stock) {
-      const delta = dto.stock - current.stock;
+      const delta = dto.stock - current.stock
 
       await this.stockMovementService.registerManual(tenantId, {
         productId: id,
         type: StockMovementType.MANUAL,
         quantity: delta,
         notes: stockNotes?.trim() || 'Ajuste manual desde edición de producto',
-      });
+      })
 
-      // registerManual ya actualizó el stock en la BD,
-      // así que lo sacamos del update para no pisarlo
-      const { stock: _stock, ...restDto } = dto;
+      const { stock: _stock, ...restDto } = dto
 
       return this.prisma.product.update({
         where: { id },
         data: {
           ...(restDto.categoryId && { categoryId: restDto.categoryId }),
-          ...(restDto.subcategoryId !== undefined && { subcategoryId: restDto.subcategoryId }),
+          ...(restDto.subcategoryId !== undefined && {
+            subcategoryId: restDto.subcategoryId,
+          }),
           ...(restDto.name && { name: restDto.name }),
-          ...(restDto.description !== undefined && { description: restDto.description }),
+          ...(restDto.description !== undefined && {
+            description: restDto.description,
+          }),
           ...(restDto.sku && { sku: restDto.sku }),
           ...(restDto.barcode !== undefined && { barcode: restDto.barcode }),
           ...(restDto.imageUrl !== undefined && { imageUrl: restDto.imageUrl }),
           ...(restDto.price !== undefined && { price: restDto.price }),
           ...(restDto.cost !== undefined && { cost: restDto.cost }),
           ...(restDto.unitType !== undefined && { unitType: restDto.unitType }),
-          ...(restDto.stockMinimum !== undefined && { stockMinimum: restDto.stockMinimum }),
+          ...(restDto.stockMinimum !== undefined && {
+            stockMinimum: restDto.stockMinimum,
+          }),
           ...(restDto.isActive !== undefined && { isActive: restDto.isActive }),
         },
         include: {
           category: { select: { id: true, name: true } },
           subcategory: { select: { id: true, name: true } },
         },
-      });
+      })
     }
 
-    // ── Sin cambio de stock — update normal ───────────────────────────────
+    // ── UPDATE NORMAL ─────────────────────────────────────────────────────
     return this.prisma.product.update({
       where: { id },
       data: {
         ...(dto.categoryId && { categoryId: dto.categoryId }),
-        ...(dto.subcategoryId !== undefined && { subcategoryId: dto.subcategoryId }),
+        ...(dto.subcategoryId !== undefined && {
+          subcategoryId: dto.subcategoryId,
+        }),
         ...(dto.name && { name: dto.name }),
-        ...(dto.description !== undefined && { description: dto.description }),
+        ...(dto.description !== undefined && {
+          description: dto.description,
+        }),
         ...(dto.sku && { sku: dto.sku }),
         ...(dto.barcode !== undefined && { barcode: dto.barcode }),
         ...(dto.imageUrl !== undefined && { imageUrl: dto.imageUrl }),
@@ -382,14 +415,16 @@ export class ProductService {
         ...(dto.cost !== undefined && { cost: dto.cost }),
         ...(dto.unitType !== undefined && { unitType: dto.unitType }),
         ...(dto.stock !== undefined && { stock: dto.stock }),
-        ...(dto.stockMinimum !== undefined && { stockMinimum: dto.stockMinimum }),
+        ...(dto.stockMinimum !== undefined && {
+          stockMinimum: dto.stockMinimum,
+        }),
         ...(dto.isActive !== undefined && { isActive: dto.isActive }),
       },
       include: {
         category: { select: { id: true, name: true } },
         subcategory: { select: { id: true, name: true } },
       },
-    });
+    })
   }
 
   // ── Deactivate ───────────────────────────────────────────────────────────

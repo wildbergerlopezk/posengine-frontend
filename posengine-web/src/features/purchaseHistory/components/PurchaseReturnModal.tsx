@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react"
 import { X, RotateCcw, AlertTriangle, Package, Loader2, Info } from "lucide-react"
 import { formatCurrency } from "@/src/shared/hooks/useFormatCurrency"
+import { API_BASE_URL } from "@/src/shared/config/api"
 import styles from "./PurchaseReturnModal.module.css"
 
 interface Product {
@@ -42,7 +43,7 @@ export function PurchaseReturnModal({ open, purchase, loading, onClose, onSucces
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  const API_BASE = process.env.NEXT_PUBLIC_BACKEND_URL
+  const API_BASE = API_BASE_URL
 
   useEffect(() => {
     if (open) {

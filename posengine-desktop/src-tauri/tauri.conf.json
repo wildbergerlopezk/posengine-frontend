@@ -5,9 +5,7 @@
   "identifier": "com.elytech.posengine",
   "build": {
     "frontendDist": "../../posengine-web/out",
-    "devUrl": null,
-    "beforeDevCommand": null,
-    "beforeBuildCommand": null
+    "devUrl": null
   },
   "app": {
     "windows": [
@@ -39,7 +37,7 @@
     "updater": {
       "active": true,
       "endpoints": [
-        "https://github.com/wildbergerlopezk/posengine/releases/latest/download/latest.json"
+        "https://github.com/wildbergerlopezk/posengine-frontend/releases/latest/download/latest.json"
       ],
       "dialog": false,
       "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEY3OEQ0NUJFQUZDODJEQTYKUldTbUxjaXZ2a1dOOTFmS1NZQnRGNE5hdnZuTmp6YUdrcXRQamVadWl3c1Z5SFRTY0h0S0cvM1gK"

@@ -6,10 +6,11 @@ import Link from "next/link"
 import { Header } from "@/src/shared/components/Header"
 import { Plus, FolderTree, Pencil, Trash2, ChevronRight, Folder, FolderOpen, Loader2, AlertCircle } from "lucide-react"
 import { useAuthStore } from "@/src/features/auth/store/auth.store"
+import { API_BASE_URL } from "@/src/shared/config/api"
 import type { Category } from "@/src/shared/types"
 import styles from "./CategoriesPage.module.css"
 
-const API_BASE = process.env.NEXT_PUBLIC_BACKEND_URL
+const API_BASE = API_BASE_URL
 
 export function CategoriesPage() {
   const { accessToken } = useAuthStore()

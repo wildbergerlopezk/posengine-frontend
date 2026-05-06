@@ -25,8 +25,9 @@ export interface CurrentSessionResponse {
 }
 
 import { useAuthStore } from "@/src/features/auth/store/auth.store"
+import { API_BASE_URL } from "@/src/shared/config/api"
 
-const API_BASE = `${process.env.NEXT_PUBLIC_BACKEND_URL}/cash-sessions`
+const API_BASE = `${API_BASE_URL}/cash-sessions`
 const POLL_INTERVAL_MS = 60_000
 
 async function apiFetch<T>(url: string, token: string, options?: RequestInit): Promise<T> {

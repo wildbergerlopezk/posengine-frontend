@@ -3,11 +3,12 @@
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { Header } from "@/src/shared/components/Header"
 import { useAuthStore } from "@/src/features/auth/store/auth.store"
+import { API_BASE_URL } from "@/src/shared/config/api"
 import tableStyles from "@/src/features/products/pages/ProductsPage.module.css"
 import { AlertCircle, ArrowDown, ArrowUp, Boxes, Loader2, Search, X, ChevronLeft, ChevronRight } from "lucide-react"
 import styles from "./StockHistoryPage.module.css"
 
-const API_BASE = process.env.NEXT_PUBLIC_BACKEND_URL
+const API_BASE = API_BASE_URL
 const LIMIT = 10
 
 type MovementType = "INITIAL" | "PURCHASE" | "SALE" | "MANUAL"

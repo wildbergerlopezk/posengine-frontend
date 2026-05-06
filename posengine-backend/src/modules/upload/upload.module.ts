@@ -1,8 +1,8 @@
-import { Module } from '@nestjs/common';
-import { UploadController } from './upload.controller';
-import { MulterModule } from '@nestjs/platform-express';
-import { diskStorage } from 'multer';
-import { extname } from 'path';
+import { Module } from '@nestjs/common'
+import { UploadController } from './upload.controller'
+import { MulterModule } from '@nestjs/platform-express'
+import { diskStorage } from 'multer'
+import { extname } from 'path'
 
 @Module({
   imports: [
@@ -10,18 +10,21 @@ import { extname } from 'path';
       storage: diskStorage({
         destination: './uploads',
         filename: (req, file, cb) => {
-          const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
-          const ext = extname(file.originalname);
-          cb(null, `${file.fieldname}-${uniqueSuffix}${ext}`);
+          const unique = Date.now() + '-' + Math.round(Math.random() * 1e9)
+          const ext = extname(file.originalname)
+          cb(null, `${unique}${ext}`)
         },
       }),
       fileFilter: (req, file, cb) => {
-        const allowedMimeTypes = ['image/jpeg', 'image/png', 'image/webp'];
-        if (allowedMimeTypes.includes(file.mimetype)) {
-          cb(null, true);
+        const allowed = ['image/jpeg', 'image/png', 'image/webp']
+        if (allowed.includes(file.mimetype)) {
+          cb(null, true)
         } else {
-          cb(new Error('Formato de archivo no permitido. Solo se aceptan .jpg, .png y .webp'), false);
+          cb(new Error('Formato inválido'), false)
         }
+      },
+      limits: {
+        fileSize: 5 * 1024 * 1024,
       },
     }),
   ],

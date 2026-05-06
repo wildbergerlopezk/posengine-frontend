@@ -1,6 +1,7 @@
 import type { AuthResponse, LoginCredentials, RegisterCredentials } from "../types"
+import { API_BASE_URL } from "@/src/shared/config/api"
 
-const BASE_URL = process.env.NEXT_PUBLIC_BACKEND_URL
+const BASE_URL = API_BASE_URL
 
 async function request<T>(path: string, method: string = "POST", body?: unknown, token?: string): Promise<T> {
   const headers: Record<string, string> = { "Content-Type": "application/json" }

@@ -12,6 +12,7 @@ import {
 } from "lucide-react"
 import { useAuthStore } from "@/src/features/auth/store/auth.store"
 import { formatCurrency } from "@/src/shared/hooks/useFormatCurrency"
+import { API_BASE_URL } from "@/src/shared/config/api"
 import tableStyles from "@/src/features/products/pages/ProductsPage.module.css"
 import styles from "./PurchaseHistoryPage.module.css"
 import {
@@ -27,7 +28,7 @@ import {
 import { ConfirmDialog } from "@/src/shared/components/ConfirmDialog"
 import { PurchaseReturnModal } from "../components/PurchaseReturnModal"
 
-const API_BASE = process.env.NEXT_PUBLIC_BACKEND_URL
+const API_BASE = API_BASE_URL
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 

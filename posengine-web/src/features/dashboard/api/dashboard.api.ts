@@ -1,6 +1,7 @@
 import type { Product } from "@/src/shared/types"
+import { API_BASE_URL } from "@/src/shared/config/api"
 
-const API_BASE = process.env.NEXT_PUBLIC_BACKEND_URL
+const API_BASE = API_BASE_URL
 
 export interface DashboardDataResponse {
   todaySales: number
@@ -114,12 +115,7 @@ export async function getDashboardData(accessToken: string): Promise<DashboardDa
       console.warn("Error fetching categories:", err)
     }
 
-    // If we have no data at all, throw error
-    if (sales.length === 0 && products.length === 0) {
-      throw new Error("No se pudieron obtener datos del servidor. Verifica tu conexión.")
-    }
-
-    // Calculate dashboard stats
+    // Calculate dashboard stats (vacío es válido: cuenta nueva sin ventas ni productos)
     const today_str = today.toISOString().split("T")[0]
 
     // Today's sales

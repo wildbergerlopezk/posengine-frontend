@@ -7,10 +7,11 @@ import { useSearchParams } from "next/navigation"
 import { Header } from "@/src/shared/components/Header"
 import { Plus, FolderTree, Pencil, Trash2, Loader2, AlertCircle, Folder, Filter } from "lucide-react"
 import { useAuthStore } from "@/src/features/auth/store/auth.store"
+import { API_BASE_URL } from "@/src/shared/config/api"
 import type { Category, Subcategory } from "@/src/shared/types"
 import styles from "./SubcategoriesPage.module.css"
 
-const API_BASE = process.env.NEXT_PUBLIC_BACKEND_URL
+const API_BASE = API_BASE_URL
 
 export function SubcategoriesPage() {
     const { accessToken } = useAuthStore()

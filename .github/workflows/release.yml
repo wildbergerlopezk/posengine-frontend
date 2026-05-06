@@ -40,6 +40,15 @@ jobs:
         working-directory: posengine-desktop
         run: npm install
 
+      - name: Sync version with tag
+        shell: bash
+        run: |
+          VERSION="${{ github.ref_name }}"
+          VERSION="${VERSION#v}"
+
+          jq ".version = \"$VERSION\"" posengine-desktop/src-tauri/tauri.conf.json > tmp.json
+          mv tmp.json posengine-desktop/src-tauri/tauri.conf.json
+
       - name: Build Tauri .msi
         working-directory: posengine-desktop
         env:
@@ -60,23 +69,54 @@ jobs:
           draft: false
           files: |
             posengine-desktop/src-tauri/target/release/bundle/msi/*.msi
+            posengine-desktop/src-tauri/target/release/bundle/msi/*.msi.sig
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Generate latest.json
         shell: bash
         run: |
+          set -e
+
           VERSION="${{ github.ref_name }}"
           VERSION="${VERSION#v}"
-          MSI_FILE=$(ls posengine-desktop/src-tauri/target/release/bundle/msi/*.msi | head -1)
+
+          MSI_DIR="posengine-desktop/src-tauri/target/release/bundle/msi"
+
+          MSI_FILE=$(find "$MSI_DIR" -type f -name "*.msi" | head -n 1)
+
+          if [ -z "$MSI_FILE" ]; then
+            echo "ERROR: No se encontró el .msi"
+            exit 1
+          fi
+
           MSI_NAME=$(basename "$MSI_FILE")
-          SIG_FILE=$(ls posengine-desktop/src-tauri/target/release/bundle/msi/*.msi.sig 2>/dev/null | head -1)
+
+          SIG_FILE=$(find "$MSI_DIR" -type f -name "*.msi.sig" | head -n 1 || true)
+
           if [ -n "$SIG_FILE" ]; then
             SIG=$(cat "$SIG_FILE")
           else
             SIG=""
           fi
-          echo "{\"version\":\"$VERSION\",\"notes\":\"Nueva version\",\"pub_date\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\",\"platforms\":{\"windows-x86_64\":{\"signature\":\"$SIG\",\"url\":\"https://github.com/wildbergerlopezk/posengine-frontend/releases/download/${{ github.ref_name }}/$MSI_NAME\"}}}" > latest.json
+
+          echo "MSI: $MSI_NAME"
+          echo "SIG: $SIG_FILE"
+
+          cat <<EOF > latest.json
+          {
+            "version": "$VERSION",
+            "notes": "Nueva version",
+            "pub_date": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+            "platforms": {
+              "windows-x86_64": {
+                "signature": "$SIG",
+                "url": "https://github.com/wildbergerlopezk/posengine-frontend/releases/download/${{ github.ref_name }}/$MSI_NAME"
+              }
+            }
+          }
+          EOF
+
           cat latest.json
 
       - name: Upload latest.json

@@ -14,7 +14,7 @@ import { join } from                'path';
 import { SupplierModule } from      './modules/supplier/supplier.module';
 import { PurchaseModule } from      './modules/purchase/purchase.module';
 import { SaleModule } from          './modules/sale/sale.module';
-import { StockMovementModule } from './stock-movement/stock-movement.module';
+import { StockMovementModule } from './modules/stock-movement/stock-movement.module';
 import { CustomerModule } from      './modules/customer/customer.module';
 import { CashSessionModule } from   './modules/cash-session/cash-session.module';
 

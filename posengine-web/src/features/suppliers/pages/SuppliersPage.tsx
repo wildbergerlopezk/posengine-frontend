@@ -15,11 +15,12 @@ import {
   AlertTriangle,
 } from "lucide-react"
 import { useAuthStore } from "@/src/features/auth/store/auth.store"
+import { API_BASE_URL } from "@/src/shared/config/api"
 import type { Supplier } from "@/src/shared/types"
 import styles from "./SuppliersPage.module.css"
 import tableStyles from "@/src/features/products/pages/ProductsPage.module.css"
 
-const API_BASE = process.env.NEXT_PUBLIC_BACKEND_URL
+const API_BASE = API_BASE_URL
 const PAGE_SIZE = 20
 
 function readApiError(body: unknown): string {

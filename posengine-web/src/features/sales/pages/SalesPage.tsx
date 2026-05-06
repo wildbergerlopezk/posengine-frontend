@@ -18,10 +18,11 @@ import { formatCurrency } from "@/src/shared/hooks/useFormatCurrency"
 import { useRouter } from "next/navigation"
 import { useCashSession } from "@/src/features/cash-session/hooks/useCashSession"
 import { useAuthStore } from "@/src/features/auth/store/auth.store"
+import { API_BASE_URL } from "@/src/shared/config/api"
 import styles from "./SalesPage.module.css"
 import tableStyles from "@/src/features/products/pages/ProductsPage.module.css"
 
-const API_BASE = process.env.NEXT_PUBLIC_BACKEND_URL
+const API_BASE = API_BASE_URL
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 

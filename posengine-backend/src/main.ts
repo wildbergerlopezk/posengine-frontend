@@ -1,10 +1,12 @@
-import { NestFactory } from '@nestjs/core';
-import { AppModule } from './app.module';
-import { ValidationPipe } from '@nestjs/common';
-import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
+import { NestFactory } from '@nestjs/core'
+import { AppModule } from './app.module'
+import { ValidationPipe } from '@nestjs/common'
+import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger'
+import { NestExpressApplication } from '@nestjs/platform-express'
+import { join } from 'path'
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create<NestExpressApplication>(AppModule)
 
   const allowedOrigins = process.env.CORS_ORIGIN?.split(',') ?? [
     'http://localhost:3000',
@@ -12,16 +14,31 @@ async function bootstrap() {
 
   app.enableCors({
     origin: (origin, callback) => {
-      if (!origin || /^http:\/\/192\.168\.\d+\.\d+:\d+$/.test(origin)) {
-        callback(null, true)
-      } else if (allowedOrigins.includes(origin)) {
-        callback(null, true)
-      } else {
-        callback(new Error(`CORS bloqueado: ${origin}`))
+      if (!origin) return callback(null, true)
+
+      const isLocalNetwork = /^http:\/\/192\.168\.\d+\.\d+:\d+$/.test(origin)
+      const isAllowed = allowedOrigins.includes(origin)
+
+      if (isLocalNetwork || isAllowed) {
+        return callback(null, true)
       }
+
+      return callback(new Error(`CORS bloqueado: ${origin}`))
     },
     credentials: true,
   })
+
+  app.useStaticAssets(join(__dirname, '..', 'uploads'), {
+    prefix: '/uploads/',
+  })
+
+  app.useGlobalPipes(
+    new ValidationPipe({
+      whitelist: true,
+      forbidNonWhitelisted: true,
+      transform: true,
+    }),
+  )
 
   const config = new DocumentBuilder()
     .setTitle('PosEngine API')
@@ -34,29 +51,20 @@ async function bootstrap() {
         bearerFormat: 'JWT',
         in: 'header',
         name: 'Authorization',
-        description: 'Ingresa el token JWT',
       },
       'access-token',
     )
-    .build();
+    .build()
 
-  const document = SwaggerModule.createDocument(app, config);
-  SwaggerModule.setup('api', app, document);
+  const document = SwaggerModule.createDocument(app, config)
+  SwaggerModule.setup('api', app, document)
 
-  app.useGlobalPipes(
-    new ValidationPipe({
-      whitelist: true,
-      forbidNonWhitelisted: true,
-      transform: true,
-    }),
-  );
-
-  const port = process.env.PORT || 3005;
+  const port = Number(process.env.PORT) || 3006
   await app.listen(port, '0.0.0.0')
 
-  console.log(`Servidor corriendo en: http://localhost:${port}`);
-  console.log(`Servidor corriendo en: http://0.0.0.0:${port}`)
-  console.log(`Swagger disponible en: http://localhost:${port}/api`);
+  console.log(`Backend corriendo en: http://localhost:${port}`)
+  console.log(`Uploads: http://localhost:${port}/uploads`)
+  console.log(`Swagger: http://localhost:${port}/api`)
 }
 
-void bootstrap();
+bootstrap()
