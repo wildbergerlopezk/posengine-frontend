@@ -62,7 +62,6 @@ jobs:
           draft: false
           files: |
             posengine-desktop/src-tauri/target/release/bundle/msi/*.msi
-            posengine-desktop/src-tauri/target/release/bundle/msi/*.msi.sig
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -73,7 +72,13 @@ jobs:
           VERSION="${VERSION#v}"
           MSI_FILE=$(ls posengine-desktop/src-tauri/target/release/bundle/msi/*.msi | head -1)
           MSI_NAME=$(basename "$MSI_FILE")
-          SIG=$(cat posengine-desktop/src-tauri/target/release/bundle/msi/*.msi.sig)
+          SIG_FILE=$(ls posengine-desktop/src-tauri/target/release/bundle/msi/*.msi.sig 2>/dev/null | head -1)
+          if [ -n "$SIG_FILE" ]; then
+            SIG=$(cat "$SIG_FILE")
+          else
+            SIG=""
+            echo "WARNING: No .sig file found, updater signature will be empty"
+          fi
           cat > latest.json << EOF
           {
             "version": "$VERSION",
