@@ -3,9 +3,8 @@ import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import { Analytics } from "@vercel/analytics/next";
 import { ThemeProvider } from "@/components/theme-provider";
+import { UpdateDialog } from "./UpdateDialog";
 import "@/styles/globals.css";
-import { useAppUpdater } from '@/hooks/useAppUpdater';
-import styles from './update-dialog.module.css';
 
 const _inter = Inter({ subsets: ["latin"] });
 
@@ -37,25 +36,5 @@ export default function RootLayout({
         </ThemeProvider>
       </body>
     </html>
-  );
-}
-
-function UpdateDialog() {
-  const { updateAvailable, updateInfo, downloading, progress, installUpdate } = useAppUpdater();
-
-  if (!updateAvailable) return null;
-
-  return (
-    <div className={styles.updateBanner}>
-      <p>Nueva versión disponible: <strong>v{updateInfo?.version}</strong></p>
-      {downloading ? (
-        <div className={styles.progressBar}>
-          <div style={{ width: `${progress}%` }} />
-          <span>Descargando... {progress}%</span>
-        </div>
-      ) : (
-        <button onClick={installUpdate}>Descargar e instalar</button>
-      )}
-    </div>
   );
 }
