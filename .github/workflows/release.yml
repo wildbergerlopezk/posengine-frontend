@@ -78,12 +78,13 @@ jobs:
       - name: Verificar firma MSI
         shell: bash
         run: |
-          MSI_SIG=$(rg --files posengine-desktop/src-tauri/target/release/bundle/msi -g "*.msi.sig" | head -n 1 || true)
-          if [ -z "$MSI_SIG" ]; then
+          shopt -s nullglob
+          sig_files=(posengine-desktop/src-tauri/target/release/bundle/msi/*.msi.sig)
+          if [ ${#sig_files[@]} -eq 0 ]; then
             echo "ERROR: No se generó ningún archivo .msi.sig"
             exit 1
           fi
-          echo "Firma generada en: $MSI_SIG"
+          echo "Firma generada en: ${sig_files[0]}"
 
       - name: Listar bundles generados
         working-directory: posengine-desktop/src-tauri/target/release/bundle
