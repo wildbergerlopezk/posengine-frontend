@@ -1,23 +1,24 @@
 "use client";
-
-import { check } from '@tauri-apps/plugin-updater';
-import type { DownloadEvent } from '@tauri-apps/plugin-updater';
-import { relaunch } from '@tauri-apps/plugin-process';
 import { useState, useEffect, useRef } from 'react';
+
+const isTauri = () => typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
 
 export function useAppUpdater() {
   const [updateAvailable, setUpdateAvailable] = useState(false);
   const [updateInfo, setUpdateInfo] = useState<{ version: string; body: string } | null>(null);
   const [downloading, setDownloading] = useState(false);
   const [progress, setProgress] = useState(0);
-  const totalSize = useRef<number>(1); // guardamos contentLength acá
+  const totalSize = useRef<number>(1);
 
   useEffect(() => {
+    if (!isTauri()) return; // 👈 no hacer nada en el browser
     checkForUpdate();
   }, []);
 
   async function checkForUpdate() {
+    if (!isTauri()) return;
     try {
+      const { check } = await import('@tauri-apps/plugin-updater'); // import dinámico
       const update = await check();
       if (update?.available) {
         setUpdateAvailable(true);
@@ -29,13 +30,15 @@ export function useAppUpdater() {
   }
 
   async function installUpdate() {
-    if (!updateInfo) return;
+    if (!updateInfo || !isTauri()) return;
     setDownloading(true);
     try {
+      const { check } = await import('@tauri-apps/plugin-updater');
+      const { relaunch } = await import('@tauri-apps/plugin-process');
       const update = await check();
-      await update?.downloadAndInstall((event: DownloadEvent) => {
+      await update?.downloadAndInstall((event) => {
         if (event.event === 'Started') {
-          totalSize.current = event.data.contentLength ?? 1; // lo guardamos acá
+          totalSize.current = event.data.contentLength ?? 1;
         } else if (event.event === 'Progress') {
           setProgress(Math.round((event.data.chunkLength / totalSize.current) * 100));
         }
