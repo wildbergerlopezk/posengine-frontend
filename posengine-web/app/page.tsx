@@ -1,21 +1,16 @@
 "use client"
 
 import { useEffect } from "react"
-import { useRouter } from "next/navigation"
 import { useAuthStore } from "@/src/features/auth/store/auth.store"
 import styles from "./home.module.css"
 
 export default function HomePage() {
-  const router = useRouter()
   const { isAuthenticated } = useAuthStore()
 
   useEffect(() => {
-    if (!isAuthenticated) {
-      router.push("/login")
-    } else {
-      router.push("/dashboard")
-    }
-  }, [isAuthenticated, router])
+    if (typeof window === 'undefined') return
+    window.location.href = isAuthenticated ? "/dashboard" : "/login"
+  }, [isAuthenticated])
 
   return (
     <div className={styles.container}>

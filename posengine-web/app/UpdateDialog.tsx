@@ -4,6 +4,14 @@ import { useAppUpdater } from "@/hooks/useAppUpdater";
 import styles from "./update-dialog.module.css";
 
 export function UpdateDialog() {
+  if (typeof window !== 'undefined' && !('__TAURI_INTERNALS__' in window)) {
+    return null;
+  }
+
+  return <UpdateDialogInner />;
+}
+
+function UpdateDialogInner() {
   const { updateAvailable, updateInfo, downloading, progress, installUpdate } = useAppUpdater();
 
   if (!updateAvailable) return null;

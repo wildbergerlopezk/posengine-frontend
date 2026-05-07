@@ -1,7 +1,6 @@
 import type React from "react";
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
-import { Analytics } from "@vercel/analytics/next";
 import { ThemeProvider } from "@/components/theme-provider";
 import { UpdateDialog } from "./UpdateDialog";
 import "@/styles/globals.css";
@@ -31,7 +30,6 @@ export default function RootLayout({
           disableTransitionOnChange
         >
           {children}
-          <Analytics />
           <UpdateDialog />
         </ThemeProvider>
       </body>
