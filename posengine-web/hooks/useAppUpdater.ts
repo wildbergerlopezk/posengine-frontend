@@ -11,14 +11,15 @@ export function useAppUpdater() {
   const totalSize = useRef<number>(1);
 
   useEffect(() => {
-    if (!isTauri()) return; // 👈 no hacer nada en el browser
-    checkForUpdate();
+    if (!isTauri()) return;
+    const timer = setTimeout(() => checkForUpdate(), 2000);
+    return () => clearTimeout(timer);
   }, []);
 
   async function checkForUpdate() {
     if (!isTauri()) return;
     try {
-      const { check } = await import('@tauri-apps/plugin-updater'); // import dinámico
+      const { check } = await import('@tauri-apps/plugin-updater');
       const update = await check();
       if (update?.available) {
         setUpdateAvailable(true);
@@ -34,16 +35,16 @@ export function useAppUpdater() {
     setDownloading(true);
     try {
       const { check } = await import('@tauri-apps/plugin-updater');
-      const { relaunch } = await import('@tauri-apps/plugin-process');
+      const processPlugin = await import('@tauri-apps/plugin-process') as any;
       const update = await check();
-      await update?.downloadAndInstall((event) => {
+      await update?.downloadAndInstall((event: any) => {
         if (event.event === 'Started') {
           totalSize.current = event.data.contentLength ?? 1;
         } else if (event.event === 'Progress') {
           setProgress(Math.round((event.data.chunkLength / totalSize.current) * 100));
         }
       });
-      await relaunch();
+      await processPlugin.relaunch();
     } catch (e) {
       console.error('Install failed:', e);
       setDownloading(false);
