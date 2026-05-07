@@ -2,7 +2,6 @@ import type React from "react";
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import { ThemeProvider } from "@/components/theme-provider";
-import { UpdateDialog } from "./UpdateDialog";
 import "@/styles/globals.css";
 
 const _inter = Inter({ subsets: ["latin"] });
@@ -30,7 +29,6 @@ export default function RootLayout({
           disableTransitionOnChange
         >
           {children}
-          <UpdateDialog />
         </ThemeProvider>
       </body>
     </html>
