@@ -107,7 +107,7 @@ if ($LASTEXITCODE -ne 0) {
 # ─── Descargar e instalar PosEngine Desktop ─────────────────────
 Write-Host "Instalando PosEngine..."
 
-$ghToken = ""
+$ghToken = "$token" # Reemplazá con tu token personal de GitHub con permisos de repo (puede ser de solo lectura)   
 $ghHeaders = @{ 
     Authorization = "token $ghToken"
     "User-Agent"  = "PosEngine-Installer"

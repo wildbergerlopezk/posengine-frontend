@@ -1,0 +1,26 @@
+/* [project]/app/update-dialog.module.css [app-client] (css) */
+.update-dialog-module__NQlAOa__updateBanner {
+  text-align: center;
+  background-color: #f9f9f9;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  margin: 16px 0;
+  padding: 16px;
+}
+
+.update-dialog-module__NQlAOa__progressBar {
+  background-color: #e0e0e0;
+  border-radius: 8px;
+  height: 24px;
+  margin-top: 8px;
+  position: relative;
+  overflow: hidden;
+}
+
+.update-dialog-module__NQlAOa__progressBar div {
+  background-color: #4caf50;
+  height: 100%;
+  transition: width .3s;
+}
+
+/*# sourceMappingURL=app_update-dialog_module_css_bad6b30c._.single.css.map*/

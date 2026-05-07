@@ -1,0 +1,6 @@
+{
+  "version": 3,
+  "sources": [],
+  "sections": [
+    {"offset": {"line": 1, "column": 0}, "map": {"version":3,"sources":["turbopack:///[project]/app/update-dialog.module.css"],"sourcesContent":[".updateBanner {\n  background-color: #f9f9f9;\n  border: 1px solid #ddd;\n  padding: 16px;\n  border-radius: 8px;\n  margin: 16px 0;\n  text-align: center;\n}\n\n.progressBar {\n  background-color: #e0e0e0;\n  border-radius: 8px;\n  overflow: hidden;\n  position: relative;\n  height: 24px;\n  margin-top: 8px;\n}\n\n.progressBar div {\n  background-color: #4caf50;\n  height: 100%;\n  transition: width 0.3s ease;\n}\n"],"names":[],"mappings":"AAAA;;;;;;;;;AASA;;;;;;;;;AASA"}}]
+}
