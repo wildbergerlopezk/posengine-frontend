@@ -42,6 +42,20 @@ services:
       - posengine-network
     restart: unless-stopped
 
+  frontend:
+    image: ${FRONTEND_IMAGE:-kevinho3324/posengine-frontend:latest}
+    container_name: ${FRONTEND_CONTAINER_NAME:-posengine-frontend}
+    expose:
+      - "3000"
+    environment:
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
+      NODE_ENV: ${NODE_ENV:-production}
+    depends_on:
+      - backend
+    networks:
+      - posengine-network
+    restart: unless-stopped
+
   nginx:
     image: ${NGINX_IMAGE:-nginx:alpine}
     container_name: ${NGINX_CONTAINER_NAME:-posengine-nginx}
