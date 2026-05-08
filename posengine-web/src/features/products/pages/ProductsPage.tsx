@@ -76,7 +76,7 @@ export function ProductsPage() {
   const [uploadingImage, setUploadingImage] = useState(false)
 
   const [confirm, setConfirm] = useState<ConfirmState>({
-    open: false, title: "", description: "", onConfirm: () => {},
+    open: false, title: "", description: "", onConfirm: () => { },
   })
 
   const openConfirm = (title: string, description: string, onConfirm: () => void) =>
@@ -91,16 +91,16 @@ export function ProductsPage() {
   })
 
   // ─── Keyboard navigation refs ─────────────────────────────────────────────
-  const nameRef        = useRef<HTMLInputElement>(null)
-  const barcodeRef     = useRef<HTMLInputElement>(null)
-  const categoryRef    = useRef<HTMLSelectElement>(null)
+  const nameRef = useRef<HTMLInputElement>(null)
+  const barcodeRef = useRef<HTMLInputElement>(null)
+  const categoryRef = useRef<HTMLSelectElement>(null)
   const subcategoryRef = useRef<HTMLSelectElement>(null)
-  const costRef        = useRef<HTMLInputElement>(null)
-  const priceRef       = useRef<HTMLInputElement>(null)
-  const unitTypeRef    = useRef<HTMLSelectElement>(null)
-  const stockRef       = useRef<HTMLInputElement>(null)
-  const stockMinRef    = useRef<HTMLInputElement>(null)
-  const submitRef      = useRef<HTMLButtonElement>(null)
+  const costRef = useRef<HTMLInputElement>(null)
+  const priceRef = useRef<HTMLInputElement>(null)
+  const unitTypeRef = useRef<HTMLSelectElement>(null)
+  const stockRef = useRef<HTMLInputElement>(null)
+  const stockMinRef = useRef<HTMLInputElement>(null)
+  const submitRef = useRef<HTMLButtonElement>(null)
 
   const handleEnterKey = (e: React.KeyboardEvent, nextRef: React.RefObject<HTMLElement | null>) => {
     if (e.key === "Enter") {
@@ -362,7 +362,7 @@ export function ProductsPage() {
       })
       if (!res.ok) throw new Error("Error al subir la imagen")
       const data = await res.json()
-      setFormData((prev) => ({ ...prev, imageUrl: `${API_BASE}${data.url}` }))
+      setFormData((prev) => ({ ...prev, imageUrl: data.url }))
     } catch (err: any) {
       openConfirm("Error al subir imagen", err.message, closeConfirm)
     } finally {
