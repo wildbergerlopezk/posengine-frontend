@@ -66,6 +66,10 @@ export function ProductsPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [searchQuery, setSearchQuery] = useState("")
+  const [currentPage, setCurrentPage] = useState(1)
+  const [total, setTotal] = useState(0)
+  const LIMIT = 20
+  const totalPages = Math.ceil(total / LIMIT)
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [editingProduct, setEditingProduct] = useState<ProductWithRelations | null>(null)
   const [openDropdown, setOpenDropdown] = useState<string | null>(null)
@@ -114,20 +118,27 @@ export function ProductsPage() {
     Authorization: `Bearer ${accessToken}`,
   }
 
-  const fetchProducts = useCallback(async () => {
+  const fetchProducts = useCallback(async (page = 1, search = searchQuery) => {
     setLoading(true)
     setError(null)
     try {
-      const res = await fetch(`${API_BASE}/product`, { headers: authHeaders })
+      const params = new URLSearchParams({
+        limit: String(LIMIT),
+        page: String(page),
+        ...(search.trim() && { search: search.trim() }),
+      })
+      const res = await fetch(`${API_BASE}/product?${params}`, { headers: authHeaders })
       if (!res.ok) throw new Error("Error al cargar productos")
       const data = await res.json()
       setProducts(data.items ?? data)
+      setTotal(data.total ?? 0)
+      setCurrentPage(page)
     } catch (err: any) {
       setError(err.message)
     } finally {
       setLoading(false)
     }
-  }, [accessToken])
+  }, [accessToken, searchQuery])
 
   const fetchCategories = useCallback(async () => {
     try {
@@ -142,9 +153,17 @@ export function ProductsPage() {
   }, [accessToken])
 
   useEffect(() => {
-    fetchProducts()
+    fetchProducts(1, searchQuery)
     fetchCategories()
-  }, [fetchProducts, fetchCategories])
+  }, [fetchCategories]) // solo al montar
+
+  // ── Búsqueda con debounce — agregá este useEffect ─────────────────────────
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      fetchProducts(1, searchQuery)
+    }, 350) // espera 350ms después de que el usuario deja de escribir
+    return () => clearTimeout(timer)
+  }, [searchQuery])
 
   // Focus primer campo al abrir modal
   useEffect(() => {
@@ -154,11 +173,6 @@ export function ProductsPage() {
   const selectedCategory = categories.find((c) => c.id === formData.categoryId)
   const subcategories = selectedCategory?.subcategories || []
 
-  const filteredProducts = products.filter((product) =>
-    product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    product.barcode?.includes(searchQuery) ||
-    product.sku?.toLowerCase().includes(searchQuery.toLowerCase()),
-  )
 
   const resetForm = () => {
     setFormData({
@@ -411,7 +425,7 @@ export function ProductsPage() {
             <div className={styles.emptyState}>
               <AlertCircle size={48} className={styles.emptyStateIcon} />
               <p className={styles.emptyStateTitle}>{error}</p>
-              <button className={styles.newButton} onClick={fetchProducts}>Reintentar</button>
+              <button className={styles.newButton} onClick={() => fetchProducts()}>Reintentar</button>
             </div>
           ) : (
             <table className={styles.table}>
@@ -428,7 +442,7 @@ export function ProductsPage() {
                 </tr>
               </thead>
               <tbody>
-                {filteredProducts.length === 0 ? (
+                {products.length === 0 ? (
                   <tr>
                     <td colSpan={8}>
                       <div className={styles.emptyState}>
@@ -438,7 +452,7 @@ export function ProductsPage() {
                     </td>
                   </tr>
                 ) : (
-                  filteredProducts.map((product) => (
+                  products.map((product) => (
                     <tr key={product.id} className={`${styles.tableRow} ${!product.isActive ? styles.tableRowInactive : ""}`}>
                       <td className={styles.tableCell}>
                         <div className={styles.productCell}>
@@ -544,6 +558,27 @@ export function ProductsPage() {
                 )}
               </tbody>
             </table>
+          )}
+          {total > LIMIT && (
+            <div className={styles.pagination}>
+              <button
+                className={styles.pageBtn}
+                disabled={currentPage === 1}
+                onClick={() => fetchProducts(currentPage - 1)}
+              >
+                ← Anterior
+              </button>
+              <span className={styles.pageInfo}>
+                Página {currentPage} de {totalPages} · {total} productos
+              </span>
+              <button
+                className={styles.pageBtn}
+                disabled={currentPage >= totalPages}
+                onClick={() => fetchProducts(currentPage + 1)}
+              >
+                Siguiente →
+              </button>
+            </div>
           )}
         </div>
       </div>
