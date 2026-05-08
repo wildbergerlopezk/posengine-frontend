@@ -8,21 +8,17 @@ import { join } from 'path'
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule)
 
-  const allowedOrigins = process.env.CORS_ORIGIN?.split(',') ?? [
-    'http://localhost:3000',
-  ]
+  const allowedOrigins = process.env.CORS_ORIGIN?.split(',') ?? ['http://localhost:3000']
 
   app.enableCors({
     origin: (origin, callback) => {
       if (!origin) return callback(null, true)
-
       const isLocalNetwork = /^http:\/\/192\.168\.\d+\.\d+:\d+$/.test(origin)
+      const isVercelPreview = /^https:\/\/.*\.vercel\.app$/.test(origin)
       const isAllowed = allowedOrigins.includes(origin)
-
-      if (isLocalNetwork || isAllowed) {
+      if (isLocalNetwork || isVercelPreview || isAllowed) {
         return callback(null, true)
       }
-
       return callback(new Error(`CORS bloqueado: ${origin}`))
     },
     credentials: true,
