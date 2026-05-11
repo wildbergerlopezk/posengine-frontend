@@ -88,7 +88,7 @@ export function KeyboardShortcutsModal({ onClose }: KeyboardShortcutsModalProps)
         <footer className={styles.footer}>
           <kbd className={styles.key}>Ctrl</kbd>
           <span className={styles.plus}>+</span>
-          <kbd className={styles.key}>?</kbd>
+          <kbd className={styles.key}>/</kbd>
           <span>para abrir y cerrar este panel</span>
         </footer>
       </div>
