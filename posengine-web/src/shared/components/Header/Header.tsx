@@ -1,9 +1,10 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Search, Bell, Sun, Moon, Menu } from "lucide-react"
+import { Search, Bell, Sun, Moon, Menu, Keyboard } from "lucide-react"
 import { useTheme } from "next-themes"
 import { useAuthStore } from "@/src/features/auth/store/auth.store"
+import { useUIStore } from "@/src/shared/store/ui.store"
 import styles from "./Header.module.css"
 
 interface HeaderProps {
@@ -20,6 +21,7 @@ export function Header({
   const { user } = useAuthStore()
   const { resolvedTheme, setTheme } = useTheme()
   const [mounted, setMounted] = useState(false)
+  const { toggleShortcutsModal } = useUIStore()
 
   useEffect(() => {
     setMounted(true)
@@ -55,6 +57,15 @@ export function Header({
       </div>
 
       <div className={styles.actions}>
+        <button
+          className={styles.iconButton}
+          onClick={toggleShortcutsModal}
+          aria-label="Atajos de teclado"
+          title="Atajos de teclado (Ctrl + ?)"
+        >
+          <Keyboard size={18} />
+        </button>
+
         <button
           className={styles.iconButton}
           onClick={toggleTheme}

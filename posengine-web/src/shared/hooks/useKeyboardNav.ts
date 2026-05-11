@@ -1,5 +1,6 @@
-import { useEffect, useState, useCallback } from "react"
+import { useEffect } from "react"
 import { useRouter } from "next/navigation"
+import { useUIStore } from "@/src/shared/store/ui.store"
 
 type ShortcutMap = Record<string, string>
 
@@ -18,9 +19,7 @@ const DEFAULT_SHORTCUTS: ShortcutMap = {
 
 export function useKeyboardNav(shortcuts: ShortcutMap = DEFAULT_SHORTCUTS) {
   const router = useRouter()
-  const [showHelp, setShowHelp] = useState(false)
-
-  const toggleHelp = useCallback(() => setShowHelp(prev => !prev), [])
+  const { isShortcutsModalOpen, toggleShortcutsModal, closeShortcutsModal } = useUIStore()
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -31,13 +30,13 @@ export function useKeyboardNav(shortcuts: ShortcutMap = DEFAULT_SHORTCUTS) {
       // Ctrl+? or Ctrl+/ 
       if (e.ctrlKey && (e.key === "?" || e.key === "/")) {
         e.preventDefault()
-        setShowHelp(prev => !prev)
+        toggleShortcutsModal()
         return
       }
 
       // Escape closes the modal
-      if (e.key === "Escape" && showHelp) {
-        setShowHelp(false)
+      if (e.key === "Escape" && isShortcutsModalOpen) {
+        closeShortcutsModal()
         return
       }
 
@@ -59,7 +58,11 @@ export function useKeyboardNav(shortcuts: ShortcutMap = DEFAULT_SHORTCUTS) {
 
     window.addEventListener("keydown", handler)
     return () => window.removeEventListener("keydown", handler)
-  }, [router, shortcuts, showHelp])
+  }, [router, shortcuts, isShortcutsModalOpen, toggleShortcutsModal, closeShortcutsModal])
 
-  return { showHelp, setShowHelp, toggleHelp }
+  return { 
+    showHelp: isShortcutsModalOpen, 
+    setShowHelp: (val: boolean) => val ? useUIStore.getState().openShortcutsModal() : useUIStore.getState().closeShortcutsModal(),
+    toggleHelp: toggleShortcutsModal 
+  }
 }
