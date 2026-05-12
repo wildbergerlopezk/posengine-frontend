@@ -27,6 +27,7 @@ import {
 import { SearchIcon } from "lucide-react"
 import { usePriceHistory } from "@/src/shared/hooks/usePriceHistory"
 import { PriceHistoryModal } from "@/src/shared/components/PriceHistoryModal"
+import { PurchaseItemPriceModal, type PriceModalData } from "../components/PurchaseItemPriceModal"
 
 const API_BASE = API_BASE_URL
 
@@ -53,6 +54,8 @@ interface PurchaseItem {
     unitCost: number
     subtotal: number
     total: number
+    marginPercentage: number
+    salePrice: number
 }
 
 function readApiError(body: unknown): string {
@@ -99,6 +102,7 @@ export function PurchasePage() {
     const [editingRowIndex, setEditingRowIndex] = useState<number | null>(null)
     const [editingField, setEditingField] = useState<"quantity" | "unitCost" | null>(null)
     const [editingValue, setEditingValue] = useState("")
+    const [priceModalIndex, setPriceModalIndex] = useState<number | null>(null)
 
     // ── Suppliers ──────────────────────────────────────────────────────────────
     const [suppliers, setSuppliers] = useState<Supplier[]>([])
@@ -296,7 +300,28 @@ export function PurchasePage() {
                 throw new Error(readApiError(body))
             }
 
-            // ── 2. Éxito ─────────────────────────────────────────────────
+            // ── 2. Actualizar precios de productos ────────────────────────────────
+            // Solo si el costo o el precio de venta son diferentes al actual
+            const productsToUpdate = items.filter(i =>
+                i.unitCost !== i.product.cost || i.salePrice !== i.product.price
+            )
+
+            if (productsToUpdate.length > 0) {
+                await Promise.all(productsToUpdate.map(async (item) => {
+                    try {
+                        await fetch(`${API_BASE}/product/${item.product.id}`, {
+                            method: "PATCH",
+                            headers: authHeaders,
+                            body: JSON.stringify({
+                                cost: item.unitCost,
+                                price: item.salePrice
+                            })
+                        })
+                    } catch { /* silent fail for individual product price update */ }
+                }))
+            }
+
+            // ── 3. Éxito ─────────────────────────────────────────────────
             setSuccess(true)
             setSubmitStep(null)
             setTimeout(() => {
@@ -344,9 +369,22 @@ export function PurchasePage() {
                 }
 
                 const unitCost = product.cost ?? 0
+                const salePrice = product.price
+                const marginPercentage = unitCost > 0 ? ((salePrice / unitCost) - 1) * 100 : 0
                 const newIndex = prev.length
-                setTimeout(() => startEdit(newIndex, "quantity", 1), 50)
-                return [...prev, { product, quantity: 1, unitCost, subtotal: unitCost, total: unitCost }]
+                
+                // Abrir el modal de precios directamente
+                setTimeout(() => setPriceModalIndex(newIndex), 100)
+                
+                return [...prev, { 
+                    product, 
+                    quantity: 1, 
+                    unitCost, 
+                    subtotal: unitCost, 
+                    total: unitCost,
+                    marginPercentage,
+                    salePrice
+                }]
             })
         } catch {
             setBarcodeError(`Error al buscar el producto con código "${code}"`)
@@ -513,10 +551,22 @@ export function PurchasePage() {
             }
 
             const unitCost = product.cost ?? 0
+            const salePrice = product.price
+            const marginPercentage = unitCost > 0 ? ((salePrice / unitCost) - 1) * 100 : 0
             const newIndex = prev.length
-            // Foco en la cantidad del producto recién agregado
-            setTimeout(() => startEdit(newIndex, "quantity", 1), 50)
-            return [...prev, { product, quantity: 1, unitCost, subtotal: unitCost, total: unitCost }]
+            
+            // Abrir el modal de precios directamente para el nuevo producto
+            setTimeout(() => setPriceModalIndex(newIndex), 100)
+            
+            return [...prev, { 
+                product, 
+                quantity: 1, 
+                unitCost, 
+                subtotal: unitCost, 
+                total: unitCost,
+                marginPercentage,
+                salePrice
+            }]
         })
     }
 
@@ -750,8 +800,10 @@ export function PurchasePage() {
                                 <th className={tableStyles.tableHeaderCell} style={{ width: 130 }}>Código</th>
                                 <th className={tableStyles.tableHeaderCell}>Descripción</th>
                                 <th className={`${tableStyles.tableHeaderCell} ${tableStyles.tableHeaderCellRight}`} style={{ width: 110 }}>Cant.</th>
-                                <th className={`${tableStyles.tableHeaderCell} ${tableStyles.tableHeaderCellRight}`} style={{ width: 140 }}>Costo unit.</th>
-                                <th className={`${tableStyles.tableHeaderCell} ${tableStyles.tableHeaderCellRight}`} style={{ width: 140 }}>SubTotal</th>
+                                <th className={`${tableStyles.tableHeaderCell} ${tableStyles.tableHeaderCellRight}`} style={{ width: 130 }}>Costo unit.</th>
+                                <th className={`${tableStyles.tableHeaderCell} ${tableStyles.tableHeaderCellRight}`} style={{ width: 90 }}>% Gan.</th>
+                                <th className={`${tableStyles.tableHeaderCell} ${tableStyles.tableHeaderCellRight}`} style={{ width: 130 }}>P. Venta</th>
+                                <th className={`${tableStyles.tableHeaderCell} ${tableStyles.tableHeaderCellRight}`} style={{ width: 130 }}>SubTotal</th>
                                 <th className={tableStyles.tableHeaderCell} style={{ width: 44 }} />
                             </tr>
                         </thead>
@@ -798,7 +850,11 @@ export function PurchasePage() {
                                                     value={editingValue}
                                                     onChange={e => setEditingValue(e.target.value)}
                                                     onKeyDown={e => {
-                                                        if (e.key === "Enter" || e.key === "Tab") { e.preventDefault(); commitEdit() }
+                                                        if (e.key === "Enter" || e.key === "Tab") {
+                                                            e.preventDefault()
+                                                            commitEdit()
+                                                            setPriceModalIndex(idx)
+                                                        }
                                                         if (e.key === "Escape") cancelEdit()
                                                     }}
                                                     onBlur={commitEdit}
@@ -817,33 +873,35 @@ export function PurchasePage() {
                                             )}
                                         </td>
 
-                                        {/* Costo unitario — editable inline */}
+                                        {/* Costo unitario — abre modal al hacer clic */}
                                         <td className={`${tableStyles.tableCell} ${tableStyles.tableCellRight}`}>
-                                            {editingRowIndex === idx && editingField === "unitCost" ? (
-                                                <input
-                                                    ref={editingInputRef}
-                                                    className={styles.inlineInput}
-                                                    type="number"
-                                                    value={editingValue}
-                                                    onChange={e => setEditingValue(e.target.value)}
-                                                    onKeyDown={e => {
-                                                        if (e.key === "Enter" || e.key === "Tab") { e.preventDefault(); commitEdit() }
-                                                        if (e.key === "Escape") cancelEdit()
-                                                    }}
-                                                    onBlur={commitEdit}
-                                                    min="0"
-                                                    step="any"
-                                                />
-                                            ) : (
-                                                <button
-                                                    type="button"
-                                                    className={styles.editableCell}
-                                                    onClick={() => startEdit(idx, "unitCost", item.unitCost)}
-                                                    title="Clic para editar"
-                                                >
-                                                    {formatCurrency(item.unitCost)}
-                                                </button>
-                                            )}
+                                            <button
+                                                type="button"
+                                                className={styles.editableCell}
+                                                onClick={() => setPriceModalIndex(idx)}
+                                                title="Clic para ajustar precios"
+                                            >
+                                                {formatCurrency(item.unitCost)}
+                                            </button>
+                                        </td>
+
+                                        {/* % Ganancia */}
+                                        <td className={`${tableStyles.tableCell} ${tableStyles.tableCellRight}`}>
+                                            <span className={styles.marginText}>
+                                                {item.marginPercentage.toFixed(1)}%
+                                            </span>
+                                        </td>
+
+                                        {/* Precio Venta */}
+                                        <td className={`${tableStyles.tableCell} ${tableStyles.tableCellRight}`}>
+                                            <button
+                                                type="button"
+                                                className={styles.editableCell}
+                                                onClick={() => setPriceModalIndex(idx)}
+                                                title="Clic para ajustar precios"
+                                            >
+                                                {formatCurrency(item.salePrice)}
+                                            </button>
                                         </td>
 
                                         {/* SubTotal */}
@@ -1054,6 +1112,34 @@ export function PurchasePage() {
                 onPageChange={priceHistory.goToPage}
                 onClose={priceHistory.close}
             />
+
+            {priceModalIndex !== null && (
+                <PurchaseItemPriceModal
+                    product={items[priceModalIndex].product}
+                    initialData={{
+                        quantity: items[priceModalIndex].quantity,
+                        unitCost: items[priceModalIndex].unitCost,
+                        marginPercentage: items[priceModalIndex].marginPercentage,
+                        salePrice: items[priceModalIndex].salePrice
+                    }}
+                    onClose={() => setPriceModalIndex(null)}
+                    onSave={(data) => {
+                        setItems(prev => prev.map((it, i) => {
+                            if (i !== priceModalIndex) return it
+                            return {
+                                ...it,
+                                quantity: data.quantity,
+                                unitCost: data.unitCost,
+                                marginPercentage: data.marginPercentage,
+                                salePrice: data.salePrice,
+                                subtotal: data.quantity * data.unitCost,
+                                total: data.quantity * data.unitCost
+                            }
+                        }))
+                        setPriceModalIndex(null)
+                    }}
+                />
+            )}
         </div>
     )
 }
