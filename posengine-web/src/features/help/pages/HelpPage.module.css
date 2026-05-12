@@ -166,7 +166,7 @@
   color: var(--color-foreground, #fff);
 }
 
-kbd {
+.key {
   background: var(--color-accent, #333);
   border: 1px solid var(--color-border, #444);
   border-radius: 0.375rem;
@@ -233,7 +233,7 @@ kbd {
   .navLink, .introCard p, .sectionContent, .table td, .table th {
     color: #333 !important;
   }
-  kbd {
+  .key {
     background: #f3f4f6 !important;
     color: black !important;
     border: 1px solid #d1d5db !important;

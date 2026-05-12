@@ -84,7 +84,7 @@ export function HelpPage() {
               <p>Registra las compras a tus proveedores para aumentar tu stock y actualizar costos.</p>
               <ul>
                 <li><strong>Nueva Compra:</strong> Selecciona el proveedor e ingresa el número de factura.</li>
-                <li><strong>Carga Rápida:</strong> Usa <kbd>F2</kbd> para buscar productos o escanea el código de barras.</li>
+                <li><strong>Carga Rápida:</strong> Usa <kbd className={styles.key}>F2</kbd> para buscar productos o escanea el código de barras.</li>
                 <li><strong>Ajuste de Precios:</strong> Al cargar un ítem, se abrirá un modal para que ajustes el costo y el nuevo precio de venta inmediatamente.</li>
                 <li><strong>Actualización Automática:</strong> Al finalizar la compra, el sistema actualiza el stock y los precios en tu catálogo.</li>
               </ul>
@@ -125,11 +125,11 @@ export function HelpPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  <tr><td>Ver Atajos</td><td><kbd>Ctrl</kbd> + <kbd>/</kbd></td></tr>
-                  <tr><td>Agregar Producto (Compras/Ventas)</td><td><kbd>F2</kbd></td></tr>
-                  <tr><td>Finalizar Operación</td><td><kbd>F12</kbd></td></tr>
-                  <tr><td>Generar Nro. Factura (Compras)</td><td><kbd>Alt</kbd> + <kbd>Q</kbd></td></tr>
-                  <tr><td>Ver Historial Precios (en búsqueda)</td><td><kbd>F8</kbd></td></tr>
+                  <tr><td>Ver Atajos</td><td><kbd className={styles.key}>Ctrl</kbd> + <kbd className={styles.key}>/</kbd></td></tr>
+                  <tr><td>Agregar Producto (Compras/Ventas)</td><td><kbd className={styles.key}>F2</kbd></td></tr>
+                  <tr><td>Finalizar Operación</td><td><kbd className={styles.key}>F12</kbd></td></tr>
+                  <tr><td>Generar Nro. Factura (Compras)</td><td><kbd className={styles.key}>Alt</kbd> + <kbd className={styles.key}>Q</kbd></td></tr>
+                  <tr><td>Ver Historial Precios (en búsqueda)</td><td><kbd className={styles.key}>F8</kbd></td></tr>
                 </tbody>
               </table>
             </div>
