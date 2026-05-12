@@ -887,9 +887,14 @@ export function PurchasePage() {
 
                                         {/* % Ganancia */}
                                         <td className={`${tableStyles.tableCell} ${tableStyles.tableCellRight}`}>
-                                            <span className={styles.marginText}>
+                                            <button
+                                                type="button"
+                                                className={styles.editableCell}
+                                                onClick={() => setPriceModalIndex(idx)}
+                                                title="Clic para ajustar precios"
+                                            >
                                                 {item.marginPercentage.toFixed(1)}%
-                                            </span>
+                                            </button>
                                         </td>
 
                                         {/* Precio Venta */}

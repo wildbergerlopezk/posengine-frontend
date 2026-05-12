@@ -166,12 +166,15 @@ export function PurchaseItemPriceModal({ product, initialData, onSave, onClose }
                 <span className={styles.inputIcon}><DollarSign size={16} /></span>
                 <input
                   ref={costRef}
-                  type="number"
-                  value={unitCost}
-                  onChange={e => handleCostChange(e.target.value)}
+                  type="text"
+                  inputMode="numeric"
+                  value={new Intl.NumberFormat("es-PY").format(Number(unitCost.replace(/\D/g, "") || 0))}
+                  onChange={e => {
+                    const val = e.target.value.replace(/\D/g, "")
+                    handleCostChange(val)
+                  }}
                   onKeyDown={e => handleKeyDown(e, marginRef)}
                   placeholder="0"
-                  step="any"
                 />
               </div>
             </div>
@@ -201,12 +204,15 @@ export function PurchaseItemPriceModal({ product, initialData, onSave, onClose }
                   <span className={styles.inputIcon}><DollarSign size={16} /></span>
                   <input
                     ref={priceRef}
-                    type="number"
-                    value={salePrice}
-                    onChange={e => handlePriceChange(e.target.value)}
+                    type="text"
+                    inputMode="numeric"
+                    value={new Intl.NumberFormat("es-PY").format(Number(salePrice.replace(/\D/g, "") || 0))}
+                    onChange={e => {
+                      const val = e.target.value.replace(/\D/g, "")
+                      handlePriceChange(val)
+                    }}
                     onKeyDown={e => handleKeyDown(e, saveBtnRef)}
                     placeholder="0"
-                    step="any"
                   />
                 </div>
               </div>
