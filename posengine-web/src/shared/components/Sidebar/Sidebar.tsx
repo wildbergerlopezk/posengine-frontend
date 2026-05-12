@@ -7,7 +7,7 @@ import {
   LayoutDashboard, ShoppingCart, Package, Users, Truck,
   Wallet, BarChart2, Printer, Settings, ShoppingBag, History,
   PlusCircle, List, Tags, Tag, Building2, LogOut, Menu,
-  ChevronDown, ChevronRight, RotateCcw
+  ChevronDown, ChevronRight, RotateCcw, HelpCircle
 } from "lucide-react"
 import { useAuthStore } from "@/src/features/auth/store/auth.store"
 import styles from "./Sidebar.module.css"
@@ -76,6 +76,7 @@ const navItems = [
       { href: "/dashboard/printing/labels", label: "Etiquetas", icon: Tag },
     ],
   },
+  { href: "/dashboard/help", label: "Ayuda", icon: HelpCircle },
 ]
 
 export function Sidebar() {
