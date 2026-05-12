@@ -235,7 +235,7 @@
   }
 }
 
-kbd {
+.key {
   background: var(--color-accent, #333);
   border: 1px solid var(--color-border, #444);
   border-radius: 0.25rem;

@@ -216,7 +216,7 @@ export function PurchaseItemPriceModal({ product, initialData, onSave, onClose }
 
         <footer className={styles.footer}>
           <div className={styles.footerHint}>
-            <kbd>Enter</kbd> para avanzar y guardar
+            <kbd className={styles.key}>Enter</kbd> para avanzar y guardar
           </div>
           <button 
             ref={saveBtnRef}
