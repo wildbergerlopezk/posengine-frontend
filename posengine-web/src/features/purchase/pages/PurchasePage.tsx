@@ -426,8 +426,10 @@ export function PurchasePage() {
                     setBarcodeError(null)
                     return
                 }
+                // If the price modal is open, let it handle Escape
+                if (priceModalIndex !== null) return;
                 if (showProductModal) {
-                    if (priceHistory.open) return
+                    if (priceHistory.open) return;
                     setShowProductModal(false)
                     setProductSearch("")
                     return

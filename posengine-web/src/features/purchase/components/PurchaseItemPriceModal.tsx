@@ -46,7 +46,17 @@ export function PurchaseItemPriceModal({ product, initialData, onSave, onClose }
       qtyRef.current?.focus()
       qtyRef.current?.select()
     }, 50)
-  }, [])
+
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        e.stopPropagation(); // Prevent global handler interference
+        onClose();
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [onClose])
 
   const calculateFromMargin = (cost: number, pct: number) => {
     const price = cost * (1 + pct / 100)
@@ -222,14 +232,14 @@ export function PurchaseItemPriceModal({ product, initialData, onSave, onClose }
 
         <footer className={styles.footer}>
           <div className={styles.footerHint}>
-            <kbd className={styles.key}>Enter</kbd> para avanzar y guardar
+            <kbd className={styles.key}>Enter</kbd> para guardar o <kbd className={styles.key}>Esc</kbd> para salir
           </div>
-          <button 
+          <button
+            className={styles.saveButton}
             ref={saveBtnRef}
-            className={styles.saveButton} 
             onClick={handleSave}
           >
-            Confirmar <ArrowRight size={18} />
+            Guardar
           </button>
         </footer>
       </div>
