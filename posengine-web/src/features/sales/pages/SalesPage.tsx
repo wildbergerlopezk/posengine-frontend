@@ -23,6 +23,7 @@ import styles from "./SalesPage.module.css"
 import tableStyles from "@/src/features/products/pages/ProductsPage.module.css"
 
 const API_BASE = API_BASE_URL
+const SALE_STORAGE_KEY = "posengine_sale_draft"
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 
@@ -106,6 +107,28 @@ export function SalesPage() {
   const editingInputRef = useRef<HTMLInputElement>(null)
   const confirmAcceptRef = useRef<HTMLButtonElement>(null)
   const confirmCancelRef = useRef<HTMLButtonElement>(null)
+  const [isDraftLoaded, setIsDraftLoaded] = useState(false)
+
+  // ── Persistence: Load draft ───────────────────────────────────────────────
+  useEffect(() => {
+    const saved = sessionStorage.getItem(SALE_STORAGE_KEY)
+    if (saved) {
+      try {
+        const draft = JSON.parse(saved)
+        if (draft.items) setItems(draft.items)
+      } catch (e) {
+        console.error("Error loading sale draft", e)
+      }
+    }
+    setIsDraftLoaded(true)
+  }, [])
+
+  // ── Persistence: Save draft ───────────────────────────────────────────────
+  useEffect(() => {
+    if (!isDraftLoaded) return
+    const draft = { items }
+    sessionStorage.setItem(SALE_STORAGE_KEY, JSON.stringify(draft))
+  }, [isDraftLoaded, items])
 
   // ── Totales ────────────────────────────────────────────────────────────────
   const total = items.reduce((acc, i) => acc + i.quantity * i.unitPrice, 0)
@@ -265,6 +288,7 @@ export function SalesPage() {
       setSuccess(true)
       setTimeout(() => {
         setItems([])
+        sessionStorage.removeItem(SALE_STORAGE_KEY)
         setSuccess(false)
       }, 1200)
     } catch (err: unknown) {
