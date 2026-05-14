@@ -1,73 +1,74 @@
 import {
   Controller,
   Post,
-  UseInterceptors,
-  UploadedFile,
-  BadRequestException,
   Delete,
   Param,
-  InternalServerErrorException,
+  UseInterceptors,
+  UploadedFile,
 } from '@nestjs/common'
 import { FileInterceptor } from '@nestjs/platform-express'
-import { createClient } from '@supabase/supabase-js'
-import sharp from 'sharp'
-import { extname } from 'path'
+import {
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
+  ApiBearerAuth,
+  ApiParam,
+  ApiConsumes,
+  ApiBody,
+} from '@nestjs/swagger'
+import { UploadService } from './upload.service'
 
-const supabase = createClient(
-  process.env.SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_KEY!,
-)
-
-const BUCKET = 'product-images'
-
+@ApiTags('Upload')
+@ApiBearerAuth('access-token')
 @Controller('upload')
 export class UploadController {
+  constructor(private readonly uploadService: UploadService) {}
+
   @Post()
   @UseInterceptors(FileInterceptor('file'))
+  @ApiOperation({
+    summary: 'Upload a product image',
+    description:
+      'Accepts JPEG, PNG or WebP. The image is resized to 800×800 and converted to WebP before being stored in Supabase Storage.',
+  })
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({
+    schema: {
+      type: 'object',
+      required: ['file'],
+      properties: {
+        file: {
+          type: 'string',
+          format: 'binary',
+          description: 'Image file (JPEG, PNG or WebP, max 5 MB)',
+        },
+      },
+    },
+  })
+  @ApiResponse({
+    status: 201,
+    description: 'Image uploaded and optimized successfully',
+    schema: { example: { url: 'https://xyz.supabase.co/storage/v1/object/public/product-images/1234567890.webp' } },
+  })
+  @ApiResponse({ status: 400, description: 'No file provided or invalid format' })
+  @ApiResponse({ status: 500, description: 'Supabase storage error' })
   async upload(@UploadedFile() file: Express.Multer.File) {
-    if (!file) {
-      throw new BadRequestException('Archivo requerido')
-    }
-
-    const optimized = await sharp(file.buffer)
-      .resize(800, 800, {
-        fit: 'inside',       
-        withoutEnlargement: true,
-      })
-      .webp({ quality: 80 }) 
-      .toBuffer()
-
-    const unique = Date.now() + '-' + Math.round(Math.random() * 1e9)
-    const filename = `${unique}.webp`
-
-    const { error } = await supabase.storage
-      .from(BUCKET)
-      .upload(filename, optimized, {
-        contentType: 'image/webp',
-        upsert: false,
-      })
-
-    if (error) {
-      throw new InternalServerErrorException(`Error al subir imagen: ${error.message}`)
-    }
-
-    const { data } = supabase.storage
-      .from(BUCKET)
-      .getPublicUrl(filename)
-
-    return { url: data.publicUrl }
+    return this.uploadService.uploadFile(file)
   }
 
   @Delete(':filename')
+  @ApiOperation({
+    summary: 'Delete a product image',
+    description: 'Removes the file from Supabase Storage by filename (e.g. 1234567890.webp).',
+  })
+  @ApiParam({
+    name: 'filename',
+    description: 'Filename returned by the upload endpoint',
+    example: '1714500000000-123456789.webp',
+  })
+  @ApiResponse({ status: 200, description: 'Image deleted successfully', schema: { example: { deleted: true } } })
+  @ApiResponse({ status: 500, description: 'Supabase storage error' })
   async remove(@Param('filename') filename: string) {
-    const { error } = await supabase.storage
-      .from(BUCKET)
-      .remove([filename])
-
-    if (error) {
-      throw new InternalServerErrorException(`Error al eliminar imagen: ${error.message}`)
-    }
-
-    return { deleted: true }
+    return this.uploadService.deleteFile(filename)
   }
 }
