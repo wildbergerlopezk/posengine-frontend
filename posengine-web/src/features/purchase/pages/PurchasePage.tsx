@@ -30,6 +30,7 @@ import { PriceHistoryModal } from "@/src/shared/components/PriceHistoryModal"
 import { PurchaseItemPriceModal, type PriceModalData } from "../components/PurchaseItemPriceModal"
 
 const API_BASE = API_BASE_URL
+const PURCHASE_STORAGE_KEY = "posengine_purchase_draft"
 
 interface Supplier {
     id: string
@@ -143,6 +144,40 @@ export function PurchasePage() {
     const confirmCancelRef = useRef<HTMLButtonElement>(null)
     const productSearchRef = useRef<HTMLInputElement>(null)
     const editingInputRef = useRef<HTMLInputElement>(null)
+    const [isDraftLoaded, setIsDraftLoaded] = useState(false)
+
+    // ── Persistence: Load draft ───────────────────────────────────────────────
+    useEffect(() => {
+        const saved = sessionStorage.getItem(PURCHASE_STORAGE_KEY)
+        if (saved) {
+            try {
+                const draft = JSON.parse(saved)
+                if (draft.supplierId) setSupplierId(draft.supplierId)
+                if (draft.invoiceNumber) setInvoiceNumber(draft.invoiceNumber)
+                if (draft.purchaseDate) setPurchaseDate(draft.purchaseDate)
+                if (draft.paymentType) setPaymentType(draft.paymentType)
+                if (draft.notes) setNotes(draft.notes)
+                if (draft.items) setItems(draft.items)
+            } catch (e) {
+                console.error("Error loading purchase draft", e)
+            }
+        }
+        setIsDraftLoaded(true)
+    }, [])
+
+    // ── Persistence: Save draft ───────────────────────────────────────────────
+    useEffect(() => {
+        if (!isDraftLoaded) return
+        const draft = {
+            supplierId,
+            invoiceNumber,
+            purchaseDate,
+            paymentType,
+            notes,
+            items
+        }
+        sessionStorage.setItem(PURCHASE_STORAGE_KEY, JSON.stringify(draft))
+    }, [isDraftLoaded, supplierId, invoiceNumber, purchaseDate, paymentType, notes, items])
 
     // ── Computed totals ────────────────────────────────────────────────────────
     const total = items.reduce((acc, i) => acc + i.total, 0)
@@ -324,6 +359,7 @@ export function PurchasePage() {
             // ── 3. Éxito ─────────────────────────────────────────────────
             setSuccess(true)
             setSubmitStep(null)
+            sessionStorage.removeItem(PURCHASE_STORAGE_KEY)
             setTimeout(() => {
                 setItems([])
                 setSupplierId("")
