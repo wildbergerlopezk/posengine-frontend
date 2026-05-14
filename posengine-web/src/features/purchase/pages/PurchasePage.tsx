@@ -406,7 +406,7 @@ export function PurchasePage() {
 
                 const unitCost = product.cost ?? 0
                 const salePrice = product.price
-                const marginPercentage = unitCost > 0 ? ((salePrice / unitCost) - 1) * 100 : 0
+                const marginPercentage = unitCost > 0 ? Number(Number(((salePrice / unitCost) - 1) * 100).toFixed(2)) : 0
                 const newIndex = prev.length
                 
                 // Abrir el modal de precios directamente
@@ -590,7 +590,7 @@ export function PurchasePage() {
 
             const unitCost = product.cost ?? 0
             const salePrice = product.price
-            const marginPercentage = unitCost > 0 ? ((salePrice / unitCost) - 1) * 100 : 0
+            const marginPercentage = unitCost > 0 ? Number(Number(((salePrice / unitCost) - 1) * 100).toFixed(2)) : 0
             const newIndex = prev.length
             
             // Abrir el modal de precios directamente para el nuevo producto

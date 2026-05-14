@@ -31,7 +31,7 @@ interface PurchaseItemPriceModalProps {
 export function PurchaseItemPriceModal({ product, initialData, onSave, onClose }: PurchaseItemPriceModalProps) {
   const [quantity, setQuantity] = useState(String(initialData.quantity))
   const [unitCost, setUnitCost] = useState(String(initialData.unitCost))
-  const [margin, setMargin] = useState(String(initialData.marginPercentage))
+  const [margin, setMargin] = useState(Number(initialData.marginPercentage).toFixed(2))
   const [salePrice, setSalePrice] = useState(String(initialData.salePrice))
 
   const qtyRef = useRef<HTMLInputElement>(null)
