@@ -42,6 +42,7 @@ export interface Product {
   subcategoryId?: string
   cost?: number
   price: number
+  wholesalePrice: number
   stock: number
   unitType: UnitType
   stockMinimum: number
@@ -74,6 +75,7 @@ export interface SaleItem {
   productName: string
   quantity: number
   unitPrice: number
+  priceType: "PUBLIC" | "WHOLESALE"
   total: number
 }
 

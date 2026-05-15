@@ -10,7 +10,7 @@ import { StockMovementService } from '../../stock-movement/stock-movement.servic
 import { ProductService } from '../../product/product.service'
 import { CreateSaleDto } from './../dto/create-sale.dto'
 import { SaleFilterDto } from './../dto/sale-filter.dto'
-import { CashSessionStatus, SaleStatus } from '../../../generated/prisma/enums'
+import { CashSessionStatus, SaleStatus, PriceType } from '../../../generated/prisma/enums'
 import { Prisma } from '../../../generated/prisma/client'
 
 @Injectable()
@@ -78,10 +78,16 @@ export class SaleService {
         )
       }
 
-      // 4d. Precio no puede ser menor al precio base del producto
-      if (item.unitPrice < product.price) {
+      // 4d. El precio no puede ser menor al precio base según el tipo seleccionado
+      const basePrice = item.priceType === PriceType.WHOLESALE
+        ? product.wholesalePrice
+        : product.price
+
+      if (item.unitPrice < basePrice) {
         throw new BadRequestException(
-          `El precio de "${product.name}" no puede ser menor al precio base (Gs. ${product.price.toLocaleString('es-PY')}). Recibido: Gs. ${item.unitPrice.toLocaleString('es-PY')}.`,
+          `El precio de "${product.name}" no puede ser menor al precio ${
+            item.priceType === PriceType.WHOLESALE ? 'mayorista' : 'público'
+          } (Gs. ${basePrice.toLocaleString('es-PY')}). Recibido: Gs. ${item.unitPrice.toLocaleString('es-PY')}.`,
         )
       }
     }
@@ -109,6 +115,7 @@ export class SaleService {
             productId: item.productId,
             quantity: item.quantity,
             unitPrice: item.unitPrice,
+            priceType: item.priceType ?? PriceType.PUBLIC,
             total: item.quantity * item.unitPrice,
           },
         })

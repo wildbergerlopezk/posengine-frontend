@@ -239,6 +239,35 @@
   color: var(--color-destructive);
 }
 
+/* ── Price Type Button ─────────────────────────────────────────────────── */
+.priceTypeBtn {
+  border: 1px solid var(--color-border);
+  background: var(--color-background);
+  color: var(--color-muted-foreground);
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  padding: 0.2rem 0.5rem;
+  border-radius: 0.375rem;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+.priceTypeBtn:hover {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+  background: color-mix(in srgb, var(--color-primary) 5%, transparent);
+}
+.priceTypeBtnWholesale {
+  background: color-mix(in srgb, #8b5cf6 10%, transparent);
+  color: #8b5cf6;
+  border-color: color-mix(in srgb, #8b5cf6 30%, transparent);
+}
+.priceTypeBtnWholesale:hover {
+  background: color-mix(in srgb, #8b5cf6 20%, transparent);
+  border-color: #8b5cf6;
+}
+
 /* ── Table footer ────────────────────────────────────────────────────────── */
 .tableFooter {
   display: flex;

@@ -1,0 +1,173 @@
+/* PriceTypeSelectorModal.module.css */
+
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(2px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 200;
+  padding: 1rem;
+  animation: fadeIn 0.15s ease-out;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.modal {
+  background: var(--color-card);
+  border-radius: 1rem;
+  width: 100%;
+  max-width: 440px;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.4);
+  overflow: hidden;
+  animation: slideUp 0.2s ease-out;
+}
+
+@keyframes slideUp {
+  from { transform: translateY(20px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+.header {
+  padding: 1.5rem 1.5rem 1rem;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.title {
+  margin: 0 0 0.25rem;
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--color-foreground);
+}
+
+.subtitle {
+  margin: 0;
+  font-size: 0.875rem;
+  color: var(--color-muted-foreground);
+}
+
+.costInfo {
+  background: color-mix(in srgb, var(--color-primary) 5%, transparent);
+  padding: 0.75rem 1.5rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.costLabel {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--color-muted-foreground);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.costValue {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--color-foreground);
+}
+
+.options {
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.optionBtn {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem 1.25rem;
+  border-radius: 0.75rem;
+  border: 2px solid transparent;
+  background: var(--color-accent);
+  cursor: pointer;
+  transition: all 0.2s;
+  width: 100%;
+  text-align: left;
+}
+
+.optionBtnActive {
+  background: color-mix(in srgb, var(--color-primary) 10%, var(--color-card));
+  border-color: var(--color-primary);
+  transform: scale(1.02);
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+}
+
+.optionIcon {
+  width: 2.5rem;
+  height: 2.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0.5rem;
+  background: var(--color-background);
+  color: var(--color-muted-foreground);
+  transition: all 0.2s;
+}
+
+.optionBtnActive .optionIcon {
+  background: var(--color-primary);
+  color: white;
+}
+
+.optionInfo {
+  flex: 1;
+}
+
+.optionLabel {
+  display: block;
+  font-weight: 700;
+  font-size: 1rem;
+  color: var(--color-foreground);
+  margin-bottom: 0.1rem;
+}
+
+.optionDetails {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.optionMargin {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #10b981; /* green */
+}
+
+.optionPrice {
+  font-size: 1.125rem;
+  font-weight: 800;
+  color: var(--color-primary);
+}
+
+.footer {
+  padding: 1rem 1.5rem;
+  background: var(--color-muted);
+  display: flex;
+  justify-content: center;
+  gap: 1.5rem;
+  font-size: 0.75rem;
+  color: var(--color-muted-foreground);
+  border-top: 1px solid var(--color-border);
+}
+
+.footer kbd {
+  background: var(--color-card);
+  border: 1px solid var(--color-border);
+  border-radius: 0.25rem;
+  padding: 0.15rem 0.4rem;
+  font-size: 0.7rem;
+  font-weight: 700;
+  font-family: monospace;
+  margin-right: 0.3rem;
+  color: var(--color-foreground);
+}

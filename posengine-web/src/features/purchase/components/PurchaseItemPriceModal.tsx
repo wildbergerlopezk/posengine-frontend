@@ -17,8 +17,12 @@ interface Product {
 export interface PriceModalData {
   quantity: number
   unitCost: number
+  // Public price
   marginPercentage: number
   salePrice: number
+  // Wholesale price
+  wholesaleMarginPercentage: number
+  wholesalePrice: number
 }
 
 interface PurchaseItemPriceModalProps {
@@ -33,12 +37,24 @@ export function PurchaseItemPriceModal({ product, initialData, onSave, onClose }
   const [unitCost, setUnitCost] = useState(String(initialData.unitCost))
   const [margin, setMargin] = useState(Number(initialData.marginPercentage).toFixed(2))
   const [salePrice, setSalePrice] = useState(String(initialData.salePrice))
+  const [wholesaleMargin, setWholesaleMargin] = useState(Number(initialData.wholesaleMarginPercentage ?? 0).toFixed(2))
+  const [wholesalePrice, setWholesalePrice] = useState(String(initialData.wholesalePrice ?? 0))
 
   const qtyRef = useRef<HTMLInputElement>(null)
   const costRef = useRef<HTMLInputElement>(null)
   const marginRef = useRef<HTMLInputElement>(null)
   const priceRef = useRef<HTMLInputElement>(null)
+  const wholesaleMarginRef = useRef<HTMLInputElement>(null)
+  const wholesalePriceRef = useRef<HTMLInputElement>(null)
   const saveBtnRef = useRef<HTMLButtonElement>(null)
+
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose()
+    }
+    window.addEventListener("keydown", handler)
+    return () => window.removeEventListener("keydown", handler)
+  }, [onClose])
 
   useEffect(() => {
     // Focus quantity on open
@@ -59,12 +75,25 @@ export function PurchaseItemPriceModal({ product, initialData, onSave, onClose }
     setMargin(pct.toFixed(2))
   }
 
+  const calculateWholesaleFromMargin = (cost: number, pct: number) => {
+    const price = cost * (1 + pct / 100)
+    setWholesalePrice(String(Math.round(price)))
+  }
+
+  const calculateWholesaleFromPrice = (cost: number, price: number) => {
+    if (cost <= 0) return
+    const pct = ((price / cost) - 1) * 100
+    setWholesaleMargin(pct.toFixed(2))
+  }
+
   const handleCostChange = (val: string) => {
     setUnitCost(val)
     const c = parseFloat(val)
     const m = parseFloat(margin)
-    if (!isNaN(c) && !isNaN(m)) {
-      calculateFromMargin(c, m)
+    const wm = parseFloat(wholesaleMargin)
+    if (!isNaN(c)) {
+      if (!isNaN(m)) calculateFromMargin(c, m)
+      if (!isNaN(wm)) calculateWholesaleFromMargin(c, wm)
     }
   }
 
@@ -86,6 +115,24 @@ export function PurchaseItemPriceModal({ product, initialData, onSave, onClose }
     }
   }
 
+  const handleWholesaleMarginChange = (val: string) => {
+    setWholesaleMargin(val)
+    const c = parseFloat(unitCost)
+    const m = parseFloat(val)
+    if (!isNaN(c) && !isNaN(m)) {
+      calculateWholesaleFromMargin(c, m)
+    }
+  }
+
+  const handleWholesalePriceChange = (val: string) => {
+    setWholesalePrice(val)
+    const c = parseFloat(unitCost)
+    const p = parseFloat(val)
+    if (!isNaN(c) && !isNaN(p) && c > 0) {
+      calculateWholesaleFromPrice(c, p)
+    }
+  }
+
   const handleKeyDown = (e: React.KeyboardEvent, nextRef: React.RefObject<HTMLInputElement | HTMLButtonElement | null>) => {
     if (e.key === "Enter") {
       e.preventDefault()
@@ -101,6 +148,8 @@ export function PurchaseItemPriceModal({ product, initialData, onSave, onClose }
     const c = parseFloat(unitCost)
     const m = parseFloat(margin)
     const p = parseFloat(salePrice)
+    const wm = parseFloat(wholesaleMargin)
+    const wp = parseFloat(wholesalePrice)
 
     if (isNaN(q) || q <= 0) { qtyRef.current?.focus(); return }
     if (isNaN(c) || c < 0) { costRef.current?.focus(); return }
@@ -109,7 +158,9 @@ export function PurchaseItemPriceModal({ product, initialData, onSave, onClose }
       quantity: q,
       unitCost: c,
       marginPercentage: isNaN(m) ? 0 : m,
-      salePrice: isNaN(p) ? 0 : p
+      salePrice: isNaN(p) ? 0 : p,
+      wholesaleMarginPercentage: isNaN(wm) ? 0 : wm,
+      wholesalePrice: isNaN(wp) ? 0 : wp
     })
   }
 
@@ -180,9 +231,9 @@ export function PurchaseItemPriceModal({ product, initialData, onSave, onClose }
             </div>
 
             <div className={styles.row}>
-              {/* Margen */}
+              {/* Margen Público */}
               <div className={styles.formGroup}>
-                <label>Ganancia (%)</label>
+                <label>Ganancia Público (%)</label>
                 <div className={styles.inputWrapper}>
                   <span className={styles.inputIcon}><Percent size={16} /></span>
                   <input
@@ -197,9 +248,9 @@ export function PurchaseItemPriceModal({ product, initialData, onSave, onClose }
                 </div>
               </div>
 
-              {/* Precio Venta */}
+              {/* Precio Público */}
               <div className={styles.formGroup}>
-                <label>Precio Venta</label>
+                <label>Precio Público</label>
                 <div className={styles.inputWrapper}>
                   <span className={styles.inputIcon}><DollarSign size={16} /></span>
                   <input
@@ -210,6 +261,45 @@ export function PurchaseItemPriceModal({ product, initialData, onSave, onClose }
                     onChange={e => {
                       const val = e.target.value.replace(/\D/g, "")
                       handlePriceChange(val)
+                    }}
+                    onKeyDown={e => handleKeyDown(e, wholesaleMarginRef)}
+                    placeholder="0"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className={styles.row}>
+              {/* Margen Mayorista */}
+              <div className={styles.formGroup}>
+                <label>Ganancia Mayorista (%)</label>
+                <div className={styles.inputWrapper}>
+                  <span className={styles.inputIcon}><Percent size={16} /></span>
+                  <input
+                    ref={wholesaleMarginRef}
+                    type="number"
+                    value={wholesaleMargin}
+                    onChange={e => handleWholesaleMarginChange(e.target.value)}
+                    onKeyDown={e => handleKeyDown(e, wholesalePriceRef)}
+                    placeholder="0"
+                    step="any"
+                  />
+                </div>
+              </div>
+
+              {/* Precio Mayorista */}
+              <div className={styles.formGroup}>
+                <label>Precio Mayorista</label>
+                <div className={styles.inputWrapper}>
+                  <span className={styles.inputIcon}><DollarSign size={16} /></span>
+                  <input
+                    ref={wholesalePriceRef}
+                    type="text"
+                    inputMode="numeric"
+                    value={new Intl.NumberFormat("es-PY").format(Number(wholesalePrice.replace(/\D/g, "") || 0))}
+                    onChange={e => {
+                      const val = e.target.value.replace(/\D/g, "")
+                      handleWholesalePriceChange(val)
                     }}
                     onKeyDown={e => handleKeyDown(e, saveBtnRef)}
                     placeholder="0"
@@ -222,7 +312,9 @@ export function PurchaseItemPriceModal({ product, initialData, onSave, onClose }
 
         <footer className={styles.footer}>
           <div className={styles.footerHint}>
-            <kbd className={styles.key}>Enter</kbd> para avanzar y guardar
+            <kbd className={styles.key}>Enter</kbd> avanzar / guardar
+            <span className={styles.separator}>•</span>
+            <kbd className={styles.key}>Esc</kbd> salir
           </div>
           <button 
             ref={saveBtnRef}

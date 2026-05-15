@@ -45,6 +45,7 @@ interface Product {
     sku?: string
     cost?: number
     price: number
+    wholesalePrice: number
     stock: number
     unitType: "UNIT" | "KG" | "G" | "L" | "ML" | "MG"
 }
@@ -57,6 +58,8 @@ interface PurchaseItem {
     total: number
     marginPercentage: number
     salePrice: number
+    wholesaleMarginPercentage: number
+    wholesalePrice: number
 }
 
 function readApiError(body: unknown): string {
@@ -349,14 +352,14 @@ export function PurchasePage() {
                             headers: authHeaders,
                             body: JSON.stringify({
                                 cost: item.unitCost,
-                                price: item.salePrice
+                                price: item.salePrice,
+                                wholesalePrice: item.wholesalePrice
                             })
                         })
-                    } catch { /* silent fail for individual product price update */ }
+                    } catch { }
                 }))
             }
 
-            // ── 3. Éxito ─────────────────────────────────────────────────
             setSuccess(true)
             setSubmitStep(null)
             sessionStorage.removeItem(PURCHASE_STORAGE_KEY)
@@ -406,20 +409,24 @@ export function PurchasePage() {
 
                 const unitCost = product.cost ?? 0
                 const salePrice = product.price
+                const wholesalePrice = product.wholesalePrice
                 const marginPercentage = unitCost > 0 ? Number(Number(((salePrice / unitCost) - 1) * 100).toFixed(2)) : 0
+                const wholesaleMarginPercentage = unitCost > 0 ? Number(Number(((wholesalePrice / unitCost) - 1) * 100).toFixed(2)) : 0
                 const newIndex = prev.length
-                
+
                 // Abrir el modal de precios directamente
                 setTimeout(() => setPriceModalIndex(newIndex), 100)
-                
-                return [...prev, { 
-                    product, 
-                    quantity: 1, 
-                    unitCost, 
-                    subtotal: unitCost, 
+
+                return [...prev, {
+                    product,
+                    quantity: 1,
+                    unitCost,
+                    subtotal: unitCost,
                     total: unitCost,
                     marginPercentage,
-                    salePrice
+                    salePrice,
+                    wholesaleMarginPercentage,
+                    wholesalePrice
                 }]
             })
         } catch {
@@ -590,20 +597,24 @@ export function PurchasePage() {
 
             const unitCost = product.cost ?? 0
             const salePrice = product.price
+            const wholesalePrice = product.wholesalePrice
             const marginPercentage = unitCost > 0 ? Number(Number(((salePrice / unitCost) - 1) * 100).toFixed(2)) : 0
+            const wholesaleMarginPercentage = unitCost > 0 ? Number(Number(((wholesalePrice / unitCost) - 1) * 100).toFixed(2)) : 0
             const newIndex = prev.length
-            
+
             // Abrir el modal de precios directamente para el nuevo producto
             setTimeout(() => setPriceModalIndex(newIndex), 100)
-            
-            return [...prev, { 
-                product, 
-                quantity: 1, 
-                unitCost, 
-                subtotal: unitCost, 
+
+            return [...prev, {
+                product,
+                quantity: 1,
+                unitCost,
+                subtotal: unitCost,
                 total: unitCost,
                 marginPercentage,
-                salePrice
+                salePrice,
+                wholesaleMarginPercentage,
+                wholesalePrice
             }]
         })
     }
@@ -839,8 +850,10 @@ export function PurchasePage() {
                                 <th className={tableStyles.tableHeaderCell}>Descripción</th>
                                 <th className={`${tableStyles.tableHeaderCell} ${tableStyles.tableHeaderCellRight}`} style={{ width: 110 }}>Cant.</th>
                                 <th className={`${tableStyles.tableHeaderCell} ${tableStyles.tableHeaderCellRight}`} style={{ width: 130 }}>Costo unit.</th>
-                                <th className={`${tableStyles.tableHeaderCell} ${tableStyles.tableHeaderCellRight}`} style={{ width: 90 }}>% Gan.</th>
-                                <th className={`${tableStyles.tableHeaderCell} ${tableStyles.tableHeaderCellRight}`} style={{ width: 130 }}>P. Venta</th>
+                                <th className={`${tableStyles.tableHeaderCell} ${tableStyles.tableHeaderCellRight}`} style={{ width: 90 }}>% Púb.</th>
+                                <th className={`${tableStyles.tableHeaderCell} ${tableStyles.tableHeaderCellRight}`} style={{ width: 120 }}>P. Público</th>
+                                <th className={`${tableStyles.tableHeaderCell} ${tableStyles.tableHeaderCellRight}`} style={{ width: 90 }}>% May.</th>
+                                <th className={`${tableStyles.tableHeaderCell} ${tableStyles.tableHeaderCellRight}`} style={{ width: 120 }}>P. Mayorista</th>
                                 <th className={`${tableStyles.tableHeaderCell} ${tableStyles.tableHeaderCellRight}`} style={{ width: 130 }}>SubTotal</th>
                                 <th className={tableStyles.tableHeaderCell} style={{ width: 44 }} />
                             </tr>
@@ -848,7 +861,7 @@ export function PurchasePage() {
                         <tbody>
                             {items.length === 0 ? (
                                 <tr>
-                                    <td colSpan={7}>
+                                <td colSpan={10}>
                                         <div className={tableStyles.emptyState}>
                                             <Package size={36} className={tableStyles.emptyStateIcon} />
                                             <p className={tableStyles.emptyStateTitle}>Sin productos</p>
@@ -923,7 +936,7 @@ export function PurchasePage() {
                                             </button>
                                         </td>
 
-                                        {/* % Ganancia */}
+                                        {/* % Gan. Público */}
                                         <td className={`${tableStyles.tableCell} ${tableStyles.tableCellRight}`}>
                                             <button
                                                 type="button"
@@ -935,7 +948,7 @@ export function PurchasePage() {
                                             </button>
                                         </td>
 
-                                        {/* Precio Venta */}
+                                        {/* Precio Público */}
                                         <td className={`${tableStyles.tableCell} ${tableStyles.tableCellRight}`}>
                                             <button
                                                 type="button"
@@ -944,6 +957,30 @@ export function PurchasePage() {
                                                 title="Clic para ajustar precios"
                                             >
                                                 {formatCurrency(item.salePrice)}
+                                            </button>
+                                        </td>
+
+                                        {/* % Gan. Mayorista */}
+                                        <td className={`${tableStyles.tableCell} ${tableStyles.tableCellRight}`}>
+                                            <button
+                                                type="button"
+                                                className={styles.editableCell}
+                                                onClick={() => setPriceModalIndex(idx)}
+                                                title="Clic para ajustar precios"
+                                            >
+                                                {(item.wholesaleMarginPercentage ?? 0).toFixed(1)}%
+                                            </button>
+                                        </td>
+
+                                        {/* Precio Mayorista */}
+                                        <td className={`${tableStyles.tableCell} ${tableStyles.tableCellRight}`}>
+                                            <button
+                                                type="button"
+                                                className={styles.editableCell}
+                                                onClick={() => setPriceModalIndex(idx)}
+                                                title="Clic para ajustar precios"
+                                            >
+                                                {formatCurrency(item.wholesalePrice ?? 0)}
                                             </button>
                                         </td>
 
@@ -1163,7 +1200,9 @@ export function PurchasePage() {
                         quantity: items[priceModalIndex].quantity,
                         unitCost: items[priceModalIndex].unitCost,
                         marginPercentage: items[priceModalIndex].marginPercentage,
-                        salePrice: items[priceModalIndex].salePrice
+                        salePrice: items[priceModalIndex].salePrice,
+                        wholesaleMarginPercentage: items[priceModalIndex].wholesaleMarginPercentage,
+                        wholesalePrice: items[priceModalIndex].wholesalePrice
                     }}
                     onClose={() => setPriceModalIndex(null)}
                     onSave={(data) => {
@@ -1175,6 +1214,8 @@ export function PurchasePage() {
                                 unitCost: data.unitCost,
                                 marginPercentage: data.marginPercentage,
                                 salePrice: data.salePrice,
+                                wholesaleMarginPercentage: data.wholesaleMarginPercentage,
+                                wholesalePrice: data.wholesalePrice,
                                 subtotal: data.quantity * data.unitCost,
                                 total: data.quantity * data.unitCost
                             }

@@ -149,6 +149,7 @@ export class ProductService {
         barcode: dto.barcode,
         imageUrl: dto.imageUrl,
         price: dto.price,
+        wholesalePrice: dto.wholesalePrice ?? 0,
         cost: dto.cost ?? 0,
         stock: initialStock,
         unitType,
@@ -382,6 +383,7 @@ export class ProductService {
           ...(restDto.barcode !== undefined && { barcode: restDto.barcode }),
           ...(restDto.imageUrl !== undefined && { imageUrl: restDto.imageUrl }),
           ...(restDto.price !== undefined && { price: restDto.price }),
+          ...(restDto.wholesalePrice !== undefined && { wholesalePrice: restDto.wholesalePrice }),
           ...(restDto.cost !== undefined && { cost: restDto.cost }),
           ...(restDto.unitType !== undefined && { unitType: restDto.unitType }),
           ...(restDto.stockMinimum !== undefined && {
@@ -412,6 +414,7 @@ export class ProductService {
         ...(dto.barcode !== undefined && { barcode: dto.barcode }),
         ...(dto.imageUrl !== undefined && { imageUrl: dto.imageUrl }),
         ...(dto.price !== undefined && { price: dto.price }),
+        ...(dto.wholesalePrice !== undefined && { wholesalePrice: dto.wholesalePrice }),
         ...(dto.cost !== undefined && { cost: dto.cost }),
         ...(dto.unitType !== undefined && { unitType: dto.unitType }),
         ...(dto.stock !== undefined && { stock: dto.stock }),

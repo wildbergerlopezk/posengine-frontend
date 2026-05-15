@@ -12,6 +12,7 @@ model Product {
   imageUrl    String?
 
   price Float
+  wholesalePrice Float @default(0)
   cost  Float
 
   stock        Float    @default(0)

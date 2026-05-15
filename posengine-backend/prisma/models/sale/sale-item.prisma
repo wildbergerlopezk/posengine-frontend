@@ -5,6 +5,7 @@ model SaleItem {
   productId String
   quantity  Float
   unitPrice Float
+  priceType PriceType @default(PUBLIC)
   total     Float
 
   sale    Sale    @relation(fields: [saleId], references: [id])
@@ -13,4 +14,9 @@ model SaleItem {
   //returns SaleReturnItem[]
 
   @@map("sale_items")
+}
+
+enum PriceType {
+  PUBLIC
+  WHOLESALE
 }

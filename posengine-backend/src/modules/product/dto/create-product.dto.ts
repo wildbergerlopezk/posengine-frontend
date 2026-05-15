@@ -64,6 +64,13 @@ export class CreateProductDto {
   @Type(() => Number)
   price!: number;
 
+  @ApiPropertyOptional({ example: 80000 })
+  @IsOptional()
+  @IsNumber({}, { message: 'El precio mayorista debe ser un número' })
+  @Min(0, { message: 'El precio mayorista no puede ser negativo' })
+  @Type(() => Number)
+  wholesalePrice?: number;
+
   @ApiPropertyOptional({ example: 60000 })
   @IsOptional()
   @IsNumber({}, { message: 'El costo debe ser un número' })

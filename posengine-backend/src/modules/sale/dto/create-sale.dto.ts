@@ -10,9 +10,12 @@ import {
   IsOptional,
   MaxLength,
   Min,
+  IsEnum,
 } from 'class-validator'
 import { Type, Transform } from 'class-transformer'
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger'
+
+import { PriceType } from '../../../generated/prisma/enums'
 
 export class CreateSaleItemDto {
   @ApiProperty({ example: 'uuid-del-producto' })
@@ -35,6 +38,11 @@ export class CreateSaleItemDto {
   @IsNumber({}, { message: 'unitPrice debe ser un número' })
   @Min(0, { message: 'unitPrice no puede ser negativo' })
   unitPrice!: number
+
+  @ApiPropertyOptional({ enum: PriceType, default: PriceType.PUBLIC })
+  @IsEnum(PriceType)
+  @IsOptional()
+  priceType?: PriceType
 }
 
 export class CreateSaleDto {

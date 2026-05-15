@@ -243,4 +243,10 @@
   font-size: 0.75rem;
   font-family: monospace;
   box-shadow: 0 1px 0 var(--color-border, #444);
+  margin-right: 0.25rem;
+}
+
+.separator {
+  margin: 0 0.5rem;
+  opacity: 0.3;
 }

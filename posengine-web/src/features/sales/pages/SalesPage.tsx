@@ -21,6 +21,7 @@ import { useAuthStore } from "@/src/features/auth/store/auth.store"
 import { API_BASE_URL } from "@/src/shared/config/api"
 import styles from "./SalesPage.module.css"
 import tableStyles from "@/src/features/products/pages/ProductsPage.module.css"
+import { PriceTypeSelectorModal } from "../components/PriceTypeSelectorModal"
 
 const API_BASE = API_BASE_URL
 const SALE_STORAGE_KEY = "posengine_sale_draft"
@@ -33,6 +34,8 @@ interface Product {
   barcode?: string
   sku?: string
   price: number
+  wholesalePrice: number
+  cost?: number
   stock: number
   unitType: "UNIT" | "KG" | "G" | "L" | "ML" | "MG"
 }
@@ -41,6 +44,7 @@ interface SaleItem {
   product: Product
   quantity: number
   unitPrice: number
+  priceType: "PUBLIC" | "WHOLESALE"
 }
 
 function readApiError(body: unknown): string {
@@ -108,6 +112,9 @@ export function SalesPage() {
   const confirmAcceptRef = useRef<HTMLButtonElement>(null)
   const confirmCancelRef = useRef<HTMLButtonElement>(null)
   const [isDraftLoaded, setIsDraftLoaded] = useState(false)
+
+  // ── Modal de selección de precio ──────────────────────────────────────────
+  const [priceSelectorIndex, setPriceSelectorIndex] = useState<number | null>(null)
 
   // ── Persistence: Load draft ───────────────────────────────────────────────
   useEffect(() => {
@@ -209,7 +216,13 @@ export function SalesPage() {
       return item
     }))
 
+    const targetIndex = editingRowIndex
+    const wasQuantityEdit = editingField === "quantity"
     cancelEdit()
+
+    if (wasQuantityEdit && targetIndex !== null) {
+      setPriceSelectorIndex(targetIndex)
+    }
   }, [editingRowIndex, editingField, editingValue, cancelEdit])
 
   const removeItem = (index: number) => {
@@ -235,7 +248,7 @@ export function SalesPage() {
       }
       const newIndex = prev.length
       setTimeout(() => startEdit(newIndex, "quantity", 1), 50)
-      return [...prev, { product, quantity: 1, unitPrice: product.price }]
+      return [...prev, { product, quantity: 1, unitPrice: product.price, priceType: "PUBLIC" }]
     })
   }, [startEdit])
 
@@ -271,6 +284,7 @@ export function SalesPage() {
           productId: i.product.id,
           quantity: i.quantity,
           unitPrice: i.unitPrice,
+          priceType: i.priceType,
         })),
       }
 
@@ -303,6 +317,9 @@ export function SalesPage() {
     const handler = (e: KeyboardEvent) => {
       const activeTag = document.activeElement?.tagName
       const isTyping = activeTag === "INPUT" || activeTag === "TEXTAREA"
+
+      // Evitar atajos si el selector de precio está abierto
+      if (priceSelectorIndex !== null) return
 
       // Barcode scanner — solo cuando no hay modal ni edición activa
       if (!showProductModal && !showConfirmModal && !isTyping) {
@@ -386,6 +403,20 @@ export function SalesPage() {
     <div className={styles.page}>
       <Header title="Nueva venta" />
 
+      {/* Modal de selección de precio */}
+      {priceSelectorIndex !== null && (
+        <PriceTypeSelectorModal
+          product={items[priceSelectorIndex].product}
+          onSelect={(type, price) => {
+            setItems(prev => prev.map((it, i) =>
+              i === priceSelectorIndex ? { ...it, priceType: type, unitPrice: price } : it
+            ))
+            setPriceSelectorIndex(null)
+          }}
+          onClose={() => setPriceSelectorIndex(null)}
+        />
+      )}
+
       <div className={styles.container}>
 
         {/* Bloqueo sin caja */}
@@ -441,6 +472,7 @@ export function SalesPage() {
                 <th className={tableStyles.tableHeaderCell} style={{ width: 130 }}>Código</th>
                 <th className={tableStyles.tableHeaderCell}>Descripción</th>
                 <th className={`${tableStyles.tableHeaderCell} ${tableStyles.tableHeaderCellRight}`} style={{ width: 110 }}>Cant.</th>
+                <th className={tableStyles.tableHeaderCell} style={{ width: 100 }}>Tipo</th>
                 <th className={`${tableStyles.tableHeaderCell} ${tableStyles.tableHeaderCellRight}`} style={{ width: 140 }}>Precio unit.</th>
                 <th className={`${tableStyles.tableHeaderCell} ${tableStyles.tableHeaderCellRight}`} style={{ width: 140 }}>SubTotal</th>
                 <th className={tableStyles.tableHeaderCell} style={{ width: 44 }} />
@@ -486,7 +518,11 @@ export function SalesPage() {
                           value={editingValue}
                           onChange={e => setEditingValue(e.target.value)}
                           onKeyDown={e => {
-                            if (e.key === "Enter" || e.key === "Tab") { e.preventDefault(); commitEdit() }
+                            if (e.key === "Enter" || e.key === "Tab") { 
+                              e.preventDefault(); 
+                              e.stopPropagation();
+                              commitEdit();
+                            }
                             if (e.key === "Escape") cancelEdit()
                           }}
                           onBlur={commitEdit}
@@ -503,6 +539,22 @@ export function SalesPage() {
                           {formatQuantity(item.quantity, item.product.unitType)}
                         </button>
                       )}
+                    </td>
+
+                    <td className={tableStyles.tableCell}>
+                      <button
+                        type="button"
+                        className={`${styles.priceTypeBtn} ${item.priceType === "WHOLESALE" ? styles.priceTypeBtnWholesale : ""}`}
+                        onClick={() => setItems(prev => prev.map((it, i) => {
+                          if (i !== idx) return it
+                          const newType = it.priceType === "PUBLIC" ? "WHOLESALE" : "PUBLIC"
+                          const newPrice = newType === "WHOLESALE" ? it.product.wholesalePrice : it.product.price
+                          return { ...it, priceType: newType, unitPrice: newPrice }
+                        }))}
+                        title="Cambiar tipo de precio (Público/Mayorista)"
+                      >
+                        {item.priceType === "WHOLESALE" ? "Mayorista" : "Público"}
+                      </button>
                     </td>
 
                     {/* Precio unitario — editable inline */}
