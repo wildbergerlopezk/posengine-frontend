@@ -3,6 +3,8 @@
 import type React from "react"
 import { Sidebar } from "@/src/shared/components/Sidebar"
 import { useAuthStore } from "@/src/features/auth/store/auth.store"
+import { getProfileApi } from "@/src/features/auth/api/auth.api"
+import { isAccessTokenValid } from "@/src/features/auth/utils/auth.utils"
 import { useRouter } from "next/navigation"
 import { useEffect, useState } from "react"
 import styles from "./layout.module.css"
@@ -14,9 +16,10 @@ export default function DashboardLayout({
 }: {
   children: React.ReactNode
 }) {
-  const { isAuthenticated } = useAuthStore()
+  const { accessToken, isAuthenticated, logout } = useAuthStore()
   const router = useRouter()
   const [mounted, setMounted] = useState(false)
+  const [isCheckingSession, setIsCheckingSession] = useState(true)
   const { showHelp, setShowHelp } = useKeyboardNav()
 
   useEffect(() => {
@@ -24,12 +27,28 @@ export default function DashboardLayout({
   }, [])
 
   useEffect(() => {
-    if (mounted && !isAuthenticated) {
-      router.push("/login")
-    }
-  }, [mounted, isAuthenticated, router])
+    if (!mounted) return
 
-  if (!mounted) {
+    const validateSession = async () => {
+      if (!accessToken || !isAuthenticated || !isAccessTokenValid(accessToken)) {
+        logout()
+        router.push("/login")
+        return
+      }
+
+      try {
+        await getProfileApi(accessToken)
+        setIsCheckingSession(false)
+      } catch {
+        logout()
+        router.push("/login")
+      }
+    }
+
+    void validateSession()
+  }, [accessToken, isAuthenticated, logout, mounted, router])
+
+  if (!mounted || isCheckingSession) {
     return (
       <div className={styles.loadingContainer}>
         <div className={styles.spinner} />
