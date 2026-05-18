@@ -300,6 +300,13 @@ export function PurchasePage() {
         if (!invoiceNumber) { setSubmitError("El número de factura es requerido"); invoiceRef.current?.focus(); return }
         if (items.length === 0) { setSubmitError("Agregá al menos un producto"); return }
 
+        const invalidItems = items.filter(i => i.unitCost <= 0)
+        if (invalidItems.length > 0) {
+            const names = invalidItems.map(i => `"${i.product.name}"`).join(", ")
+            setSubmitError(`Los siguientes productos tienen costo $0: ${names}. Editá el costo antes de guardar.`)
+            return
+        }
+
         setSubmitting(true)
         setSubmitError(null)
 
@@ -344,10 +351,11 @@ export function PurchasePage() {
                 i.unitCost !== i.product.cost || i.salePrice !== i.product.price
             )
 
+            const productUpdateErrors: string[] = []
             if (productsToUpdate.length > 0) {
                 await Promise.all(productsToUpdate.map(async (item) => {
                     try {
-                        await fetch(`${API_BASE}/product/${item.product.id}`, {
+                        const updateRes = await fetch(`${API_BASE}/product/${item.product.id}`, {
                             method: "PATCH",
                             headers: authHeaders,
                             body: JSON.stringify({
@@ -356,11 +364,29 @@ export function PurchasePage() {
                                 wholesalePrice: item.wholesalePrice
                             })
                         })
-                    } catch { }
+
+                        if (!updateRes.ok) {
+                            const body = await updateRes.json().catch(() => ({}))
+                            productUpdateErrors.push(
+                                `${item.product.name}: ${readApiError(body)}`,
+                            )
+                        }
+                    } catch (updateErr) {
+                        productUpdateErrors.push(
+                            `${item.product.name}: error al actualizar el producto`,
+                        )
+                    }
                 }))
             }
 
-            setSuccess(true)
+            if (productUpdateErrors.length > 0) {
+                setSubmitError(
+                    `Compra guardada, pero no se actualizaron algunos precios: ${productUpdateErrors.join('; ')}`,
+                )
+            } else {
+                setSuccess(true)
+            }
+
             setSubmitStep(null)
             sessionStorage.removeItem(PURCHASE_STORAGE_KEY)
             setTimeout(() => {

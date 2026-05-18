@@ -62,19 +62,48 @@ export class PurchaseService {
       )
     }
 
-    const productIds = dto.items.map((item) => item.productId)
+    const itemProductIds = dto.items.map((item) => item.productId)
+    const uniqueProductIds = new Set(itemProductIds)
+    if (uniqueProductIds.size !== itemProductIds.length) {
+      throw new BadRequestException(
+        'No puede haber productos duplicados en la misma compra',
+      )
+    }
+
+    const productIds = Array.from(uniqueProductIds)
     const products = await this.prisma.product.findMany({
       where: { id: { in: productIds }, tenantId },
       select: { id: true, name: true, unitType: true },
     })
     const productMap = new Map(products.map((product) => [product.id, product]))
 
+    let calculatedTotal = 0
     for (const item of dto.items) {
+      if (!Number.isFinite(item.quantity) || !Number.isFinite(item.unitCost)) {
+        throw new BadRequestException(
+          `El producto "${item.productId}" contiene valores numéricos inválidos`,
+        )
+      }
+
+      if (item.quantity <= 0 || item.unitCost <= 0) {
+        throw new BadRequestException(
+          `El producto "${item.productId}" debe tener cantidad y costo mayores a 0`,
+        )
+      }
+
       const product = productMap.get(item.productId)
       if (!product) {
         throw new NotFoundException(`Producto con id "${item.productId}" no encontrado`)
       }
+
       this.productService.validateQuantity(item.quantity, product.unitType, product.name)
+      calculatedTotal += item.quantity * item.unitCost
+    }
+
+    if (Math.abs(calculatedTotal - dto.total) > 1) {
+      throw new BadRequestException(
+        `El total de la compra no coincide con la suma de los items (${calculatedTotal} vs ${dto.total})`,
+      )
     }
 
     return this.prisma.$transaction(async (tx) => {
@@ -120,6 +149,9 @@ export class PurchaseService {
           items: true,
         },
       })
+    }, {
+      timeout: 30_000,
+      maxWait: 5_000,
     })
   }
 

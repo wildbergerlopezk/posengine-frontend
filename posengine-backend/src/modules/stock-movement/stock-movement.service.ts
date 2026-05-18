@@ -45,6 +45,12 @@ export class StockMovementService {
     referenceId: string,   // purchaseItemId
     tx?: Prisma.TransactionClient,
   ) {
+    if (!Number.isFinite(quantity) || quantity <= 0) {
+      throw new BadRequestException(
+        `Cantidad inválida para la compra del producto "${productId}"`,
+      )
+    }
+
     const prismaClient = tx ?? this.prisma;
 
     const product = await prismaClient.product.findFirst({

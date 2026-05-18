@@ -152,7 +152,7 @@ export function PurchaseItemPriceModal({ product, initialData, onSave, onClose }
     const wp = parseFloat(wholesalePrice)
 
     if (isNaN(q) || q <= 0) { qtyRef.current?.focus(); return }
-    if (isNaN(c) || c < 0) { costRef.current?.focus(); return }
+    if (isNaN(c) || c <= 0) { costRef.current?.focus(); return }
 
     onSave({
       quantity: q,
