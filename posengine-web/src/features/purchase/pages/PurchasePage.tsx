@@ -28,6 +28,7 @@ import { SearchIcon } from "lucide-react"
 import { usePriceHistory } from "@/src/shared/hooks/usePriceHistory"
 import { PriceHistoryModal } from "@/src/shared/components/PriceHistoryModal"
 import { PurchaseItemPriceModal, type PriceModalData } from "../components/PurchaseItemPriceModal"
+import { ZeroCostWarningModal } from "../components/ZeroCostWarningModal"
 
 const API_BASE = API_BASE_URL
 const PURCHASE_STORAGE_KEY = "posengine_purchase_draft"
@@ -100,6 +101,7 @@ export function PurchasePage() {
     const [purchaseDate, setPurchaseDate] = useState(() => new Date().toISOString().slice(0, 10))
     const [paymentType, setPaymentType] = useState<"CASH" | "CREDIT">("CASH")
     const [notes, setNotes] = useState("")
+    const [zeroCostProducts, setZeroCostProducts] = useState<string[]>([])
 
     // ── Items state ────────────────────────────────────────────────────────────
     const [items, setItems] = useState<PurchaseItem[]>([])
@@ -302,8 +304,7 @@ export function PurchasePage() {
 
         const invalidItems = items.filter(i => i.unitCost <= 0)
         if (invalidItems.length > 0) {
-            const names = invalidItems.map(i => `"${i.product.name}"`).join(", ")
-            setSubmitError(`Los siguientes productos tienen costo $0: ${names}. Editá el costo antes de guardar.`)
+            setZeroCostProducts(invalidItems.map(i => i.product.name))
             return
         }
 
@@ -1218,6 +1219,13 @@ export function PurchasePage() {
                 onPageChange={priceHistory.goToPage}
                 onClose={priceHistory.close}
             />
+
+            {zeroCostProducts.length > 0 && (
+                <ZeroCostWarningModal
+                    productNames={zeroCostProducts}
+                    onClose={() => setZeroCostProducts([])}
+                />
+            )}
 
             {priceModalIndex !== null && (
                 <PurchaseItemPriceModal
