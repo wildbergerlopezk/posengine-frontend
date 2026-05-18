@@ -121,26 +121,60 @@ export class PurchaseService {
         },
       })
 
-      for (const item of dto.items) {
-        const purchaseItem = await tx.purchaseItem.create({
-          data: {
-            purchaseId: purchase.id,
-            productId: item.productId,
-            quantity: item.quantity,
-            unitCost: item.unitCost,
-            total: item.quantity * item.unitCost,
-          },
-        })
+      const productStocks = await tx.product.findMany({
+        where: { id: { in: dto.items.map((item) => item.productId) }, tenantId },
+        select: { id: true, stock: true },
+      })
+      const stockMap = new Map(productStocks.map((product) => [product.id, product.stock]))
 
-        // Register stock movement immediately
-        await this.stockMovementService.registerPurchase(
-          tenantId,
-          item.productId,
-          item.quantity,
-          purchaseItem.id,
-          tx,
-        )
-      }
+      const purchaseItemsCreated = await Promise.all(
+        dto.items.map(async (item) => {
+          const before = stockMap.get(item.productId) ?? 0
+          const after = before + item.quantity
+          stockMap.set(item.productId, after)
+
+          const purchaseItem = await tx.purchaseItem.create({
+            data: {
+              purchaseId: purchase.id,
+              productId: item.productId,
+              quantity: item.quantity,
+              unitCost: item.unitCost,
+              total: item.quantity * item.unitCost,
+            },
+          })
+
+          return {
+            item,
+            purchaseItemId: purchaseItem.id,
+            before,
+            after,
+          }
+        }),
+      )
+
+      await Promise.all(
+        purchaseItemsCreated.map(async ({ item, purchaseItemId, before, after }) => {
+          await Promise.all([
+            tx.stockMovement.create({
+              data: {
+                tenantId,
+                productId: item.productId,
+                type: 'PURCHASE',
+                quantity: item.quantity,
+                before,
+                after,
+                referenceId: purchaseItemId,
+                notes: 'Ingreso por compra',
+                sourceType: 'PURCHASE',
+              },
+            }),
+            tx.product.update({
+              where: { id: item.productId },
+              data: { stock: after },
+            }),
+          ])
+        }),
+      )
 
       return tx.purchase.findUnique({
         where: { id: purchase.id },
