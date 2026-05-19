@@ -90,9 +90,12 @@ export function ProductsPage() {
 
   const [formData, setFormData] = useState({
     name: "", barcode: "", categoryId: "", subcategoryId: "",
-    price: "", cost: "", stock: "", stockMinimum: "", imageUrl: "",
+    price: "", cost: "", wholesalePrice: "",
+    stock: "", stockMinimum: "", imageUrl: "",
     unitType: "UNIT" as UnitType, stockNotes: "",
   })
+  const [publicMargin, setPublicMargin] = useState("")
+  const [wholesaleMargin, setWholesaleMargin] = useState("")
 
   // ─── Keyboard navigation refs ─────────────────────────────────────────────
   const nameRef = useRef<HTMLInputElement>(null)
@@ -101,6 +104,9 @@ export function ProductsPage() {
   const subcategoryRef = useRef<HTMLSelectElement>(null)
   const costRef = useRef<HTMLInputElement>(null)
   const priceRef = useRef<HTMLInputElement>(null)
+  const wholesalePriceRef = useRef<HTMLInputElement>(null)
+  const publicMarginRef = useRef<HTMLInputElement>(null)
+  const wholesaleMarginRef = useRef<HTMLInputElement>(null)
   const unitTypeRef = useRef<HTMLSelectElement>(null)
   const stockRef = useRef<HTMLInputElement>(null)
   const stockMinRef = useRef<HTMLInputElement>(null)
@@ -173,26 +179,90 @@ export function ProductsPage() {
   const selectedCategory = categories.find((c) => c.id === formData.categoryId)
   const subcategories = selectedCategory?.subcategories || []
 
+  const handleCostChange = (val: string) => {
+    const c = parseFloat(val)
+    const m = parseFloat(publicMargin)
+    const wm = parseFloat(wholesaleMargin)
+    if (!isNaN(c)) {
+      const updates: Partial<typeof formData> = { cost: val }
+      if (!isNaN(m)) {
+        updates.price = String(Math.round(c * (1 + m / 100)))
+      }
+      if (!isNaN(wm)) {
+        updates.wholesalePrice = String(Math.round(c * (1 + wm / 100)))
+      }
+      setFormData(prev => ({ ...prev, ...updates }))
+    } else {
+      setFormData(prev => ({ ...prev, cost: val }))
+    }
+  }
+
+  const handlePublicMarginChange = (val: string) => {
+    setPublicMargin(val)
+    const c = parseFloat(formData.cost)
+    const m = parseFloat(val)
+    if (!isNaN(c) && !isNaN(m)) {
+      setFormData(prev => ({ ...prev, price: String(Math.round(c * (1 + m / 100))) }))
+    }
+  }
+
+  const handlePublicPriceChange = (val: string) => {
+    setFormData(prev => ({ ...prev, price: val }))
+    const c = parseFloat(formData.cost)
+    const p = parseFloat(val)
+    if (!isNaN(c) && !isNaN(p) && c > 0) {
+      setPublicMargin((((p / c) - 1) * 100).toFixed(2))
+    }
+  }
+
+  const handleWholesaleMarginChange = (val: string) => {
+    setWholesaleMargin(val)
+    const c = parseFloat(formData.cost)
+    const m = parseFloat(val)
+    if (!isNaN(c) && !isNaN(m)) {
+      setFormData(prev => ({ ...prev, wholesalePrice: String(Math.round(c * (1 + m / 100))) }))
+    }
+  }
+
+  const handleWholesalePriceChange = (val: string) => {
+    setFormData(prev => ({ ...prev, wholesalePrice: val }))
+    const c = parseFloat(formData.cost)
+    const p = parseFloat(val)
+    if (!isNaN(c) && !isNaN(p) && c > 0) {
+      setWholesaleMargin((((p / c) - 1) * 100).toFixed(2))
+    }
+  }
 
   const resetForm = () => {
     setFormData({
       name: "", barcode: "", categoryId: "", subcategoryId: "",
-      price: "", cost: "", stock: "", stockMinimum: "", imageUrl: "",
+      price: "", cost: "", wholesalePrice: "",
+      stock: "", stockMinimum: "", imageUrl: "",
       unitType: "UNIT", stockNotes: "",
     })
+    setPublicMargin("")
+    setWholesaleMargin("")
     setEditingProduct(null)
     setSubmitError(null)
   }
 
   const handleEdit = (product: ProductWithRelations) => {
+    const cost = product.cost ?? 0
+    const price = product.price ?? 0
+    const wholesale = product.wholesalePrice ?? 0
+
+    setPublicMargin(cost > 0 ? (((price / cost) - 1) * 100).toFixed(2) : "")
+    setWholesaleMargin(cost > 0 ? (((wholesale / cost) - 1) * 100).toFixed(2) : "")
+
     setEditingProduct(product)
     setFormData({
       name: product.name,
       barcode: product.barcode || "",
       categoryId: product.categoryId || "",
       subcategoryId: product.subcategoryId || "",
-      price: product.price?.toString() || "0",
-      cost: product.cost?.toString() || "0",
+      price: price.toString(),
+      cost: cost.toString(),
+      wholesalePrice: wholesale.toString(),
       stock: product.stock?.toString() || "0",
       unitType: product.unitType ?? "UNIT",
       stockMinimum: product.stockMinimum?.toString() || "0",
@@ -327,6 +397,7 @@ export function ProductsPage() {
       subcategoryId: formData.subcategoryId || undefined,
       price: Number.parseFloat(formData.price),
       cost: formData.cost ? Number.parseFloat(formData.cost) : undefined,
+      wholesalePrice: formData.wholesalePrice ? Number.parseFloat(formData.wholesalePrice) : 0,
       stock,
       unitType: formData.unitType,
       stockMinimum,
@@ -382,6 +453,20 @@ export function ProductsPage() {
     } finally {
       setUploadingImage(false)
     }
+  }
+
+  const calcMargin = (price: string, cost: string) => {
+    const p = Number.parseFloat(price)
+    const c = Number.parseFloat(cost)
+    if (!Number.isFinite(p) || !Number.isFinite(c) || c <= 0) return ""
+    return (((p / c) - 1) * 100).toFixed(2)
+  }
+
+  const applyMarginToPrice = (margin: string, cost: string) => {
+    const m = Number.parseFloat(margin)
+    const c = Number.parseFloat(cost)
+    if (!Number.isFinite(m) || !Number.isFinite(c) || c <= 0) return ""
+    return (c * (1 + m / 100)).toFixed(0)
   }
 
   const isLowStock = (p: ProductWithRelations) => p.stock <= p.stockMinimum
@@ -659,18 +744,89 @@ export function ProductsPage() {
                     </select>
                   </div>
                 </div>
-                <div className={styles.formRow}>
-                  <div className={styles.formGroup}>
-                    <label className={styles.label}>Precio de costo</label>
-                    <input ref={costRef} className={styles.input} type="number" value={formData.cost}
-                      onChange={(e) => setFormData({ ...formData, cost: e.target.value })}
-                      onKeyDown={(e) => handleEnterKey(e, priceRef)} placeholder="0" min="0" />
+                <div className={styles.formGroup}>
+                  <label className={styles.label}>Precio de costo</label>
+                  <input
+                    ref={costRef}
+                    className={styles.input}
+                    type="text"
+                    inputMode="numeric"
+                    value={formData.cost}
+                    onChange={(e) => {
+                      const val = e.target.value.replace(/[^0-9]/g, "")
+                      setFormData({ ...formData, cost: val })
+                    }}
+                    onKeyDown={(e) => handleEnterKey(e, publicMarginRef)}
+                    placeholder="0"
+                  />
+                </div>
+
+                <div className={styles.pricingCard}>
+                  <div className={styles.pricingCardTitle}>Precios de venta</div>
+
+                  <div className={styles.pricingRow}>
+                    <span className={styles.pricingLabel}>Precio público</span>
+                    <div className={styles.pricingInputGroup}>
+                      <div className={styles.pricingField}>
+                        <span className={styles.pricingFieldHint}>%</span>
+                        <input
+                          ref={publicMarginRef}
+                          className={styles.pricingInput}
+                          type="number"
+                          step="any"
+                          placeholder="0.00"
+                          value={publicMargin}
+                          onChange={(e) => handlePublicMarginChange(e.target.value)}
+                          onKeyDown={(e) => handleEnterKey(e, priceRef)}
+                        />
+                      </div>
+                      <div className={styles.pricingField}>
+                        <span className={styles.pricingFieldHint}>Gs.</span>
+                        <input
+                          ref={priceRef}
+                          className={styles.pricingInput}
+                          type="text"
+                          inputMode="numeric"
+                          placeholder="0"
+                          value={formData.price}
+                          onChange={(e) => handlePublicPriceChange(e.target.value.replace(/[^0-9]/g, ""))}
+                          onKeyDown={(e) => handleEnterKey(e, wholesaleMarginRef)}
+                          required
+                        />
+                      </div>
+                    </div>
                   </div>
-                  <div className={styles.formGroup}>
-                    <label className={styles.label}>Precio de venta *</label>
-                    <input ref={priceRef} className={styles.input} type="number" value={formData.price}
-                      onChange={(e) => setFormData({ ...formData, price: e.target.value })}
-                      onKeyDown={(e) => handleEnterKey(e, unitTypeRef)} placeholder="0" min="0" required />
+
+                  <div className={styles.pricingRow}>
+                    <span className={styles.pricingLabel}>Precio mayorista</span>
+                    <div className={styles.pricingInputGroup}>
+                      <div className={styles.pricingField}>
+                        <span className={styles.pricingFieldHint}>%</span>
+                        <input
+                          ref={wholesaleMarginRef}
+                          className={styles.pricingInput}
+                          type="number"
+                          step="any"
+                          placeholder="0.00"
+                          value={wholesaleMargin}
+                          onChange={(e) => handleWholesaleMarginChange(e.target.value)}
+                          onKeyDown={(e) => handleEnterKey(e, wholesalePriceRef)}
+                        />
+                      </div>
+                      <div className={styles.pricingField}>
+                        <span className={styles.pricingFieldHint}>Gs.</span>
+                        <input
+                          ref={wholesalePriceRef}
+                          className={styles.pricingInput}
+                          type="text"
+                          inputMode="numeric"
+                          placeholder="0"
+                          value={formData.wholesalePrice}
+                          onChange={(e) => handleWholesalePriceChange(e.target.value.replace(/[^0-9]/g, ""))}
+                          onKeyDown={(e) => handleEnterKey(e, unitTypeRef)}
+                        />
+                      </div>
+                    </div>
                   </div>
                 </div>
                 <div className={styles.formGroup}>
