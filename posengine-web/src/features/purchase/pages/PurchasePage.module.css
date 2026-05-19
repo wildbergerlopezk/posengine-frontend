@@ -203,6 +203,12 @@
   color: white;
 }
 
+.payToggleBtnDisabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  color: var(--color-muted-foreground);
+}
+
 /* ══════════════════════════════════════════════════
    ITEMS TOOLBAR
 ══════════════════════════════════════════════════ */

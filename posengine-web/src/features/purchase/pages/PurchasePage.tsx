@@ -159,7 +159,7 @@ export function PurchasePage() {
                 if (draft.supplierId) setSupplierId(draft.supplierId)
                 if (draft.invoiceNumber) setInvoiceNumber(draft.invoiceNumber)
                 if (draft.purchaseDate) setPurchaseDate(draft.purchaseDate)
-                if (draft.paymentType) setPaymentType(draft.paymentType)
+                if (draft.paymentType === "CASH") setPaymentType("CASH")
                 if (draft.notes) setNotes(draft.notes)
                 if (draft.items) setItems(draft.items)
             } catch (e) {
@@ -777,7 +777,6 @@ export function PurchasePage() {
                                     className={`${styles.payToggleBtn} ${paymentType === "CASH" ? styles.payToggleBtnActive : ""}`}
                                     onClick={() => setPaymentType("CASH")}
                                     onKeyDown={e => {
-                                        if (e.key === "ArrowRight") { e.preventDefault(); setPaymentType("CREDIT"); paymentCreditRef.current?.focus() }
                                         if (e.key === "Enter") { e.preventDefault(); setPaymentType("CASH"); notesRef.current?.focus() }
                                         if (e.key === "Tab" && !e.shiftKey) { e.preventDefault(); notesRef.current?.focus() }
                                     }}
@@ -787,13 +786,10 @@ export function PurchasePage() {
                                 <button
                                     ref={paymentCreditRef}
                                     type="button"
-                                    className={`${styles.payToggleBtn} ${paymentType === "CREDIT" ? styles.payToggleBtnActive : ""}`}
-                                    onClick={() => setPaymentType("CREDIT")}
-                                    onKeyDown={e => {
-                                        if (e.key === "ArrowLeft") { e.preventDefault(); setPaymentType("CASH"); paymentCashRef.current?.focus() }
-                                        if (e.key === "Enter") { e.preventDefault(); setPaymentType("CREDIT"); notesRef.current?.focus() }
-                                        if (e.key === "Tab" && !e.shiftKey) { e.preventDefault(); notesRef.current?.focus() }
-                                    }}
+                                    className={`${styles.payToggleBtn} ${styles.payToggleBtnDisabled}`}
+                                    disabled
+                                    aria-disabled="true"
+                                    tabIndex={-1}
                                 >
                                     Crédito
                                 </button>

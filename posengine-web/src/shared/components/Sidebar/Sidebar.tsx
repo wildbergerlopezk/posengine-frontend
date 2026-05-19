@@ -65,8 +65,6 @@ const navItems = [
     icon: Wallet,
   },
 
-  { href: "/dashboard/reports", label: "Reportes", icon: BarChart2 },
-
   {
     href: "/dashboard/printing",
     label: "Impresión",
