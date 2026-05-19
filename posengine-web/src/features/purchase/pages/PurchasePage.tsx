@@ -3,6 +3,7 @@
 import type React from "react"
 import { useState, useEffect, useLayoutEffect, useRef, useCallback } from "react"
 import { Header } from "@/src/shared/components/Header"
+import { ProductSearchModal } from "@/src/shared/components/ProductSearchModal"
 import { usePathname, useRouter } from "next/navigation"
 import {
     Search, Plus, Trash2, Package, AlertCircle,
@@ -118,7 +119,6 @@ export function PurchasePage() {
     const [productSearch, setProductSearch] = useState("")
     const [products, setProducts] = useState<Product[]>([])
     const [loadingProducts, setLoadingProducts] = useState(false)
-    const [selectedProductIndex, setSelectedProductIndex] = useState(0)
 
     // ── Submit ─────────────────────────────────────────────────────────────────
     const [submitting, setSubmitting] = useState(false)
@@ -147,7 +147,6 @@ export function PurchasePage() {
     const paymentCreditRef = useRef<HTMLButtonElement>(null)
     const confirmAcceptRef = useRef<HTMLButtonElement>(null)
     const confirmCancelRef = useRef<HTMLButtonElement>(null)
-    const productSearchRef = useRef<HTMLInputElement>(null)
     const editingInputRef = useRef<HTMLInputElement>(null)
     const [isDraftLoaded, setIsDraftLoaded] = useState(false)
 
@@ -211,7 +210,6 @@ export function PurchasePage() {
             if (res.ok) {
                 const data = await res.json()
                 setProducts(data.items ?? data)
-                setSelectedProductIndex(0)
             }
         } catch { /* silent */ }
         finally { setLoadingProducts(false) }
@@ -225,10 +223,9 @@ export function PurchasePage() {
 
     useEffect(() => {
         if (showProductModal) {
-            setTimeout(() => productSearchRef.current?.focus(), 80)
             fetchProducts("")
         }
-    }, [showProductModal])
+    }, [showProductModal, fetchProducts])
 
     // ── Generate invoice number (Alt+Q) ───────────────────────────────────────
     const generateInvoiceNumber = useCallback(async () => {
@@ -583,26 +580,6 @@ export function PurchasePage() {
             }, 100)
         }
     }, [showConfirmModal, confirmModalSelectedButton])
-
-    // ── Product modal keyboard nav ─────────────────────────────────────────────
-    const handleProductModalKeyDown = (e: React.KeyboardEvent) => {
-        if (e.key === "ArrowDown") { e.preventDefault(); setSelectedProductIndex(p => Math.min(products.length - 1, p + 1)) }
-        if (e.key === "ArrowUp") { e.preventDefault(); setSelectedProductIndex(p => Math.max(0, p - 1)) }
-        if (e.key === "Enter") { e.preventDefault(); const p = products[selectedProductIndex]; if (p) addProduct(p) }
-        if (e.key === "F8") {
-            e.preventDefault()
-            const p = products[selectedProductIndex]
-            if (p) priceHistory.openFor(p.id, p.name)
-        }
-        if (e.key === "Escape") {
-            if (priceHistory.open) {
-                priceHistory.close()
-                return
-            }
-            setShowProductModal(false)
-            setProductSearch("")
-        }
-    }
 
     // ── Add product to items ───────────────────────────────────────────────────
     const addProduct = (product: Product) => {
@@ -1081,71 +1058,27 @@ export function PurchasePage() {
             {/* ══════════════════════════════════════════════════
           MODAL — búsqueda de productos (F2)
       ══════════════════════════════════════════════════ */}
-            {showProductModal && (
-                <div className={tableStyles.modalOverlay} onClick={() => { setShowProductModal(false); setProductSearch("") }}>
-                    <div className={styles.productModal} onClick={e => e.stopPropagation()}>
+            <ProductSearchModal
+                open={showProductModal}
+                products={products as any}
+                loading={loadingProducts}
+                searchValue={productSearch}
+                onSearchChange={(v) => setProductSearch(v)}
+                onSelect={(p) => addProduct(p as Product)}
+                onClose={() => {
+                    setShowProductModal(false)
+                    setProductSearch("")
+                }}
+                priceColumn="cost"
+                extraHints={<span><kbd>F8</kbd> Último precio</span>}
+                onExtraKeyDown={(e, selectedProduct) => {
+                    if (e.key === "F8" && selectedProduct) {
+                        e.preventDefault()
+                        priceHistory.openFor(selectedProduct.id, selectedProduct.name)
+                    }
+                }}
+            />
 
-                        <div className={styles.modalHeader}>
-                            <h2 className={styles.modalTitle}>Agregar producto</h2>
-                            <button type="button" className={styles.modalCloseBtn} onClick={() => { setShowProductModal(false); setProductSearch("") }}>
-                                <X size={18} />
-                            </button>
-                        </div>
-
-                        {/* Search input */}
-                        <div className={styles.modalSearchBox}>
-                            <Search size={16} className={styles.modalSearchIcon} />
-                            <input
-                                ref={productSearchRef}
-                                className={styles.modalSearchInput}
-                                placeholder="Buscar por nombre, código o SKU…"
-                                value={productSearch}
-                                onChange={e => { setProductSearch(e.target.value); setSelectedProductIndex(0) }}
-                                onKeyDown={handleProductModalKeyDown}
-                            />
-                        </div>
-
-                        {/* Product list */}
-                        <div className={styles.productList}>
-                            {loadingProducts ? (
-                                <div className={styles.productListEmpty}>
-                                    <Loader2 size={24} className={tableStyles.spinner} />
-                                </div>
-                            ) : products.length === 0 ? (
-                                <div className={styles.productListEmpty}>
-                                    <Package size={28} style={{ opacity: 0.3 }} />
-                                    <p>Sin resultados</p>
-                                </div>
-                            ) : (
-                                products.map((product, idx) => (
-                                    <button
-                                        key={product.id}
-                                        type="button"
-                                        className={`${styles.productRow} ${selectedProductIndex === idx ? styles.productRowSelected : ""}`}
-                                        onClick={() => addProduct(product)}
-                                        onMouseEnter={() => setSelectedProductIndex(idx)}
-                                    >
-                                        <span className={styles.productRowCode}>{product.barcode || product.sku || "—"}</span>
-                                        <span className={styles.productRowName}>{product.name}</span>
-                                        <span className={styles.productRowUnit}>{!isUnitType(product.unitType) ? product.unitType : ""}</span>
-                                        <span className={styles.productRowStock}>Stock: {formatQuantity(product.stock, product.unitType)}</span>
-                                        <span className={styles.productRowCost}>{product.cost != null ? formatCurrency(product.cost) : "—"}</span>
-                                    </button>
-                                ))
-                            )}
-                        </div>
-
-                        {/* Hints */}
-                        <div className={styles.modalHints}>
-                            <span><kbd>↑↓</kbd> Navegar</span>
-                            <span><kbd>Enter</kbd> Seleccionar</span>
-                            <span><kbd>F8</kbd> Último precio</span>
-                            <span><kbd>Esc</kbd> Cerrar</span>
-                        </div>
-
-                    </div>
-                </div>
-            )}
             {/* Confirm Modal */}
             {showConfirmModal && (
                 <div className={styles.modalOverlay}>

@@ -1,0 +1,202 @@
+.overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 1rem;
+}
+
+.modal {
+  width: 720px;
+  height: 500px;          /* ← fijo siempre */
+  background: var(--card);
+  color: var(--card-foreground);
+  border-radius: var(--radius, 8px);
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid var(--border);
+}
+
+.header {
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.title {
+  margin: 0;
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: var(--foreground);
+}
+
+.closeBtn {
+  background: none;
+  border: none;
+  color: var(--muted-foreground);
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+}
+
+.closeBtn:hover {
+  background-color: var(--secondary);
+  color: var(--foreground);
+}
+
+.searchBox {
+  padding: 1rem 1.25rem;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  border-bottom: 1px solid var(--border);
+  background-color: var(--muted);
+}
+
+.searchIcon {
+  color: var(--muted-foreground);
+}
+
+.searchInput {
+  flex: 1;
+  background: transparent;
+  border: none;
+  outline: none;
+  font-size: 1rem;
+  color: var(--foreground);
+}
+
+.searchInput::placeholder {
+  color: var(--muted-foreground);
+  opacity: 0.7;
+}
+
+.listWrapper {
+  flex: 1;        /* ocupa el espacio restante */
+  min-height: 0;
+  overflow-y: auto;
+  background-color: var(--card);
+}
+
+.emptyState {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: var(--muted-foreground);
+  gap: 1rem;
+}
+
+.spinner {
+  animation: spin 1s linear infinite;
+  color: var(--primary);
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.emptyIcon {
+  color: var(--border);
+}
+
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.row {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 120px 1fr 60px 100px 100px;
+  align-items: center;
+  padding: 0.75rem 1.25rem;
+  border: none;
+  background: none;
+  text-align: left;
+  cursor: pointer;
+  border-bottom: 1px solid var(--border);
+  transition: background-color 0.1s;
+  color: var(--foreground);
+}
+
+.rowSelected {
+  background-color: var(--accent);
+}
+
+.colCode {
+  font-family: monospace;
+  font-size: 0.875rem;
+  color: var(--muted-foreground);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.colName {
+  font-weight: 500;
+  color: var(--foreground);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.colUnit {
+  font-size: 0.75rem;
+  color: var(--muted-foreground);
+  text-align: center;
+}
+
+.colStock {
+  font-size: 0.875rem;
+  color: var(--muted-foreground);
+  text-align: right;
+}
+
+.colPrice {
+  font-weight: 600;
+  color: var(--primary);
+  text-align: right;
+}
+
+.rowSelected .colPrice {
+  color: var(--primary);
+}
+
+.hints {
+  padding: 0.625rem 1.25rem;
+  background-color: var(--muted);
+  border-top: 1px solid var(--border);
+  display: flex;
+  gap: 1.5rem;
+  font-size: 0.75rem;
+  color: var(--muted-foreground);
+}
+
+.hints kbd {
+  background-color: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 1px 4px;
+  font-family: sans-serif;
+  font-weight: 600;
+  color: var(--foreground);
+  margin-right: 4px;
+}
