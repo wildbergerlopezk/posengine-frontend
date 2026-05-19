@@ -183,18 +183,13 @@ export function ProductsPage() {
     const c = parseFloat(val)
     const m = parseFloat(publicMargin)
     const wm = parseFloat(wholesaleMargin)
-    if (!isNaN(c)) {
-      const updates: Partial<typeof formData> = { cost: val }
-      if (!isNaN(m)) {
-        updates.price = String(Math.round(c * (1 + m / 100)))
-      }
-      if (!isNaN(wm)) {
-        updates.wholesalePrice = String(Math.round(c * (1 + wm / 100)))
-      }
-      setFormData(prev => ({ ...prev, ...updates }))
-    } else {
-      setFormData(prev => ({ ...prev, cost: val }))
-    }
+
+    setFormData(prev => ({
+      ...prev,
+      cost: val,
+      price: (!isNaN(c) && !isNaN(m)) ? String(Math.round(c * (1 + m / 100))) : prev.price,
+      wholesalePrice: (!isNaN(c) && !isNaN(wm)) ? String(Math.round(c * (1 + wm / 100))) : prev.wholesalePrice,
+    }))
   }
 
   const handlePublicMarginChange = (val: string) => {
@@ -521,7 +516,8 @@ export function ProductsPage() {
                   <th className={styles.tableHeaderCell}>Categoría</th>
                   <th className={styles.tableHeaderCell}>Unidad</th>
                   <th className={`${styles.tableHeaderCell} ${styles.tableHeaderCellRight}`}>Costo</th>
-                  <th className={`${styles.tableHeaderCell} ${styles.tableHeaderCellRight}`}>Precio</th>
+                  <th className={`${styles.tableHeaderCell} ${styles.tableHeaderCellRight}`}>Precio público</th>
+                  <th className={`${styles.tableHeaderCell} ${styles.tableHeaderCellRight}`}>Precio mayorista</th>
                   <th className={`${styles.tableHeaderCell} ${styles.tableHeaderCellRight}`}>Stock</th>
                   <th className={`${styles.tableHeaderCell} ${styles.tableHeaderCellRight}`}>Acciones</th>
                 </tr>
@@ -529,7 +525,7 @@ export function ProductsPage() {
               <tbody>
                 {products.length === 0 ? (
                   <tr>
-                    <td colSpan={8}>
+                    <td colSpan={9}>
                       <div className={styles.emptyState}>
                         <Package size={32} className={styles.emptyStateIcon} />
                         <p>No se encontraron productos</p>
@@ -592,6 +588,9 @@ export function ProductsPage() {
                       </td>
                       <td className={`${styles.tableCell} ${styles.tableCellRight} ${styles.priceText}`}>
                         {formatCurrency(product.price)}
+                      </td>
+                      <td className={`${styles.tableCell} ${styles.tableCellRight} ${styles.priceText}`}>
+                        {product.wholesalePrice != null ? formatCurrency(product.wholesalePrice) : "—"}
                       </td>
                       <td className={`${styles.tableCell} ${styles.tableCellRight}`}>
                         <div className={styles.stockCell}>
@@ -754,7 +753,7 @@ export function ProductsPage() {
                     value={formData.cost}
                     onChange={(e) => {
                       const val = e.target.value.replace(/[^0-9]/g, "")
-                      setFormData({ ...formData, cost: val })
+                      handleCostChange(val)
                     }}
                     onKeyDown={(e) => handleEnterKey(e, publicMarginRef)}
                     placeholder="0"
