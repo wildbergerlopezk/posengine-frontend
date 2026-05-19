@@ -1,5 +1,6 @@
-import { useState, useEffect, useRef, useMemo } from 'react'
+import { useState, useEffect, useRef, useMemo, type MouseEvent } from 'react'
 import { X, ChevronLeft, ChevronRight, Loader2, Calendar, Unlock, Lock, AlertTriangle, Clock } from 'lucide-react'
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion'
 import { useCashHistory } from '../hooks/useCashHistory'
 import type { CashSession } from '../hooks/useCashSession'
 import styles from './HistoryModal.module.css'
@@ -32,18 +33,17 @@ export function HistoryModal({ open, onClose }: Props) {
   const today = new Date()
   const [currentYear, setCurrentYear] = useState(today.getFullYear())
   const [currentMonth, setCurrentMonth] = useState(today.getMonth())
-  const [hoveredSession, setHoveredSession] = useState<CashSession | null>(null)
+  const [hoveredSessions, setHoveredSessions] = useState<CashSession[] | null>(null)
   const [tooltipPos, setTooltipPos] = useState<{ x: number; y: number }>({ x: 0, y: 0 })
+  const tooltipCloseTimeout = useRef<number | null>(null)
   const { sessions, loading, error, fetchHistory } = useCashHistory()
 
-  // Fetch history when month changes
   useEffect(() => {
     if (open) {
-      fetchHistory(currentYear, currentMonth + 1) // API expects 1-indexed month
+      fetchHistory(currentYear, currentMonth + 1)
     }
   }, [open, currentYear, currentMonth, fetchHistory])
 
-  // Close on Escape
   useEffect(() => {
     if (!open) return
     const handler = (e: KeyboardEvent) => {
@@ -56,19 +56,25 @@ export function HistoryModal({ open, onClose }: Props) {
     return () => window.removeEventListener('keydown', handler, true)
   }, [open, onClose])
 
-  // Map sessions by day-of-month for quick lookup
   const sessionsByDay = useMemo(() => {
-    const map = new Map<number, CashSession>()
+    const map = new Map<number, CashSession[]>()
     sessions.forEach((s) => {
       const d = new Date(s.openedAt).getDate()
-      map.set(d, s)
+      const existing = map.get(d) ?? []
+      existing.push(s)
+      map.set(d, existing)
     })
+
+    for (const sessionsForDay of map.values()) {
+      sessionsForDay.sort(
+        (a, b) => new Date(a.openedAt).getTime() - new Date(b.openedAt).getTime(),
+      )
+    }
+
     return map
   }, [sessions])
 
-  // Calendar grid helpers
   const firstDayOfMonth = new Date(currentYear, currentMonth, 1)
-  // getDay(): 0=Sun … 6=Sat  →  we want Mon=0, so shift
   const startOffset = (firstDayOfMonth.getDay() + 6) % 7
   const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate()
 
@@ -84,7 +90,7 @@ export function HistoryModal({ open, onClose }: Props) {
   const nextMonth = () => {
     const isCurrentMonth =
       currentYear === today.getFullYear() && currentMonth === today.getMonth()
-    if (isCurrentMonth) return // don't go past current month
+    if (isCurrentMonth) return
     if (currentMonth === 11) {
       setCurrentMonth(0)
       setCurrentYear((y) => y + 1)
@@ -96,10 +102,30 @@ export function HistoryModal({ open, onClose }: Props) {
   const isNextDisabled =
     currentYear === today.getFullYear() && currentMonth === today.getMonth()
 
-  const handleCellHover = (session: CashSession, e: React.MouseEvent) => {
+  const clearTooltipTimeout = () => {
+    if (tooltipCloseTimeout.current) {
+      window.clearTimeout(tooltipCloseTimeout.current)
+      tooltipCloseTimeout.current = null
+    }
+  }
+
+  const handleCellHover = (sessions: CashSession[], e: MouseEvent) => {
+    clearTooltipTimeout()
     const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
     setTooltipPos({ x: rect.left + rect.width / 2, y: rect.top })
-    setHoveredSession(session)
+    setHoveredSessions(sessions)
+  }
+
+  const handleTooltipEnter = () => {
+    clearTooltipTimeout()
+  }
+
+  const handleTooltipLeave = () => {
+    clearTooltipTimeout()
+    tooltipCloseTimeout.current = window.setTimeout(() => {
+      setHoveredSessions(null)
+      tooltipCloseTimeout.current = null
+    }, 100)
   }
 
   if (!open) return null
@@ -111,7 +137,6 @@ export function HistoryModal({ open, onClose }: Props) {
       onClick={(e) => e.target === overlayRef.current && onClose()}
     >
       <div className={styles.modal}>
-        {/* Header */}
         <div className={styles.header}>
           <div className={styles.headerLeft}>
             <div className={styles.iconWrap}>
@@ -127,7 +152,6 @@ export function HistoryModal({ open, onClose }: Props) {
           </button>
         </div>
 
-        {/* Calendar navigation */}
         <div className={styles.calendarNav}>
           <button className={styles.navBtn} onClick={prevMonth} aria-label="Mes anterior">
             <ChevronLeft size={18} />
@@ -135,17 +159,11 @@ export function HistoryModal({ open, onClose }: Props) {
           <span className={styles.monthLabel}>
             {MONTHS_ES[currentMonth]} {currentYear}
           </span>
-          <button
-            className={styles.navBtn}
-            onClick={nextMonth}
-            disabled={isNextDisabled}
-            aria-label="Mes siguiente"
-          >
+          <button className={styles.navBtn} onClick={nextMonth} disabled={isNextDisabled} aria-label="Mes siguiente">
             <ChevronRight size={18} />
           </button>
         </div>
 
-        {/* Calendar body */}
         <div className={styles.calendarBody}>
           {loading ? (
             <div className={styles.loadingState}>
@@ -159,7 +177,6 @@ export function HistoryModal({ open, onClose }: Props) {
             </div>
           ) : (
             <>
-              {/* Day headers */}
               <div className={styles.calendarGrid}>
                 {DAYS_ES.map((d) => (
                   <div key={d} className={styles.dayHeader}>
@@ -167,15 +184,13 @@ export function HistoryModal({ open, onClose }: Props) {
                   </div>
                 ))}
 
-                {/* Empty cells for offset */}
                 {Array.from({ length: startOffset }).map((_, i) => (
                   <div key={`empty-${i}`} className={styles.dayCell} />
                 ))}
 
-                {/* Day cells */}
                 {Array.from({ length: daysInMonth }).map((_, i) => {
                   const day = i + 1
-                  const session = sessionsByDay.get(day)
+                  const daySessions = sessionsByDay.get(day) ?? []
                   const isToday =
                     day === today.getDate() &&
                     currentMonth === today.getMonth() &&
@@ -183,31 +198,34 @@ export function HistoryModal({ open, onClose }: Props) {
                   const isFuture =
                     new Date(currentYear, currentMonth, day) > today
 
+                  const hasOpenSession = daySessions.some((s) => s.status === 'OPEN')
+                  const sessionState = hasOpenSession
+                    ? 'OPEN'
+                    : daySessions[0]?.status
+
                   let cellClass = styles.dayCell
                   if (isToday) cellClass += ` ${styles.today}`
                   if (isFuture) cellClass += ` ${styles.future}`
-                  if (session) {
+                  if (daySessions.length > 0) {
                     cellClass += ` ${styles.hasSession}`
-                    if (session.status === 'OPEN') cellClass += ` ${styles.sessionOpen}`
-                    if (session.forcedClose) cellClass += ` ${styles.sessionForced}`
-                    if (session.status === 'CLOSED' && !session.forcedClose)
-                      cellClass += ` ${styles.sessionClosed}`
+                    if (sessionState === 'OPEN') cellClass += ` ${styles.sessionOpen}`
+                    if (sessionState === 'CLOSED') cellClass += ` ${styles.sessionClosed}`
                   }
 
                   return (
                     <div
                       key={day}
                       className={cellClass}
-                      onMouseEnter={(e) => session && handleCellHover(session, e)}
-                      onMouseLeave={() => setHoveredSession(null)}
+                      onMouseEnter={(e) => daySessions.length > 0 && handleCellHover(daySessions, e)}
+                      onMouseLeave={handleTooltipLeave}
                     >
                       <span className={styles.dayNumber}>{day}</span>
-                      {session && (
+                      {daySessions.length > 0 && (
                         <div className={styles.sessionDot}>
-                          {session.status === 'OPEN' ? (
+                          {daySessions.length > 1 ? (
+                            <span className={styles.sessionCount}>{daySessions.length}</span>
+                          ) : sessionState === 'OPEN' ? (
                             <Unlock size={8} />
-                          ) : session.forcedClose ? (
-                            <AlertTriangle size={8} />
                           ) : (
                             <Lock size={8} />
                           )}
@@ -218,7 +236,6 @@ export function HistoryModal({ open, onClose }: Props) {
                 })}
               </div>
 
-              {/* Legend */}
               <div className={styles.legend}>
                 <div className={styles.legendItem}>
                   <span className={`${styles.legendDot} ${styles.legendClosed}`} />
@@ -228,32 +245,29 @@ export function HistoryModal({ open, onClose }: Props) {
                   <span className={`${styles.legendDot} ${styles.legendOpen}`} />
                   <span>Abierta</span>
                 </div>
-                <div className={styles.legendItem}>
-                  <span className={`${styles.legendDot} ${styles.legendForced}`} />
-                  <span>Cierre forzado</span>
-                </div>
               </div>
             </>
           )}
         </div>
 
-        {/* Floating tooltip */}
-        {hoveredSession && (
+        {hoveredSessions && (
           <div
             className={styles.tooltip}
+            onMouseEnter={handleTooltipEnter}
+            onMouseLeave={handleTooltipLeave}
             style={{
               left: `${tooltipPos.x}px`,
               top: `${tooltipPos.y - 8}px`,
             }}
           >
             <div className={styles.tooltipHeader}>
-              {hoveredSession.status === 'OPEN' ? (
+              {hoveredSessions.length > 1 ? (
+                <span className={styles.tooltipBadgeMultiple}>
+                  {hoveredSessions.length} sesiones
+                </span>
+              ) : hoveredSessions[0].status === 'OPEN' ? (
                 <span className={styles.tooltipBadgeOpen}>
                   <Unlock size={10} /> Abierta
-                </span>
-              ) : hoveredSession.forcedClose ? (
-                <span className={styles.tooltipBadgeForced}>
-                  <AlertTriangle size={10} /> Cierre forzado
                 </span>
               ) : (
                 <span className={styles.tooltipBadgeClosed}>
@@ -262,43 +276,101 @@ export function HistoryModal({ open, onClose }: Props) {
               )}
             </div>
 
-            <div className={styles.tooltipGrid}>
-              <div className={styles.tooltipRow}>
-                <Clock size={12} />
-                <span>
-                  Apertura: {formatTime(hoveredSession.openedAt)}
-                  {hoveredSession.closedAt && ` — Cierre: ${formatTime(hoveredSession.closedAt)}`}
-                </span>
+            {hoveredSessions.length === 1 ? (
+              <div className={styles.tooltipContentSingle}>
+                {hoveredSessions.map((session) => (
+                  <div key={session.id} className={styles.tooltipSessionSingle}>
+                    <div className={styles.tooltipRow}>
+                      <Clock size={12} />
+                      <span>
+                        Apertura: {formatTime(session.openedAt)}
+                        {session.closedAt && ` — Cierre: ${formatTime(session.closedAt)}`}
+                      </span>
+                    </div>
+                    <div className={styles.tooltipRow}>
+                      <span className={styles.tooltipLabel}>Inicio:</span>
+                      <span className={styles.tooltipValue}>{formatGs(session.openingAmount)}</span>
+                    </div>
+                    {session.status === 'CLOSED' && session.closingAmount != null && (
+                      <div className={styles.tooltipRow}>
+                        <span className={styles.tooltipLabel}>Cierre:</span>
+                        <span className={styles.tooltipValue}>{formatGs(session.closingAmount)}</span>
+                      </div>
+                    )}
+                    <div className={styles.tooltipRow}>
+                      <span className={styles.tooltipLabel}>Ventas:</span>
+                      <span className={`${styles.tooltipValue} ${styles.positive}`}>
+                        +{formatGs(session.totalSales)}
+                      </span>
+                    </div>
+                    {session.difference !== undefined && session.difference !== 0 && (
+                      <div className={styles.tooltipRow}>
+                        <span className={styles.tooltipLabel}>Diferencia:</span>
+                        <span
+                          className={`${styles.tooltipValue} ${
+                            session.difference > 0 ? styles.positive : styles.negative
+                          }`}
+                        >
+                          {session.difference > 0 ? '+' : ''}{formatGs(session.difference)}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                ))}
               </div>
-              <div className={styles.tooltipRow}>
-                <span className={styles.tooltipLabel}>Inicio:</span>
-                <span className={styles.tooltipValue}>{formatGs(hoveredSession.openingAmount)}</span>
-              </div>
-              {hoveredSession.status === 'CLOSED' && hoveredSession.closingAmount != null && (
-                <div className={styles.tooltipRow}>
-                  <span className={styles.tooltipLabel}>Cierre:</span>
-                  <span className={styles.tooltipValue}>{formatGs(hoveredSession.closingAmount)}</span>
-                </div>
-              )}
-              <div className={styles.tooltipRow}>
-                <span className={styles.tooltipLabel}>Ventas:</span>
-                <span className={`${styles.tooltipValue} ${styles.positive}`}>
-                  +{formatGs(hoveredSession.totalSales)}
-                </span>
-              </div>
-              {hoveredSession.difference !== undefined && hoveredSession.difference !== 0 && (
-                <div className={styles.tooltipRow}>
-                  <span className={styles.tooltipLabel}>Diferencia:</span>
-                  <span
-                    className={`${styles.tooltipValue} ${
-                      hoveredSession.difference > 0 ? styles.positive : styles.negative
-                    }`}
-                  >
-                    {hoveredSession.difference > 0 ? '+' : ''}{formatGs(hoveredSession.difference)}
-                  </span>
-                </div>
-              )}
-            </div>
+            ) : (
+              <Accordion type="single" defaultValue="" collapsible className={styles.tooltipAccordion}>
+                {hoveredSessions.map((session, index) => (
+                  <AccordionItem key={session.id} value={session.id} className={styles.accordionItem}>
+                    <AccordionTrigger className={styles.accordionTrigger}>
+                      <div className={styles.accordionTriggerContent}>
+                        <span>Sesión {index + 1}</span>
+                        <span className={styles.accordionStatus}>
+                          {session.status === 'OPEN' ? 'Abierta' : 'Cerrada'}
+                        </span>
+                      </div>
+                    </AccordionTrigger>
+                    <AccordionContent className={styles.accordionContent}>
+                      <div className={styles.tooltipRow}>
+                        <Clock size={12} />
+                        <span>
+                          Apertura: {formatTime(session.openedAt)}
+                          {session.closedAt && ` — Cierre: ${formatTime(session.closedAt)}`}
+                        </span>
+                      </div>
+                      <div className={styles.tooltipRow}>
+                        <span className={styles.tooltipLabel}>Inicio:</span>
+                        <span className={styles.tooltipValue}>{formatGs(session.openingAmount)}</span>
+                      </div>
+                      {session.status === 'CLOSED' && session.closingAmount != null && (
+                        <div className={styles.tooltipRow}>
+                          <span className={styles.tooltipLabel}>Cierre:</span>
+                          <span className={styles.tooltipValue}>{formatGs(session.closingAmount)}</span>
+                        </div>
+                      )}
+                      <div className={styles.tooltipRow}>
+                        <span className={styles.tooltipLabel}>Ventas:</span>
+                        <span className={`${styles.tooltipValue} ${styles.positive}`}>
+                          +{formatGs(session.totalSales)}
+                        </span>
+                      </div>
+                      {session.difference !== undefined && session.difference !== 0 && (
+                        <div className={styles.tooltipRow}>
+                          <span className={styles.tooltipLabel}>Diferencia:</span>
+                          <span
+                            className={`${styles.tooltipValue} ${
+                              session.difference > 0 ? styles.positive : styles.negative
+                            }`}
+                          >
+                            {session.difference > 0 ? '+' : ''}{formatGs(session.difference)}
+                          </span>
+                        </div>
+                      )}
+                    </AccordionContent>
+                  </AccordionItem>
+                ))}
+              </Accordion>
+            )}
           </div>
         )}
       </div>

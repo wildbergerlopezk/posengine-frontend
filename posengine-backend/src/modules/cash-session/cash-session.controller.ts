@@ -19,7 +19,6 @@ import {
 import { CashSessionService } from './cash-session.service'
 import { OpenCashSessionDto } from './dto/open-cash-session.dto'
 import { CloseCashSessionDto } from './dto/close-cash-session.dto'
-import { ForceCloseCashSessionDto } from './dto/force-close-cash-session.dto'
 import { CashSessionFilterDto } from './dto/cash-session-filter.dto'
 import {
   CurrentUser,
@@ -32,21 +31,15 @@ import { UserRole } from '../../generated/prisma/enums'
 @ApiBearerAuth('access-token')
 @Controller('cash-sessions')
 export class CashSessionController {
-  constructor(private readonly cashSessionService: CashSessionService) { }
+  constructor(private readonly cashSessionService: CashSessionService) {}
 
   @Post('open')
   @Roles(UserRole.ADMIN, UserRole.SUPERADMIN)
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Abrir una nueva sesión de caja' })
   @ApiBody({ type: OpenCashSessionDto })
-  @ApiResponse({
-    status: 201,
-    description: 'Sesión de caja abierta correctamente',
-  })
-  @ApiResponse({
-    status: 409,
-    description: 'Ya existe una sesión abierta o se abrió una hoy',
-  })
+  @ApiResponse({ status: 201, description: 'Sesión de caja abierta correctamente' })
+  @ApiResponse({ status: 409, description: 'Ya existe una sesión abierta' })
   open(
     @CurrentUser() user: AuthenticatedUser,
     @Body() dto: OpenCashSessionDto,
@@ -56,14 +49,8 @@ export class CashSessionController {
 
   @Get('current')
   @Roles(UserRole.ADMIN, UserRole.SUPERADMIN)
-  @ApiOperation({
-    summary:
-      'Obtener la sesión de caja actual o estado de cierre del día actual',
-  })
-  @ApiResponse({
-    status: 200,
-    description: 'Sesión actual (o null si está cerrada)',
-  })
+  @ApiOperation({ summary: 'Obtener la sesión de caja actualmente abierta' })
+  @ApiResponse({ status: 200, description: 'Sesión actual (o null si no hay)' })
   getCurrent(@CurrentUser('tenantId') tenantId: string) {
     return this.cashSessionService.getCurrent(tenantId)
   }
@@ -75,7 +62,6 @@ export class CashSessionController {
   @ApiParam({ name: 'id', description: 'Cash Session ID' })
   @ApiBody({ type: CloseCashSessionDto })
   @ApiResponse({ status: 200, description: 'Sesión cerrada correctamente' })
-  @ApiResponse({ status: 400, description: 'Validación fallida' })
   @ApiResponse({ status: 404, description: 'Sesión no encontrada' })
   close(
     @Param('id') id: string,
@@ -85,33 +71,9 @@ export class CashSessionController {
     return this.cashSessionService.close(tenantId, id, dto)
   }
 
-  @Post(':id/force-close')
-  @Roles(UserRole.ADMIN, UserRole.SUPERADMIN)
-  @HttpCode(HttpStatus.OK)
-  @ApiOperation({
-    summary: 'Forzar el cierre de una sesión de caja (sin validaciones)',
-  })
-  @ApiParam({ name: 'id', description: 'Cash Session ID' })
-  @ApiBody({ type: ForceCloseCashSessionDto })
-  @ApiResponse({
-    status: 200,
-    description: 'Sesión cerrada forzadamente',
-  })
-  @ApiResponse({ status: 404, description: 'Sesión no encontrada' })
-  forceClose(
-    @Param('id') id: string,
-    @CurrentUser('tenantId') tenantId: string,
-    @Body() dto: ForceCloseCashSessionDto,
-  ) {
-    return this.cashSessionService.forceClose(tenantId, id, dto)
-  }
-
   @Get()
   @Roles(UserRole.ADMIN, UserRole.SUPERADMIN)
-  @ApiOperation({
-    summary:
-      'Listar sesiones de caja del tenant con paginación y filtros',
-  })
+  @ApiOperation({ summary: 'Listar sesiones de caja con paginación y filtros' })
   @ApiResponse({ status: 200, description: 'Lista de sesiones de caja' })
   findAll(
     @CurrentUser('tenantId') tenantId: string,
@@ -122,9 +84,7 @@ export class CashSessionController {
 
   @Get('history')
   @Roles(UserRole.ADMIN, UserRole.SUPERADMIN)
-  @ApiOperation({
-    summary: 'Obtener historial mensual de sesiones de caja',
-  })
+  @ApiOperation({ summary: 'Obtener historial mensual de sesiones de caja' })
   @ApiResponse({ status: 200, description: 'Historial mensual de sesiones' })
   getHistory(
     @CurrentUser('tenantId') tenantId: string,

@@ -1,11 +1,9 @@
 import {
-  IsNotEmpty,
   IsNumber,
   IsOptional,
   IsString,
   Max,
   MaxLength,
-  Min,
 } from 'class-validator'
 import { Type, Transform } from 'class-transformer'
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger'
@@ -16,7 +14,6 @@ export class CloseCashSessionDto {
     description: 'Monto en efectivo contado físicamente al cerrar la caja (Gs.)',
   })
   @IsNumber({}, { message: 'el monto contado debe ser un número' })
-  @Min(0, { message: 'el monto contado no puede ser negativo' })
   @Max(999_999_999, { message: 'el monto contado excede el límite permitido' })
   @Type(() => Number)
   closingAmount!: number

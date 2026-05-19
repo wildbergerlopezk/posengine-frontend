@@ -11,14 +11,13 @@ model CashSession {
   closedAt DateTime?
 
   openingAmount  Float
-  closingAmount  Float?
+  closingAmount Float?
   expectedAmount Float?
   totalSales     Float  @default(0)
   totalPurchases Float  @default(0)
   difference     Float?
 
   status      CashSessionStatus @default(OPEN)
-  forcedClose Boolean           @default(false)
 
   openedBy String 
 

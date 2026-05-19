@@ -190,6 +190,12 @@
   justify-content: center;
 }
 
+.sessionCount {
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: currentColor;
+}
+
 /* ── Session states ── */
 .hasSession {
   cursor: pointer;
@@ -285,7 +291,7 @@
   padding: 0.875rem;
   min-width: 220px;
   max-width: 280px;
-  pointer-events: none;
+  pointer-events: auto;
   animation: tooltipIn 0.15s ease-out;
 }
 
@@ -323,10 +329,110 @@
   border: 1px solid color-mix(in srgb, #f59e0b 25%, transparent);
 }
 
+.tooltipBadgeMultiple {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.25rem 0.55rem;
+  border-radius: 999px;
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  background: color-mix(in srgb, var(--color-muted-foreground) 8%, transparent);
+  color: var(--color-foreground);
+  border: 1px solid var(--color-border);
+}
+
+.tooltipAccordion {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.accordionItem {
+  border: 1px solid var(--color-border);
+  border-radius: 0.75rem;
+  overflow: hidden;
+  background: var(--color-surface);
+}
+
+.accordionTrigger {
+  width: 100%;
+  padding: 0.8rem 0.9rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  background: transparent;
+}
+
+.accordionTriggerContent {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  gap: 0.75rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.accordionStatus {
+  font-size: 0.78rem;
+  color: var(--color-muted-foreground);
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.accordionContent {
+  padding: 0 0.9rem 0.8rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  animation: accordionDown 0.2s ease-out;
+  overflow: hidden;
+}
+
+.tooltipContentSingle {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.tooltipSessionSingle {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+
+@keyframes accordionDown {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 .tooltipGrid {
   display: flex;
   flex-direction: column;
+  gap: 0.45rem;
+}
+
+.tooltipSession {
+  padding-top: 0.45rem;
+  border-top: 1px solid var(--color-border);
+  display: flex;
+  flex-direction: column;
   gap: 0.35rem;
+}
+
+.tooltipSession:first-child {
+  border-top: none;
+  padding-top: 0;
 }
 
 .tooltipRow {

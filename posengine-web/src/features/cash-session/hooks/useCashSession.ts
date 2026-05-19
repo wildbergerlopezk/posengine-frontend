@@ -14,21 +14,17 @@ export interface CashSession {
   totalPurchases: number
   difference?: number
   status: CashSessionStatus
-  forcedClose: boolean
   openedBy: string
 }
 
 export interface CurrentSessionResponse {
   session: CashSession | null
-  closedToday: boolean
-  autoClosedStale?: boolean  // ← nuevo
 }
 
-import { useAuthStore } from "@/src/features/auth/store/auth.store"
-import { API_BASE_URL } from "@/src/shared/config/api"
+import { useAuthStore } from '@/src/features/auth/store/auth.store'
+import { API_BASE_URL } from '@/src/shared/config/api'
 
 const API_BASE = `${API_BASE_URL}/cash-sessions`
-const POLL_INTERVAL_MS = 60_000
 
 async function apiFetch<T>(url: string, token: string, options?: RequestInit): Promise<T> {
   const res = await fetch(url, {
@@ -48,10 +44,7 @@ async function apiFetch<T>(url: string, token: string, options?: RequestInit): P
 
 export function useCashSession() {
   const { accessToken } = useAuthStore()
-  const [state, setState] = useState<CurrentSessionResponse>({
-    session: null,
-    closedToday: false,
-  })
+  const [session, setSession] = useState<CashSession | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -61,12 +54,7 @@ export function useCashSession() {
     setError(null)
     try {
       const data = await apiFetch<CurrentSessionResponse>(`${API_BASE}/current`, accessToken)
-      // Notificar al usuario si se cerró una sesión vieja automáticamente
-      if (data.autoClosedStale) {
-        console.info('[CashSession] Se cerró automáticamente una sesión pendiente del día anterior.')
-        // Si tenés un sistema de toasts: toast.info('Se cerró la sesión pendiente del día anterior.')
-      }
-      setState(data)
+      setSession(data.session)
     } catch (err: any) {
       setError(err.message)
     } finally {
@@ -77,14 +65,6 @@ export function useCashSession() {
   useEffect(() => {
     fetchCurrent()
   }, [fetchCurrent])
-
-  useEffect(() => {
-    if (!accessToken) return
-    const interval = setInterval(() => {
-      fetchCurrent()
-    }, POLL_INTERVAL_MS)
-    return () => clearInterval(interval)
-  }, [accessToken, fetchCurrent])
 
   useEffect(() => {
     const handleFocus = () => fetchCurrent()
@@ -98,7 +78,7 @@ export function useCashSession() {
         method: 'POST',
         body: JSON.stringify({ openingAmount, notes }),
       })
-      setState({ session: result, closedToday: false })
+      setSession(result)
       return result
     },
     [accessToken],
@@ -114,42 +94,18 @@ export function useCashSession() {
           body: JSON.stringify({ closingAmount, notes }),
         },
       )
-      setState({ session: null, closedToday: true })
+      setSession(null)
       return result
     },
     [accessToken],
   )
-
-  const forceCloseCash = useCallback(
-    async (
-      sessionId: string,
-      closingAmount: number,
-      confirmation: string,
-      forceReason?: string,
-    ) => {
-      const result = await apiFetch<CashSession>(
-        `${API_BASE}/${sessionId}/force-close`,
-        accessToken!,
-        {
-          method: 'POST',
-          body: JSON.stringify({ closingAmount, confirmation, forceReason }),
-        },
-      )
-      setState({ session: null, closedToday: true })
-      return result
-    },
-    [accessToken],
-  )
-
 
   return {
-    session: state.session,
-    closedToday: state.closedToday,
+    session,
     loading,
     error,
     refresh: fetchCurrent,
     openCash,
     closeCash,
-    forceCloseCash,
   }
 }
