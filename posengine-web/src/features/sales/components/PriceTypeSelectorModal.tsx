@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useState, useEffect } from "react"
+import React, { useState, useEffect, useMemo } from "react"
 import { Users, User } from "lucide-react"
 import styles from "./PriceTypeSelectorModal.module.css"
 import { formatCurrency } from "@/src/shared/hooks/useFormatCurrency"
@@ -25,26 +25,28 @@ export function PriceTypeSelectorModal({ product, onSelect, onClose }: PriceType
     const cost = product.cost ?? 0
     const publicPrice = product.price
     const wholesalePrice = product.wholesalePrice || product.price
-    
-    const publicMargin = cost > 0 ? ((publicPrice / cost) - 1) * 100 : 0
-    const wholesaleMargin = cost > 0 ? ((wholesalePrice / cost) - 1) * 100 : 0
 
-    const options = [
-        { 
-            type: "PUBLIC" as const, 
-            label: "Precio Público", 
-            price: publicPrice, 
-            margin: publicMargin,
-            icon: <User size={20} />
-        },
-        { 
-            type: "WHOLESALE" as const, 
-            label: "Precio Mayorista", 
-            price: wholesalePrice, 
-            margin: wholesaleMargin,
-            icon: <Users size={20} />
-        }
-    ]
+    const options = useMemo(() => {
+        const publicMargin = cost > 0 ? ((publicPrice / cost) - 1) * 100 : 0
+        const wholesaleMargin = cost > 0 ? ((wholesalePrice / cost) - 1) * 100 : 0
+
+        return [
+            {
+                type: "PUBLIC" as const,
+                label: "Precio Público",
+                price: publicPrice,
+                margin: publicMargin,
+                icon: <User size={20} />
+            },
+            {
+                type: "WHOLESALE" as const,
+                label: "Precio Mayorista",
+                price: wholesalePrice,
+                margin: wholesaleMargin,
+                icon: <Users size={20} />
+            }
+        ]
+    }, [cost, publicPrice, wholesalePrice])
 
     useEffect(() => {
         const handler = (e: KeyboardEvent) => {

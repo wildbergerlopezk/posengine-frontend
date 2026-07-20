@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useHydrated } from "@/src/shared/hooks/useHydrated"
 import { Search, Bell, Sun, Moon, Menu, Keyboard } from "lucide-react"
 import { useTheme } from "next-themes"
 import { useAuthStore } from "@/src/features/auth/store/auth.store"
@@ -20,12 +20,8 @@ export function Header({
 }: HeaderProps) {
   const { user } = useAuthStore()
   const { resolvedTheme, setTheme } = useTheme()
-  const [mounted, setMounted] = useState(false)
+  const mounted = useHydrated()
   const { toggleShortcutsModal } = useUIStore()
-
-  useEffect(() => {
-    setMounted(true)
-  }, [])
 
   const toggleTheme = () => {
     setTheme(resolvedTheme === "dark" ? "light" : "dark")

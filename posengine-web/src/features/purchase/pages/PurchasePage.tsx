@@ -2,6 +2,7 @@
 
 import type React from "react"
 import { useState, useEffect, useLayoutEffect, useRef, useCallback } from "react"
+import { useHydrated } from "@/src/shared/hooks/useHydrated"
 import { Header } from "@/src/shared/components/Header"
 import { ProductSearchModal } from "@/src/shared/components/ProductSearchModal"
 import { usePathname, useRouter } from "next/navigation"
@@ -148,10 +149,13 @@ export function PurchasePage() {
     const confirmAcceptRef = useRef<HTMLButtonElement>(null)
     const confirmCancelRef = useRef<HTMLButtonElement>(null)
     const editingInputRef = useRef<HTMLInputElement>(null)
+    const isHydrated = useHydrated()
     const [isDraftLoaded, setIsDraftLoaded] = useState(false)
 
     // ── Persistence: Load draft ───────────────────────────────────────────────
     useEffect(() => {
+        if (!isHydrated) return
+
         const saved = sessionStorage.getItem(PURCHASE_STORAGE_KEY)
         if (saved) {
             try {
@@ -167,7 +171,7 @@ export function PurchasePage() {
             }
         }
         setIsDraftLoaded(true)
-    }, [])
+    }, [isHydrated])
 
     // ── Persistence: Save draft ───────────────────────────────────────────────
     useEffect(() => {

@@ -7,7 +7,8 @@
     "dev": "NEXT_TURBOPACK=false next dev",
     "lint": "eslint .",
     "start": "next start",
-    "export": "next export"
+    "export": "next export",
+    "doctor": "npx react-doctor@latest"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",

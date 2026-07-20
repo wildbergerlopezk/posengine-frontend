@@ -2,6 +2,7 @@
 
 import type React from "react"
 import { useState, useRef, useEffect, useCallback } from "react"
+import { useHydrated } from "@/src/shared/hooks/useHydrated"
 import {
   Trash2,
   ShoppingCart,
@@ -108,6 +109,7 @@ export function SalesPage() {
   const editingInputRef = useRef<HTMLInputElement>(null)
   const confirmAcceptRef = useRef<HTMLButtonElement>(null)
   const confirmCancelRef = useRef<HTMLButtonElement>(null)
+  const isHydrated = useHydrated()
   const [isDraftLoaded, setIsDraftLoaded] = useState(false)
 
   // ── Modal de selección de precio ──────────────────────────────────────────
@@ -115,6 +117,8 @@ export function SalesPage() {
 
   // ── Persistence: Load draft ───────────────────────────────────────────────
   useEffect(() => {
+    if (!isHydrated) return
+
     const saved = sessionStorage.getItem(SALE_STORAGE_KEY)
     if (saved) {
       try {
@@ -125,7 +129,7 @@ export function SalesPage() {
       }
     }
     setIsDraftLoaded(true)
-  }, [])
+  }, [isHydrated])
 
   // ── Persistence: Save draft ───────────────────────────────────────────────
   useEffect(() => {

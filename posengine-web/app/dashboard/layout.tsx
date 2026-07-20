@@ -7,6 +7,7 @@ import { getProfileApi } from "@/src/features/auth/api/auth.api"
 import { isAccessTokenValid } from "@/src/features/auth/utils/auth.utils"
 import { useRouter } from "next/navigation"
 import { useEffect, useState } from "react"
+import { useHydrated } from "@/src/shared/hooks/useHydrated"
 import styles from "./layout.module.css"
 import { useKeyboardNav } from "@/src/shared/hooks/useKeyboardNav"
 import { KeyboardShortcutsModal } from "@/src/shared/components"
@@ -18,13 +19,9 @@ export default function DashboardLayout({
 }) {
   const { accessToken, isAuthenticated, logout } = useAuthStore()
   const router = useRouter()
-  const [mounted, setMounted] = useState(false)
+  const mounted = useHydrated()
   const [isCheckingSession, setIsCheckingSession] = useState(true)
   const { showHelp, setShowHelp } = useKeyboardNav()
-
-  useEffect(() => {
-    setMounted(true)
-  }, [])
 
   useEffect(() => {
     if (!mounted) return

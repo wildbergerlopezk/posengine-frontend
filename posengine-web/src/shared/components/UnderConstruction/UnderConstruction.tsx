@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useHydrated } from "@/src/shared/hooks/useHydrated"
 import { Construction, ArrowLeft } from "lucide-react"
 import Link from "next/link"
 import styles from "./UnderConstruction.module.css"
@@ -10,11 +10,7 @@ interface Props {
 }
 
 export function UnderConstruction({ moduleName }: Props) {
-  const [mounted, setMounted] = useState(false)
-
-  useEffect(() => {
-    setMounted(true)
-  }, [])
+  const mounted = useHydrated()
 
   return (
     <div className={styles.container}>

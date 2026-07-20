@@ -3,7 +3,8 @@
 import type React from "react"
 import { useAuthStore } from "@/src/features/auth/store/auth.store"
 import { useRouter } from "next/navigation"
-import { useEffect, useState } from "react"
+import { useEffect } from "react"
+import { useHydrated } from "@/src/shared/hooks/useHydrated"
 import styles from "./ProtectedRoute.module.css"
 
 interface ProtectedRouteProps {
@@ -13,11 +14,7 @@ interface ProtectedRouteProps {
 export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
     const { isAuthenticated } = useAuthStore()
     const router = useRouter()
-    const [mounted, setMounted] = useState(false)
-
-    useEffect(() => {
-        setMounted(true)
-    }, [])
+    const mounted = useHydrated()
 
     useEffect(() => {
         if (mounted && !isAuthenticated) {

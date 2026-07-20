@@ -222,7 +222,8 @@ export function ComboboxInput({ placeholder, startAddon, className = "" }: Combo
   const inputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
-    setTimeout(() => inputRef.current?.focus(), 30)
+    const timeoutId = window.setTimeout(() => inputRef.current?.focus(), 30)
+    return () => window.clearTimeout(timeoutId)
   }, [])
 
   return (

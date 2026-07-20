@@ -20,28 +20,23 @@ function formatDisplay(val: string) {
   return num.replace(/\B(?=(\d{3})+(?!\d))/g, '.')
 }
 
-export function CloseCashModal({
-  open,
+function CloseCashModalContent({
   session,
   loading,
   onClose,
   onConfirm,
-}: Props) {
+}: Omit<Props, 'open'>) {
   const [amount, setAmount] = useState('')
   const [notes, setNotes] = useState('')
   const [error, setError] = useState<string | null>(null)
   const inputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
-    if (!open) return
-    setAmount('')
-    setNotes('')
-    setError(null)
-    setTimeout(() => inputRef.current?.focus(), 80)
-  }, [open])
+    const timeoutId = window.setTimeout(() => inputRef.current?.focus(), 80)
+    return () => window.clearTimeout(timeoutId)
+  }, [])
 
   useEffect(() => {
-    if (!open) return
     const handler = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         e.stopPropagation()
@@ -50,9 +45,7 @@ export function CloseCashModal({
     }
     window.addEventListener('keydown', handler, true)
     return () => window.removeEventListener('keydown', handler, true)
-  }, [open, onClose])
-
-  if (!open || !session) return null
+  }, [onClose])
 
   const parsed = parseFloat(amount.replace(/\./g, '').replace(',', '.'))
   const isAmountValid = !isNaN(parsed)
@@ -195,5 +188,24 @@ export function CloseCashModal({
         </div>
       </div>
     </div>
+  )
+}
+
+export function CloseCashModal({
+  open,
+  session,
+  loading,
+  onClose,
+  onConfirm,
+}: Props) {
+  if (!open || !session) return null
+
+  return (
+    <CloseCashModalContent
+      session={session}
+      loading={loading}
+      onClose={onClose}
+      onConfirm={onConfirm}
+    />
   )
 }
