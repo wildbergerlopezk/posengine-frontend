@@ -9,6 +9,8 @@ import { UserModule } from '../user/user.module';
 import { RolesGuard } from './guards/roles.guard';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { APP_GUARD } from '@nestjs/core';
+import { ThrottlerGuard } from '@nestjs/throttler';
+import {MailModule} from '../../common/mail/mail.module';
 
 @Module({
   imports: [
@@ -23,6 +25,7 @@ import { APP_GUARD } from '@nestjs/core';
       }),
     }),
     UserModule,
+    MailModule,
   ],
   controllers: [AuthController],
   providers: [
@@ -33,6 +36,10 @@ import { APP_GUARD } from '@nestjs/core';
     {
       provide: APP_GUARD,
       useClass: JwtAuthGuard,
+    },
+    {
+      provide: APP_GUARD,
+      useClass: ThrottlerGuard,
     },
     {
       provide: APP_GUARD,

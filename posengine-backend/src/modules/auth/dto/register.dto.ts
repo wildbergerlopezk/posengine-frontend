@@ -42,5 +42,4 @@ export class RegisterDto {
   @MaxLength(100)
   @Transform(({ value }) => value?.trim())
   tenantName!: string;
-
 }

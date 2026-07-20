@@ -15,7 +15,9 @@ model User {
   updatedAt DateTime @updatedAt
 
   tenant Tenant? @relation(fields: [tenantId], references: [id])
-
+  refreshTokens RefreshToken[]
+  passwordResetTokens PasswordResetToken[]
+  
   @@unique([email, tenantId])
   @@map("users")
 }

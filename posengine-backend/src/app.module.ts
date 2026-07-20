@@ -17,10 +17,12 @@ import { SaleModule } from          './modules/sale/sale.module';
 import { StockMovementModule } from './modules/stock-movement/stock-movement.module';
 import { CustomerModule } from      './modules/customer/customer.module';
 import { CashSessionModule } from   './modules/cash-session/cash-session.module';
+import { ThrottlerModule } from '@nestjs/throttler';
 
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true, envFilePath: '.env' }),
+    ThrottlerModule.forRoot([{ ttl: 60000, limit: 20 }]),
     PrismaModule,
     UserModule,
     AuthModule,
