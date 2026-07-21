@@ -59,6 +59,15 @@ export class AuthController {
     return this.authService.logout(dto);
   }
 
+  @Post('logout-all')
+  @ApiBearerAuth('access-token')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Logout from all devices by revoking every active refresh token for the current user' })
+  @ApiResponse({ status: 200, description: 'All sessions closed' })
+  logoutAll(@CurrentUser() user: AuthenticatedUser) {
+    return this.authService.logoutAll(user.id);
+  }
+
   @Post('forgot-password')
   @Public()
   @Throttle({ default: { limit: 3, ttl: 60000 } })

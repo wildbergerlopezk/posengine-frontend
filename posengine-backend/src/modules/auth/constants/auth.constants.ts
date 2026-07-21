@@ -1,0 +1,7 @@
+export const ACCESS_TOKEN_TTL = '15m';
+export const REFRESH_TOKEN_TTL_DAYS = 7;
+export const REFRESH_TOKEN_TTL_DAYS_REMEMBER = 30;
+export const PASSWORD_RESET_TTL_MINUTES = 30;
+export const BCRYPT_SALT_ROUNDS = 10;
+export const REFRESH_TOKEN_BYTES = 40;
+export const PASSWORD_RESET_TOKEN_BYTES = 32;
