@@ -18,4 +18,5 @@ model Tenant {
   stockMovements  StockMovement[]
   customers       Customer[]
   cashSessions    CashSession[]
+  subscription    Subscription?
 }

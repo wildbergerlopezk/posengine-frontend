@@ -19,6 +19,7 @@ import { RefreshTokenService } from './services/refresh-token.service';
 import { LogoutService } from './services/logout.service';
 import { ForgotPasswordService } from './services/forgot-password.service';
 import { ResetPasswordService } from './services/reset-password.service';
+import { EmailVerificationService } from './services/email-verification.service';
 
 @Module({
   imports: [
@@ -45,6 +46,7 @@ import { ResetPasswordService } from './services/reset-password.service';
     LogoutService,
     ForgotPasswordService,
     ResetPasswordService,
+    EmailVerificationService,
     JwtStrategy,
     JwtAuthGuard,
     RolesGuard,

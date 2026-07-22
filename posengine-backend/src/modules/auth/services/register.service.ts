@@ -4,6 +4,7 @@ import slugify from 'slugify';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { UserService } from '../../user/user.service';
 import { TokenService } from './token.service';
+import { EmailVerificationService } from './email-verification.service';
 import { RegisterDto } from '../dto/register.dto';
 import { BCRYPT_SALT_ROUNDS } from '../constants/auth.constants';
 
@@ -13,6 +14,7 @@ export class RegisterService {
     private readonly userService: UserService,
     private readonly prisma: PrismaService,
     private readonly tokenService: TokenService,
+    private readonly emailVerificationService: EmailVerificationService,
   ) {}
 
   async register(dto: RegisterDto) {
@@ -33,22 +35,50 @@ export class RegisterService {
 
     const passwordHash = await bcrypt.hash(dto.password, BCRYPT_SALT_ROUNDS);
 
-    const tenant = await this.prisma.tenant.create({
-      data: {
-        name: dto.tenantName,
-        slug,
-      },
+    const { tenant, user } = await this.prisma.$transaction(async (tx) => {
+      // Buscar o crear plan "free" de manera robusta
+      let freePlan = await tx.plan.findUnique({
+        where: { slug: 'free' },
+      });
+
+      if (!freePlan) {
+        freePlan = await tx.plan.create({
+          data: {
+            name: 'Free Plan',
+            slug: 'free',
+            price: 0,
+          },
+        });
+      }
+
+      const createdTenant = await tx.tenant.create({
+        data: {
+          name: dto.tenantName,
+          slug,
+          subscription: {
+            create: {
+              planId: freePlan.id,
+              status: 'ACTIVE',
+            },
+          },
+        },
+      });
+
+      const createdUser = await tx.user.create({
+        data: {
+          name: dto.name,
+          email: dto.email.toLowerCase(),
+          password: passwordHash,
+          tenantId: createdTenant.id,
+          active: true,
+          emailVerified: false,
+        },
+      });
+
+      return { tenant: createdTenant, user: createdUser };
     });
 
-    const user = await this.prisma.user.create({
-      data: {
-        name: dto.name,
-        email: dto.email.toLowerCase(),
-        password: passwordHash,
-        tenantId: tenant.id,
-        active: true,
-      },
-    });
+    await this.emailVerificationService.sendVerificationEmail(user.id);
 
     const accessToken = this.tokenService.signAccessToken(user);
     const refreshToken = await this.tokenService.issueRefreshToken(user.id);
@@ -62,6 +92,7 @@ export class RegisterService {
         email: user.email,
         tenantId: user.tenantId,
         tenantName: tenant.name,
+        emailVerified: user.emailVerified,
       },
     };
   }

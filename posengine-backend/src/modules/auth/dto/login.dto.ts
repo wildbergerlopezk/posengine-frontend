@@ -23,13 +23,7 @@ export class LoginDto {
   password!: string;
 
   @ApiProperty({
-    description: 'Indica si el usuario desea mantener la sesión iniciada',
-    example: true,
-    required: false,
-  })
-
-  @ApiProperty({
-    description: 'Recordar sesión',
+    description: 'Mantener sesión iniciada',
     example: true,
     required: false,
   })

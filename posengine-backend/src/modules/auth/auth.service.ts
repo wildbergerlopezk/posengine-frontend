@@ -9,6 +9,7 @@ import { RefreshTokenService } from './services/refresh-token.service';
 import { LogoutService } from './services/logout.service';
 import { ForgotPasswordService } from './services/forgot-password.service';
 import { ResetPasswordService } from './services/reset-password.service';
+import { EmailVerificationService } from './services/email-verification.service';
 
 @Injectable()
 export class AuthService {
@@ -19,6 +20,7 @@ export class AuthService {
     private readonly logoutService: LogoutService,
     private readonly forgotPasswordService: ForgotPasswordService,
     private readonly resetPasswordService: ResetPasswordService,
+    private readonly emailVerificationService: EmailVerificationService,
   ) {}
 
   async login(dto: LoginDto) {
@@ -48,4 +50,13 @@ export class AuthService {
   async resetPassword(dto: ResetPasswordDto) {
     return this.resetPasswordService.resetPassword(dto);
   }
+
+  async verifyEmail(token: string) {
+    return this.emailVerificationService.verifyEmail(token);
+  }
+
+  async resendVerificationEmail(userId: string) {
+    return this.emailVerificationService.sendVerificationEmail(userId);
+  }
 }
+

@@ -49,4 +49,28 @@ export class MailService {
       `,
     });
   }
+
+  async sendVerificationEmail(email: string, rawToken: string, tenantName?: string | null) {
+    const frontendUrl = this.config.get<string>('FRONTEND_URL');
+    const verificationLink = `${frontendUrl}/auth/verify-email?token=${rawToken}`;
+
+    if (!this.transporter) {
+      this.logger.log(
+        `[DEV] Verification link para ${email}${tenantName ? ` (tenant: ${tenantName})` : ''}: ${verificationLink}`,
+      );
+      return;
+    }
+
+    await this.transporter.sendMail({
+      from: this.config.get<string>('MAIL_FROM'),
+      to: email,
+      subject: 'Verifica tu correo — PosEngine',
+      html: `
+        <p>Hola,</p>
+        <p>Gracias por registrarte${tenantName ? ` en <strong>${tenantName}</strong>` : ''}.</p>
+        <p><a href="${verificationLink}">Confirma tu cuenta aquí</a></p>
+        <p>Este enlace expira en 24 horas.</p>
+      `,
+    });
+  }
 }

@@ -18,6 +18,7 @@ import { StockMovementModule } from './modules/stock-movement/stock-movement.mod
 import { CustomerModule } from      './modules/customer/customer.module';
 import { CashSessionModule } from   './modules/cash-session/cash-session.module';
 import { ThrottlerModule } from '@nestjs/throttler';
+import { SubscriptionModule } from './modules/subscription/subscription.module';
 
 @Module({
   imports: [
@@ -26,6 +27,7 @@ import { ThrottlerModule } from '@nestjs/throttler';
     PrismaModule,
     UserModule,
     AuthModule,
+    SubscriptionModule,
     CategoryModule,
     SubcategoryModule,
     ProductModule,

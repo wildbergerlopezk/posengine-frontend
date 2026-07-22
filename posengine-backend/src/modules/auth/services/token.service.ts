@@ -24,7 +24,7 @@ export class TokenService {
     );
   }
 
-  async issueRefreshToken(userId: string, isRemember?: boolean): Promise<string> {
+  async issueRefreshToken(userId: string, isRemember = false): Promise<string> {
     const rawToken = crypto.randomBytes(REFRESH_TOKEN_BYTES).toString('hex');
     const tokenHash = hashToken(rawToken);
     const ttlDays = isRemember ? REFRESH_TOKEN_TTL_DAYS_REMEMBER : REFRESH_TOKEN_TTL_DAYS;

@@ -1,0 +1,13 @@
+model Plan {
+  id    String  @id @default(uuid())
+  name  String
+  slug  String  @unique
+  price Decimal @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  subscriptions Subscription[]
+
+  @@map("plans")
+}
