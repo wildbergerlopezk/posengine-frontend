@@ -27,6 +27,9 @@ export class SubscriptionGuard implements CanActivate {
     }
 
     try {
+      // SAAS BILLING HOOK:
+      // This guard should later evaluate the tenant's payment state, grace period,
+      // and subscription validity before allowing access to the app.
       const subscription = await this.subscriptionService.getByTenant(user.tenantId);
       if (subscription.status !== 'ACTIVE') {
         throw new ForbiddenException('Su suscripción no está activa. Por favor, regularice su pago.');

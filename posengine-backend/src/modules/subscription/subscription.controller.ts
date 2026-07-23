@@ -9,6 +9,9 @@ import { CurrentUser, type AuthenticatedUser } from '../../common/decorators/cur
 export class SubscriptionController {
   constructor(private readonly subscriptionService: SubscriptionService) {}
 
+  // SAAS BILLING HOOK:
+  // This endpoint can later return payment history, invoice status, and plan
+  // upgrade/downgrade information for the tenant owner.
   @Get('me')
   @ApiOperation({ summary: 'Obtener la suscripción activa del tenant actual' })
   @ApiResponse({ status: 200, description: 'Devuelve los detalles de la suscripción y el plan' })

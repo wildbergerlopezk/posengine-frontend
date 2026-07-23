@@ -36,6 +36,9 @@ export class RegisterService {
     const passwordHash = await bcrypt.hash(dto.password, BCRYPT_SALT_ROUNDS);
 
     const { tenant, user } = await this.prisma.$transaction(async (tx) => {
+      // SAAS BILLING HOOK:
+      // This is the place to attach a new tenant to a paid plan, trial period,
+      // or initial billing setup when subscription payments are implemented.
       // Buscar o crear plan "free" de manera robusta
       let freePlan = await tx.plan.findUnique({
         where: { slug: 'free' },

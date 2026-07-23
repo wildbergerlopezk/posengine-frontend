@@ -64,200 +64,190 @@ export function RegisterForm() {
   }
 
   return (
-    <div className={styles.authLayout}>
-      {/* Panel izquierdo - formulario */}
-      <div className={styles.formPanel}>
-        <div className={styles.card}>
-          <div className={styles.cardHeader}>
-            <h1 className={styles.cardTitle}>Crear cuenta</h1>
-            <p className={styles.cardDescription}>Regístrate y configura tu negocio en pocos pasos</p>
-          </div>
+    <div className={styles.supabaseFormContainer}>
+      <div className={styles.supabaseHeader}>
+        <h1 className={styles.supabaseTitle}>Crear cuenta</h1>
+        <p className={styles.supabaseSubtitle}>Regístrate y configura tu negocio en pocos pasos</p>
+      </div>
 
-          <div className={styles.progressWrap}>
-            <div className={styles.progressMeta}>
-              <span className={styles.progressLabel}>{progressLabel}</span>
-              <span className={styles.progressPct}>{progress}%</span>
-            </div>
-            <div className={styles.progressTrack}>
-              <div className={styles.progressFill} style={{ width: `${progress}%` }} />
-            </div>
-          </div>
-
-          <form onSubmit={handleSubmit}>
-            <div className={styles.cardContent}>
-              {error && (
-                <div className={styles.errorMessage}>
-                  <span className={styles.errorDot} />
-                  {error}
-                </div>
-              )}
-
-              {/* Paso 1: Datos personales */}
-              {step === 1 && (
-                <div className={styles.form}>
-                  <div className={styles.formGroup}>
-                    <label htmlFor="name" className={styles.label}>Nombre completo</label>
-                    <input
-                      id="name"
-                      type="text"
-                      placeholder="Juan Pérez"
-                      value={name}
-                      onChange={(e) => setName(e.target.value)}
-                      className={styles.input}
-                      autoFocus
-                    />
-                  </div>
-                  <div className={styles.formGroup}>
-                    <label htmlFor="email" className={styles.label}>Email</label>
-                    <input
-                      id="email"
-                      type="email"
-                      placeholder="tu@email.com"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      className={`${styles.input} ${email && !isValidEmail(email) ? styles.inputError : ""}`}
-                    />
-                    {email && !isValidEmail(email) && (
-                      <span className={`${styles.fieldHint} ${styles.fieldHintError}`}>
-                        Ingresá un email válido
-                      </span>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {/* Paso 2: Contraseña */}
-              {step === 2 && (
-                <div className={styles.form}>
-                  <div className={styles.formGroup}>
-                    <label htmlFor="password" className={styles.label}>Contraseña</label>
-                    <div className={styles.inputWrapper}>
-                      <input
-                        id="password"
-                        type={showPassword ? "text" : "password"}
-                        placeholder="••••••••"
-                        value={password}
-                        onChange={(e) => setPassword(e.target.value)}
-                        className={styles.input}
-                        autoFocus
-                      />
-                      <button
-                        type="button"
-                        className={styles.passwordToggle}
-                        onClick={() => setShowPassword(!showPassword)}
-                      >
-                        {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
-                      </button>
-                    </div>
-                    {password && (
-                      <div className={styles.strengthWrap}>
-                        <div className={styles.strengthBar}>
-                          {[1, 2, 3, 4].map((i) => (
-                            <div
-                              key={i}
-                              className={styles.strengthSeg}
-                              style={{ background: i <= strength.score ? strength.color : undefined }}
-                            />
-                          ))}
-                        </div>
-                        <span className={styles.strengthLabel} style={{ color: strength.color }}>
-                          {strength.label}
-                        </span>
-                      </div>
-                    )}
-                  </div>
-
-                  <div className={styles.formGroup}>
-                    <label htmlFor="confirmPassword" className={styles.label}>Confirmar contraseña</label>
-                    <input
-                      id="confirmPassword"
-                      type={showPassword ? "text" : "password"}
-                      placeholder="••••••••"
-                      value={confirmPassword}
-                      onChange={(e) => setConfirmPassword(e.target.value)}
-                      className={`${styles.input} ${
-                        confirmPassword
-                          ? passwordsMatch
-                            ? styles.inputSuccess
-                            : styles.inputError
-                          : ""
-                      }`}
-                    />
-                    {confirmPassword && (
-                      <div className={`${styles.matchBadge} ${passwordsMatch ? styles.matchOk : styles.matchNo}`}>
-                        {passwordsMatch ? (
-                          <><CheckCircle2 size={13} /> Contraseñas coinciden</>
-                        ) : (
-                          <><XCircle size={13} /> No coinciden</>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {/* Paso 3: Negocio */}
-              {step === 3 && (
-                <div className={styles.form}>
-                  <div className={styles.formGroup}>
-                    <label htmlFor="tenantName" className={styles.label}>Nombre del negocio</label>
-                    <input
-                      id="tenantName"
-                      type="text"
-                      placeholder="Mi Tienda"
-                      value={tenantName}
-                      onChange={(e) => setTenantName(e.target.value)}
-                      className={styles.input}
-                      autoFocus
-                    />
-                  </div>
-                </div>
-              )}
-            </div>
-
-            <div className={styles.cardFooter}>
-              {/* Botones de navegación */}
-              <div className={styles.stepActions}>
-                {step > 1 && (
-                  <button type="button" className={styles.backButton} onClick={handleBack}>
-                    <ArrowLeft size={16} />
-                  </button>
-                )}
-                {step < 3 ? (
-                  <button
-                    type="button"
-                    className={styles.submitButton}
-                    onClick={handleNext}
-                    disabled={!canGoNext}
-                  >
-                    Siguiente <ArrowRight size={16} />
-                  </button>
-                ) : (
-                  <button
-                    type="submit"
-                    className={styles.submitButton}
-                    disabled={isLoading || !step3Valid}
-                  >
-                    {isLoading ? (
-                      <>
-                        <Loader2 size={16} className={styles.spinner} />
-                        Creando cuenta...
-                      </>
-                    ) : (
-                      "Crear cuenta"
-                    )}
-                  </button>
-                )}
-              </div>
-
-              <p className={styles.registerLink}>
-                ¿Ya tienes una cuenta? <Link href="/login">Inicia sesión</Link>
-              </p>
-            </div>
-          </form>
+      <div className={styles.progressWrap}>
+        <div className={styles.progressMeta}>
+          <span className={styles.progressLabel}>{progressLabel}</span>
+          <span className={styles.progressPct}>{progress}%</span>
+        </div>
+        <div className={styles.progressTrack}>
+          <div className={styles.progressFill} style={{ width: `${progress}%` }} />
         </div>
       </div>
 
+      <form onSubmit={handleSubmit} className={styles.form}>
+        {error && (
+          <div className={styles.errorMessage}>
+            <span className={styles.errorDot} />
+            {error}
+          </div>
+        )}
+
+        {/* Paso 1: Datos personales */}
+        {step === 1 && (
+          <div className={styles.form}>
+            <div className={styles.formGroup}>
+              <label htmlFor="name" className={styles.label}>Nombre completo</label>
+              <input
+                id="name"
+                type="text"
+                placeholder="Juan Pérez"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                className={styles.input}
+                autoFocus
+              />
+            </div>
+            <div className={styles.formGroup}>
+              <label htmlFor="email" className={styles.label}>Email</label>
+              <input
+                id="email"
+                type="email"
+                placeholder="tu@email.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className={`${styles.input} ${email && !isValidEmail(email) ? styles.inputError : ""}`}
+              />
+              {email && !isValidEmail(email) && (
+                <span className={`${styles.fieldHint} ${styles.fieldHintError}`}>
+                  Ingresá un email válido
+                </span>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Paso 2: Contraseña */}
+        {step === 2 && (
+          <div className={styles.form}>
+            <div className={styles.formGroup}>
+              <label htmlFor="password" className={styles.label}>Contraseña</label>
+              <div className={styles.inputWrapper}>
+                <input
+                  id="password"
+                  type={showPassword ? "text" : "password"}
+                  placeholder="••••••••"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className={styles.input}
+                  autoFocus
+                />
+                <button
+                  type="button"
+                  className={styles.passwordToggle}
+                  onClick={() => setShowPassword(!showPassword)}
+                >
+                  {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                </button>
+              </div>
+              {password && (
+                <div className={styles.strengthWrap}>
+                  <div className={styles.strengthBar}>
+                    {[1, 2, 3, 4].map((i) => (
+                      <div
+                        key={i}
+                        className={styles.strengthSeg}
+                        style={{ background: i <= strength.score ? strength.color : undefined }}
+                      />
+                    ))}
+                  </div>
+                  <span className={styles.strengthLabel} style={{ color: strength.color }}>
+                    {strength.label}
+                  </span>
+                </div>
+              )}
+            </div>
+
+            <div className={styles.formGroup}>
+              <label htmlFor="confirmPassword" className={styles.label}>Confirmar contraseña</label>
+              <input
+                id="confirmPassword"
+                type={showPassword ? "text" : "password"}
+                placeholder="••••••••"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                className={`${styles.input} ${
+                  confirmPassword
+                    ? passwordsMatch
+                      ? styles.inputSuccess
+                      : styles.inputError
+                    : ""
+                }`}
+              />
+              {confirmPassword && (
+                <div className={`${styles.matchBadge} ${passwordsMatch ? styles.matchOk : styles.matchNo}`}>
+                  {passwordsMatch ? (
+                    <><CheckCircle2 size={13} /> Contraseñas coinciden</>
+                  ) : (
+                    <><XCircle size={13} /> No coinciden</>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Paso 3: Negocio */}
+        {step === 3 && (
+          <div className={styles.form}>
+            <div className={styles.formGroup}>
+              <label htmlFor="tenantName" className={styles.label}>Nombre del negocio</label>
+              <input
+                id="tenantName"
+                type="text"
+                placeholder="Mi Tienda"
+                value={tenantName}
+                onChange={(e) => setTenantName(e.target.value)}
+                className={styles.input}
+                autoFocus
+              />
+            </div>
+          </div>
+        )}
+
+        {/* Botones de navegación */}
+        <div className={styles.stepActions}>
+          {step > 1 && (
+            <button type="button" className={styles.backButton} onClick={handleBack}>
+              <ArrowLeft size={16} />
+            </button>
+          )}
+          {step < 3 ? (
+            <button
+              type="button"
+              className={styles.submitButton}
+              onClick={handleNext}
+              disabled={!canGoNext}
+            >
+              Siguiente <ArrowRight size={16} />
+            </button>
+          ) : (
+            <button
+              type="submit"
+              className={styles.submitButton}
+              disabled={isLoading || !step3Valid}
+            >
+              {isLoading ? (
+                <>
+                  <Loader2 size={16} className={styles.spinner} />
+                  Creando cuenta...
+                </>
+              ) : (
+                "Crear cuenta"
+              )}
+            </button>
+          )}
+        </div>
+
+        <p className={styles.registerLink} style={{ marginTop: "1rem" }}>
+          ¿Ya tienes una cuenta? <Link href="/login">Inicia sesión</Link>
+        </p>
+      </form>
     </div>
   )
 }

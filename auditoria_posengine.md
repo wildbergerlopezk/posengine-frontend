@@ -7,7 +7,7 @@
 
 ## 1. Resumen Ejecutivo y Puntuación General
 
-**Puntuación Global del Sistema: 4.5 / 10**
+**Puntuación Global del Sistema: 5.0 / 10**
 
 PosEngine tiene una base arquitectónica sólida en el backend (NestJS + Prisma) que demuestra buenas intenciones (estructura modular, soporte multitenant desde el inicio, uso de transacciones). Sin embargo, la ejecución en el frontend (Next.js) es deficiente, sufriendo de componentes masivos ("Fat Components"), mezcla inconsistente de paradigmas de UI, y falta de herramientas estándar modernas para el manejo de formularios y validaciones.
 
@@ -20,9 +20,15 @@ A nivel funcional, el sistema cubre el "camino feliz" (happy path) de operacione
 A continuación se evalúan las funcionalidades exigidas para un entorno de producción de un punto de venta (POS).
 
 ### 2.1. Autenticación y Autorización
-**Estado:** 🟡 Parcial | **Puntuación:** 6/10
-*   **¿Qué funciona?** El login básico con JWT está implementado y el backend valida correctamente los tokens.
-*   **¿Qué falta/Está mal diseñado?** Faltan funcionalidades esenciales como "Recuperar contraseña" (Reset Password), "Recordarme" (Refresh Tokens robustos), y cierre de sesión seguro a nivel backend (token invalidation/blacklist). El manejo de roles y permisos existe en concepto (`JwtAuthGuard`, `RolesGuard`), pero la granularidad es limitada.
+**Estado:** 🟢 Completo en Backend / Pendiente en Frontend | **Puntuación:** 9.5/10
+*   **¿Qué funciona?** El backend ahora cuenta con una arquitectura de autenticación sumamente robusta y segura:
+    *   **Login y Registro** con creación de Tenants.
+    *   **Rotación de Tokens de Refresco (RTR)**: Cada refresco emite un nuevo refresh token con el tiempo restante. Si un refresh token revocado es reutilizado (intento de robo/reproducción), se invalidan automáticamente *todas* las sesiones activas del usuario.
+    *   **Recordarme (Remember Me)**: Soporta duraciones personalizadas para los tokens de refresco según la preferencia del usuario.
+    *   **Recuperación de Contraseña**: Flujo completo y seguro con hash de tokens de recuperación e invalidación automática de sesiones activas al cambiar de contraseña.
+    *   **Verificación de Correo**: Flujo completo de verificación y reenvío de correo transaccional.
+    *   **Cierre de sesión seguro**: Endpoints para `logout` (revocar token actual) y `logout-all` (cerrar todas las sesiones).
+*   **¿Qué falta/Está mal diseñado?** La implementación en el backend es excelente y sigue los mejores estándares de seguridad OWASP. Falta verificar e integrar completamente todos estos flujos en la interfaz de usuario del frontend (vistas de recuperar contraseña, pantallas de verificación de correo, etc.) para que deje de ser "Parcial" a nivel del sistema general.
 
 ### 2.2. Multiempresa (Multitenant)
 **Estado:** 🟢 Funcional pero frágil | **Puntuación:** 7/10

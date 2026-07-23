@@ -1,276 +1,126 @@
-/* ================================
-   AUTH LAYOUT STYLES - POSENGINE
-   ================================ */
-
 .layout {
   min-height: 100vh;
-  height: 100vh;        /* ← fija la altura */
-  overflow: hidden;     /* ← solo en auth */
   display: flex;
+  background-color: var(--background);
 }
 
-.formSection {
-  flex: 1;
+.leftSection {
+  flex: 0 0 40%;
   display: flex;
-  align-items: center;
-  justify-content: center;
+  flex-direction: column;
   padding: 2rem;
   box-sizing: border-box;
 }
-/* ============================================
-   BRANDING SECTION - ESTILO FITTRACK
-   ============================================ */
-.brandingSection {
+
+.header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 1rem 2rem;
+}
+
+.logoText {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--foreground);
+  letter-spacing: -0.03em;
+}
+
+.logoHighlight {
+  color: var(--primary);
+}
+
+.formContainer {
+  flex: 1;
+  display: flex;
+  /* Center the card vertically within the left panel */
+  align-items: center;
+  justify-content: center;
+  padding: 4rem 0 2rem;
+}
+
+.formInner {
+  width: 100%;
+  max-width: 380px;
+}
+
+.rightSection {
   display: none;
   flex: 1;
   flex-direction: column;
-  align-items: center;
   justify-content: center;
-  padding: 3rem;
-  background: linear-gradient(135deg, 
-    hsl(220, 25%, 8%) 0%, 
-    hsl(220, 20%, 12%) 50%, 
-    hsl(220, 25%, 10%) 100%
-  );
-  color: white;
+  align-items: center;
+  padding: 4rem;
+  background-color: var(--card);
+  border-left: 1px solid var(--border);
   position: relative;
-  overflow: hidden;
 }
 
 @media (min-width: 1024px) {
-  .brandingSection {
+  .rightSection {
     display: flex;
   }
 }
 
-/* Background blur effects - colores FitTrack */
-.brandingSection::before,
-.brandingSection::after {
-  content: '';
-  position: absolute;
-  border-radius: 50%;
-  filter: blur(100px);
-  opacity: 0.15;
-  animation: slowFloat 20s ease-in-out infinite;
-  pointer-events: none;
+.quoteContainer {
+  max-width: 500px;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
 }
 
-.brandingSection::before {
-  top: -20%;
-  right: -10%;
-  width: 600px;
-  height: 600px;
-  background: radial-gradient(circle, #0066ff 0%, transparent 70%);
+.quoteMark {
+  font-family: serif;
+  font-size: 5rem;
+  line-height: 1;
+  color: var(--primary);
+  opacity: 0.8;
+  height: 2.5rem;
 }
 
-.brandingSection::after {
-  bottom: -20%;
-  left: -10%;
-  width: 500px;
-  height: 500px;
-  background: radial-gradient(circle, #00d9ff 0%, transparent 70%);
-  animation-delay: -10s;
+.quoteText {
+  font-size: 1.5rem;
+  line-height: 1.6;
+  font-weight: 500;
+  color: var(--foreground);
 }
 
-@keyframes slowFloat {
-  0%, 100% {
-    transform: translate(0, 0) rotate(0deg);
-  }
-  33% {
-    transform: translate(30px, -30px) rotate(5deg);
-  }
-  66% {
-    transform: translate(-20px, 20px) rotate(-5deg);
-  }
+.inlineHighlight {
+  color: var(--primary);
 }
 
-.brandingContent {
-  max-width: 32rem;
-  text-align: center;
-  position: relative;
-  z-index: 2;
-}
-
-/* Badge - colores FitTrack */
-.brandingBadge {
-  display: inline-flex;
+.authorContainer {
+  display: flex;
   align-items: center;
-  gap: 0.5rem;
-  padding: 0.75rem 1.25rem;
-  background: rgba(42, 42, 42, 0.8);
-  color: #00d9ff;
-  font-size: 0.875rem;
-  font-weight: 600;
-  border-radius: 12px;
-  border: 1px solid rgba(0, 102, 255, 0.3);
-  backdrop-filter: blur(15px);
-  margin-bottom: 2rem;
+  gap: 1rem;
+  margin-top: 1rem;
 }
 
-.badgeDot {
-  width: 8px;
-  height: 8px;
-  background: #0066ff;
+.avatar {
+  width: 3rem;
+  height: 3rem;
   border-radius: 50%;
-  animation: pulse 2s infinite;
-}
-
-@keyframes pulse {
-  0%, 100% {
-    opacity: 1;
-    transform: scale(1);
-  }
-  50% {
-    opacity: 0.6;
-    transform: scale(1.2);
-  }
-}
-
-/* Ícono con gradiente FitTrack */
-.brandingIcon {
-  width: 5rem;
-  height: 5rem;
-  background: linear-gradient(135deg, #0066ff 0%, #00d9ff 100%);
-  border-radius: 1.25rem;
+  background-color: var(--secondary);
+  border: 1px solid var(--border);
   display: flex;
   align-items: center;
   justify-content: center;
-  margin: 0 auto 2rem;
-  color: white;
-  box-shadow: 0 8px 24px rgba(0, 102, 255, 0.4);
-}
-
-/* Título */
-.brandingTitle {
-  font-size: 2.5rem;
-  font-weight: 800;
-  margin: 0 0 1.5rem 0;
-  color: white;
-  letter-spacing: -0.02em;
-}
-
-/* Gradiente exacto de FitTrack (cyan a azul) */
-.brandingTitleGradient {
-  background: linear-gradient(135deg, #0066ff 0%, #00d9ff 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-  font-weight: 800;
-}
-
-/* Descripción */
-.brandingDescription {
-  font-size: 1.125rem;
-  line-height: 1.7;
-  color: rgba(255, 255, 255, 0.7);
-  margin: 0 0 3rem 0;
-}
-
-/* Stats Grid con glass effect */
-.statsGrid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 2rem;
-  margin-top: 3rem;
-  padding-top: 2rem;
-  border-top: 1px solid rgba(255, 255, 255, 0.1);
-}
-
-.stat {
-  text-align: center;
-  padding: 1.5rem 1rem;
-  border-radius: 16px;
-  background: rgba(30, 30, 35, 0.6);
-  backdrop-filter: blur(15px);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  transition: all 0.3s ease;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
-}
-
-.stat:hover {
-  background: rgba(30, 30, 35, 0.8);
-  border-color: rgba(0, 217, 255, 0.4);
-  transform: translateY(-4px) scale(1.02);
-  box-shadow: 0 8px 24px rgba(0, 217, 255, 0.3);
-}
-
-/* Valores con el degradado FitTrack */
-.statValue {
-  font-size: 2rem;
   font-weight: 700;
-  background: linear-gradient(135deg, #0066ff 0%, #00d9ff 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-  margin: 0 0 0.5rem 0;
+  color: var(--primary);
 }
 
-.statLabel {
-  font-size: 0.875rem;
-  color: rgba(255, 255, 255, 0.6);
-  margin: 0;
-  font-weight: 500;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
+.authorInfo {
+  display: flex;
+  flex-direction: column;
 }
 
-/* Responsive */
-@media (max-width: 1024px) {
-  .layout {
-    flex-direction: column;
-  }
-  
-  .formSection {
-    min-height: 100vh;
-    padding: 1.5rem;
-  }
+.authorName {
+  font-weight: 600;
+  font-size: 0.95rem;
+  color: var(--foreground);
 }
 
-@media (max-width: 768px) {
-  .formSection {
-    padding: 1rem;
-  }
-
-  .brandingTitle {
-    font-size: 2rem;
-  }
-
-  .brandingDescription {
-    font-size: 1rem;
-  }
-
-  .statsGrid {
-    grid-template-columns: 1fr;
-    gap: 1rem;
-  }
-
-  .statValue {
-    font-size: 1.5rem;
-  }
-
-  .brandingIcon {
-    width: 4rem;
-    height: 4rem;
-  }
-
-  .brandingSection::before,
-  .brandingSection::after {
-    width: 400px;
-    height: 400px;
-  }
-}
-
-@media (max-width: 480px) {
-  .formSection {
-    padding: 1rem 0.75rem;
-  }
-  
-  .brandingTitle {
-    font-size: 1.75rem;
-  }
-  
-  .brandingBadge {
-    font-size: 0.75rem;
-    padding: 0.5rem 1rem;
-  }
+.authorHandle {
+  font-size: 0.85rem;
+  color: var(--muted-foreground);
 }
