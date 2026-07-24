@@ -14,15 +14,18 @@ var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$zustand$2f$e
 const useAuthStore = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$zustand$2f$esm$2f$react$2e$mjs__$5b$app$2d$client$5d$__$28$ecmascript$29$__["create"])()((0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$zustand$2f$esm$2f$middleware$2e$mjs__$5b$app$2d$client$5d$__$28$ecmascript$29$__["persist"])((set)=>({
         user: null,
         accessToken: null,
+        refreshToken: null,
         isAuthenticated: false,
-        setAuth: ({ user, accessToken })=>set({
+        setAuth: ({ user, accessToken, refreshToken })=>set({
                 user,
                 accessToken,
+                refreshToken: refreshToken || null,
                 isAuthenticated: true
             }),
         logout: ()=>set({
                 user: null,
                 accessToken: null,
+                refreshToken: null,
                 isAuthenticated: false
             })
     }), {

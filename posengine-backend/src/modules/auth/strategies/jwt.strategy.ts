@@ -16,6 +16,8 @@ export interface AuthenticatedUser {
   email: string;
   tenantId: string | null;
   role: UserRole;
+  name: string;
+  emailVerified: boolean;
 }
 
 @Injectable()
@@ -34,7 +36,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
   async validate(payload: JwtPayload): Promise<AuthenticatedUser> {
     const user = await this.prisma.user.findUnique({
       where: { id: payload.sub },
-      select: { id: true, email: true, tenantId: true, role: true, active: true },
+      select: { id: true, email: true, tenantId: true, role: true, active: true, name: true, emailVerified: true },
     });
 
     if (!user) throw new UnauthorizedException('Credenciales inválidas');
@@ -45,6 +47,8 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       email: user.email,
       tenantId: user.tenantId,
       role: user.role,
+      name: user.name,
+      emailVerified: user.emailVerified,
     };
   }
 }

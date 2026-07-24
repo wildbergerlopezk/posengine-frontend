@@ -34,7 +34,19 @@ export default function DashboardLayout({
       }
 
       try {
-        await getProfileApi(accessToken)
+        const profile = await getProfileApi(accessToken)
+        const currentUser = useAuthStore.getState().user
+        if (currentUser) {
+          useAuthStore.setState({
+            user: {
+              ...currentUser,
+              name: profile.name ?? currentUser.name,
+              email: profile.email ?? currentUser.email,
+              tenantId: profile.tenantId ?? currentUser.tenantId,
+              emailVerified: typeof profile.emailVerified === "boolean" ? profile.emailVerified : currentUser.emailVerified,
+            }
+          })
+        }
         setIsCheckingSession(false)
       } catch {
         logout()

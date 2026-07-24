@@ -32,3 +32,15 @@ export const registerApi = (credentials: RegisterCredentials) =>
 
 export const getProfileApi = (token: string) =>
   request<any>("/auth/profile", "GET", undefined, token)
+
+export const forgotPasswordApi = (email: string) =>
+  request<void>("/auth/forgot-password", "POST", { email })
+
+export const resetPasswordApi = (token: string, password: string) =>
+  request<void>("/auth/reset-password", "POST", { token, password })
+
+export const verifyEmailApi = (token: string) =>
+  request<any>(`/auth/verify-email?token=${token}`, "GET")
+
+export const resendVerificationEmailApi = (accessToken: string) =>
+  request<any>("/auth/resend-verification-email", "POST", undefined, accessToken)

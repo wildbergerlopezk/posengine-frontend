@@ -90,7 +90,23 @@ export function Sidebar() {
     )
   }
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    const { refreshToken, accessToken } = useAuthStore.getState()
+    if (refreshToken) {
+      try {
+        const { API_BASE_URL } = await import("@/src/shared/config/api")
+        await fetch(`${API_BASE_URL}/auth/logout`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${accessToken}`,
+          },
+          body: JSON.stringify({ refreshToken }),
+        })
+      } catch (err) {
+        console.error("Error revoking refresh token", err)
+      }
+    }
     logout()
     router.push("/login")
   }

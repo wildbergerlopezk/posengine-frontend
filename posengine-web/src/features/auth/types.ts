@@ -13,11 +13,13 @@ export interface RegisterCredentials {
 
 export interface AuthResponse {
   accessToken: string
+  refreshToken?: string
   user: {
     id: string
     name: string
     email: string
     tenantId: string | null
     tenantName?: string | null
+    emailVerified: boolean
   }
 }

@@ -9,6 +9,7 @@ type AuthUser = AuthResponse["user"]
 interface AuthState {
   user: AuthUser | null
   accessToken: string | null
+  refreshToken: string | null
   isAuthenticated: boolean
   setAuth: (data: AuthResponse) => void
   logout: () => void
@@ -19,12 +20,14 @@ export const useAuthStore = create<AuthState>()(
     (set) => ({
       user: null,
       accessToken: null,
+      refreshToken: null,
       isAuthenticated: false,
 
-      setAuth: ({ user, accessToken }) =>
+      setAuth: ({ user, accessToken, refreshToken }) =>
         set({
           user,
           accessToken,
+          refreshToken: refreshToken || null,
           isAuthenticated: true,
         }),
 
@@ -32,6 +35,7 @@ export const useAuthStore = create<AuthState>()(
         set({
           user: null,
           accessToken: null,
+          refreshToken: null,
           isAuthenticated: false,
         }),
     }),

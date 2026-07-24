@@ -171,13 +171,12 @@ export function RegisterForm() {
                 placeholder="••••••••"
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
-                className={`${styles.input} ${
-                  confirmPassword
+                className={`${styles.input} ${confirmPassword
                     ? passwordsMatch
                       ? styles.inputSuccess
                       : styles.inputError
                     : ""
-                }`}
+                  }`}
               />
               {confirmPassword && (
                 <div className={`${styles.matchBadge} ${passwordsMatch ? styles.matchOk : styles.matchNo}`}>
