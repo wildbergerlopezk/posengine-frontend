@@ -190,7 +190,7 @@ function getWeeklySalesData(sales: any[]): WeeklySalesData[] {
   })
 
   return days.map((day, index) => ({
-    name: day,
+    day: day,
     ventas: weekData[index] || 0,
   }))
 }

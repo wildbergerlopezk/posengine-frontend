@@ -1,17 +1,18 @@
 "use client"
 
 import { Header } from "@/src/shared/components/Header"
-import { DollarSign, ShoppingCart, AlertTriangle, TrendingUp, ArrowUpRight, Loader2 } from "lucide-react"
+import { Skeleton } from "@/src/shared/components/Skeleton"
+import { DollarSign, ShoppingCart, AlertTriangle, TrendingUp, ArrowUpRight } from "lucide-react"
 import { useAuthStore } from "@/src/features/auth/store/auth.store"
 import { formatCurrency } from "@/src/shared/hooks/useFormatCurrency"
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar } from "recharts"
 import styles from "./DashboardPage.module.css"
 import { useEffect, useState } from "react"
 import { getDashboardData } from "../api/dashboard.api"
-import type { DashboardDataResponse, WeeklySalesData, CategorySalesData } from "../api/dashboard.api"
+import type { DashboardDataResponse } from "../api/dashboard.api"
 
 export function DashboardPage() {
-  const { user, accessToken } = useAuthStore()
+  const { accessToken } = useAuthStore()
   const [dashboardData, setDashboardData] = useState<DashboardDataResponse | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -40,9 +41,51 @@ export function DashboardPage() {
     return (
       <div className={styles.page}>
         <Header title="Dashboard" />
-        <div className={styles.loadingContainer}>
-          <Loader2 size={40} className={styles.spinner} />
-          <p>Cargando datos...</p>
+        <div className={styles.container}>
+          <div className={styles.statsGrid}>
+            {[1, 2, 3, 4].map((i) => (
+              <div key={i} className={styles.statCard}>
+                <div className={styles.statHeader}>
+                  <Skeleton width="70px" height="14px" />
+                  <Skeleton width="2rem" height="2rem" className={styles.statIcon} />
+                </div>
+                <Skeleton width="90px" height="28px" />
+                <div style={{ marginTop: "0.5rem" }}>
+                  <Skeleton width="120px" height="12px" />
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div className={styles.chartsGrid}>
+            {[1, 2].map((i) => (
+              <div key={i} className={styles.card}>
+                <div className={styles.cardHeader}>
+                  <Skeleton width="160px" height="18px" />
+                </div>
+                <div className={styles.cardContent}>
+                  <Skeleton width="100%" height="280px" />
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div className={styles.bottomGrid}>
+            {[1, 2].map((i) => (
+              <div key={i} className={styles.card}>
+                <div className={styles.cardHeader}>
+                  <Skeleton width="180px" height="18px" />
+                </div>
+                <div className={styles.cardContent}>
+                  {[1, 2, 3].map((j) => (
+                    <div key={j} style={{ marginBottom: "0.75rem" }}>
+                      <Skeleton width="100%" height="48px" />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
     )
@@ -180,7 +223,7 @@ export function DashboardPage() {
                       </linearGradient>
                     </defs>
                     <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                    <XAxis dataKey="name" tick={{ fontSize: 12 }} />
+                    <XAxis dataKey="day" tick={{ fontSize: 12 }} />
                     <YAxis tick={{ fontSize: 12 }} tickFormatter={(v) => `$${v / 1000}k`} />
                     <Tooltip
                       formatter={(value: number) => [formatCurrency(value), "Ventas"]}

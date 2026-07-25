@@ -121,7 +121,10 @@ function AuthInterceptor() {
                     const url = typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
                     const isApiRequest = url.includes(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$shared$2f$config$2f$api$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["API_BASE_URL"]);
                     const isRefreshRequest = url.includes("/auth/refresh");
-                    if (!isApiRequest || isRefreshRequest) {
+                    const hasClientHeader = init?.headers && (init.headers instanceof Headers && init.headers.has("X-Client-Request") || Array.isArray(init.headers) && init.headers.some({
+                        "AuthInterceptor.useEffect": ([k])=>k.toLowerCase() === "x-client-request"
+                    }["AuthInterceptor.useEffect"]) || typeof init.headers === "object" && init.headers["X-Client-Request"]);
+                    if (!isApiRequest || isRefreshRequest || hasClientHeader) {
                         return originalFetch(input, init);
                     }
                     // Intentar realizar la petición original

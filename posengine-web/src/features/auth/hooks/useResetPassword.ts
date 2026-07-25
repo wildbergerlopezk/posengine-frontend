@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { resetPasswordApi } from "../api/auth.api"
+import { resetPasswordApi } from "../api"
 
 export function useResetPassword() {
   const [isLoading, setIsLoading] = useState(false)

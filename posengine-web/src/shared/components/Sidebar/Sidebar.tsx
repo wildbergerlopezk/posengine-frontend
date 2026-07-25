@@ -5,9 +5,9 @@ import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
 import {
   LayoutDashboard, ShoppingCart, Package, Users, Truck,
-  Wallet, BarChart2, Printer, Settings, ShoppingBag, History,
+  Wallet, Printer, Settings, ShoppingBag, History,
   PlusCircle, List, Tags, Tag, Building2, LogOut, Menu,
-  ChevronDown, ChevronRight, RotateCcw, HelpCircle
+  ChevronDown, ChevronRight, HelpCircle, Layers
 } from "lucide-react"
 import { useAuthStore } from "@/src/features/auth/store/auth.store"
 import styles from "./Sidebar.module.css"

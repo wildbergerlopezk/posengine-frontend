@@ -2,7 +2,7 @@
 
 import { create } from "zustand"
 import { persist } from "zustand/middleware"
-import type { AuthResponse } from "../types"
+import type { AuthResponse } from "../types/auth.types"
 
 type AuthUser = AuthResponse["user"]
 

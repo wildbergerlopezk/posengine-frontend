@@ -1,24 +1,15 @@
 import { Suspense } from "react"
 import { ResetPasswordForm } from "../components/ResetPasswordForm"
-import styles from "./ForgotPassword.module.css"
+import { AuthLayout, AuthCard } from "@/src/features/auth"
 
 export function ResetPasswordPage() {
   return (
-    <main className={styles.container}>
-      <section className={styles.card}>
-        <div className={styles.brand}>
-          Elytech
-          <span className={styles.brandText}>
-            POS<span className={styles.brandHighlight}>ENGINE</span>
-          </span>
-        </div>
-
-        <h1>Nueva contraseña</h1>
-
+    <AuthLayout>
+      <AuthCard title="Nueva contraseña">
         <Suspense fallback={<div>Cargando...</div>}>
           <ResetPasswordForm />
         </Suspense>
-      </section>
-    </main>
+      </AuthCard>
+    </AuthLayout>
   )
 }

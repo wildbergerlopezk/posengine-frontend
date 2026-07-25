@@ -3,8 +3,8 @@
 import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { useAuthStore } from "../store/auth.store"
-import { loginApi } from "../api/auth.api"
-import type { LoginCredentials } from "../types"
+import { loginApi } from "../api"
+import type { LoginCredentials } from "../types/auth.types"
 
 export function useLogin() {
   const router = useRouter()

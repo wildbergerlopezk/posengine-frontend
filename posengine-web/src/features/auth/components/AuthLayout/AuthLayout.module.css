@@ -1,0 +1,11 @@
+.container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  padding: 1.5rem;
+  background-color: var(--color-background);
+  background-image: radial-gradient(circle at top right, rgba(37, 99, 235, 0.06), transparent 45%),
+                    radial-gradient(circle at bottom left, rgba(16, 185, 129, 0.04), transparent 45%);
+  box-sizing: border-box;
+}

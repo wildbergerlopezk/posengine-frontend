@@ -5,7 +5,8 @@ import { useSearchParams, useRouter } from "next/navigation"
 import Link from "next/link"
 import { Mail, CheckCircle, AlertCircle, Loader2, ArrowLeft } from "lucide-react"
 import { useAuthStore } from "../store/auth.store"
-import { verifyEmailApi, resendVerificationEmailApi } from "../api/auth.api"
+import { verifyEmailApi, resendVerificationEmailApi } from "../api"
+import { AuthLayout, AuthCard } from "@/src/features/auth"
 import styles from "./VerifyEmailPage.module.css"
 
 export function VerifyEmailPage() {
@@ -43,13 +44,14 @@ export function VerifyEmailPage() {
         await verifyEmailApi(token)
         setStatus("success")
         
-        // Si el usuario está logueado en la sesión local, actualizamos su estado
-        if (user && accessToken) {
-          setAuth({
-            accessToken,
-            refreshToken: refreshToken || "",
+        // Obtener el estado actualizado (hidratado) en este momento
+        const { user: freshUser, accessToken: freshToken, refreshToken: freshRefresh, setAuth: freshSetAuth } = useAuthStore.getState()
+        if (freshUser && freshToken) {
+          freshSetAuth({
+            accessToken: freshToken,
+            refreshToken: freshRefresh || "",
             user: {
-              ...user,
+              ...freshUser,
               emailVerified: true,
             },
           })
@@ -65,7 +67,7 @@ export function VerifyEmailPage() {
     }
 
     verify()
-  }, [token, user, accessToken, refreshToken, setAuth])
+  }, [token])
 
   const handleResend = async () => {
     if (!accessToken) {
@@ -78,7 +80,7 @@ export function VerifyEmailPage() {
     setResendSuccess(false)
 
     try {
-      await resendVerificationEmailApi(accessToken)
+      await resendVerificationEmailApi()
       setResendSuccess(true)
       setResendCooldown(60)
     } catch (err) {
@@ -235,21 +237,15 @@ export function VerifyEmailPage() {
   }
 
   return (
-    <main className={styles.container}>
-      <section className={styles.card}>
-        <div className={styles.brand}>
-          Elytech
-          <span className={styles.brandText}>
-            POS<span className={styles.brandHighlight}>ENGINE</span>
-          </span>
-        </div>
+    <AuthLayout>
+      <AuthCard>
         {renderContent()}
         
         <Link href="/dashboard" className={styles.backLink}>
           <ArrowLeft size={16} />
           Volver
         </Link>
-      </section>
-    </main>
+      </AuthCard>
+    </AuthLayout>
   )
 }

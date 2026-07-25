@@ -3,7 +3,7 @@
 import type React from "react"
 import { Sidebar } from "@/src/shared/components/Sidebar"
 import { useAuthStore } from "@/src/features/auth/store/auth.store"
-import { getProfileApi } from "@/src/features/auth/api/auth.api"
+import { getProfileApi } from "@/src/features/auth/api"
 import { isAccessTokenValid } from "@/src/features/auth/utils/auth.utils"
 import { useRouter } from "next/navigation"
 import { useEffect, useState } from "react"
@@ -34,7 +34,8 @@ export default function DashboardLayout({
       }
 
       try {
-        const profile = await getProfileApi(accessToken)
+        const profile = await getProfileApi()
+        console.log("PROFILE FETCHED IN DASHBOARD:", profile)
         const currentUser = useAuthStore.getState().user
         if (currentUser) {
           useAuthStore.setState({

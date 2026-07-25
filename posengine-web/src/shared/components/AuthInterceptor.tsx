@@ -27,7 +27,13 @@ export function AuthInterceptor() {
       const isApiRequest = url.includes(API_BASE_URL)
       const isRefreshRequest = url.includes("/auth/refresh")
 
-      if (!isApiRequest || isRefreshRequest) {
+      const hasClientHeader = init?.headers && (
+        (init.headers instanceof Headers && init.headers.has("X-Client-Request")) ||
+        (Array.isArray(init.headers) && init.headers.some(([k]) => k.toLowerCase() === "x-client-request")) ||
+        (typeof init.headers === "object" && (init.headers as Record<string, string>)["X-Client-Request"])
+      )
+
+      if (!isApiRequest || isRefreshRequest || hasClientHeader) {
         return originalFetch(input, init)
       }
 

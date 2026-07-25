@@ -1,21 +1,12 @@
 import { ForgotPasswordForm } from "@/src/features/auth/components/ForgotPasswordForm"
-import styles from "./ForgotPassword.module.css"
+import { AuthLayout, AuthCard } from "@/src/features/auth"
 
 export function ForgotPasswordPage() {
   return (
-    <main className={styles.container}>
-      <section className={styles.card}>
-        <div className={styles.brand}>
-          Elytech
-          <span className={styles.brandText}>
-            POS<span className={styles.brandHighlight}>ENGINE</span>
-          </span>
-        </div>
-
-        <h1>Recuperar contraseña</h1>
-
+    <AuthLayout>
+      <AuthCard title="Recuperar contraseña">
         <ForgotPasswordForm />
-      </section>
-    </main>
+      </AuthCard>
+    </AuthLayout>
   )
 }

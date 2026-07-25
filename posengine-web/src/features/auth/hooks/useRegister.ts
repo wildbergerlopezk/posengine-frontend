@@ -3,8 +3,8 @@
 import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { useAuthStore } from "../store/auth.store"
-import { registerApi } from "../api/auth.api"
-import type { RegisterCredentials } from "../types"
+import { registerApi } from "../api"
+import type { RegisterCredentials } from "../types/auth.types"
 
 export function useRegister() {
   const router = useRouter()

@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { forgotPasswordApi } from "../api/auth.api"
+import { forgotPasswordApi } from "../api"
 
 export function useForgotPassword() {
   const [isLoading, setIsLoading] = useState(false)
