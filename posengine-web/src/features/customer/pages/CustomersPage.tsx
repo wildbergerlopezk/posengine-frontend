@@ -5,7 +5,7 @@ import { Header } from "@/src/shared/components/Header"
 import {
   Search, Plus, Pencil, Trash2, X, Users,
   AlertCircle, Loader2, Check, ChevronLeft,
-  ChevronRight, UserPlus, BadgeCheck, CreditCard,
+  ChevronRight, UserPlus, BadgeCheck, CreditCard, UsersRound, Eye,
 } from "lucide-react"
 import { useAuthStore } from "@/src/features/auth/store/auth.store"
 import { formatCurrency } from "@/src/shared/hooks/useFormatCurrency"
@@ -18,12 +18,10 @@ const API_BASE = API_BASE_URL
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-type DocumentType = "RUC" | "CI"
-
 interface Customer {
   id: string
   name: string
-  documentType: DocumentType
+  taxId?: string
   documentNumber?: string
   phone?: string
   email?: string
@@ -34,7 +32,7 @@ interface Customer {
 
 interface CustomerForm {
   name: string
-  documentType: DocumentType
+  taxId: string
   documentNumber: string
   phone: string
   email: string
@@ -45,10 +43,13 @@ interface CustomerForm {
 
 const EMPTY_FORM: CustomerForm = {
   name: "",
-  documentType: "CI", documentNumber: "",
-  phone: "", email: "",
+  taxId: "",
+  documentNumber: "",
+  phone: "",
+  email: "",
   address: "",
-  creditEnabled: false, creditLimit: "0",
+  creditEnabled: false,
+  creditLimit: "0",
 }
 
 function readApiError(body: unknown): string {
@@ -82,6 +83,7 @@ export function CustomersPage() {
   // ── Form modal ─────────────────────────────────────────────────────────────
   const [showModal, setShowModal]     = useState(false)
   const [editingId, setEditingId]     = useState<string | null>(null)
+  const [isReadOnly, setIsReadOnly]   = useState(false)
   const [form, setForm]               = useState<CustomerForm>(EMPTY_FORM)
   const [saving, setSaving]           = useState(false)
   const [formError, setFormError]     = useState<string | null>(null)
@@ -117,20 +119,20 @@ export function CustomersPage() {
   useEffect(() => { void fetchCustomers() }, [fetchCustomers])
   useEffect(() => { setPage(1) }, [search, creditFilter])
   useEffect(() => {
-    if (showModal) setTimeout(() => firstInputRef.current?.focus(), 80)
-  }, [showModal])
+    if (showModal && !isReadOnly) setTimeout(() => firstInputRef.current?.focus(), 80)
+  }, [showModal, isReadOnly])
 
   // ── Modal helpers ──────────────────────────────────────────────────────────
   const openCreate = () => {
-    setEditingId(null); setForm(EMPTY_FORM)
+    setEditingId(null); setIsReadOnly(false); setForm(EMPTY_FORM)
     setFormError(null); setSaveSuccess(false); setShowModal(true)
   }
 
   const openEdit = (c: Customer) => {
-    setEditingId(c.id)
+    setEditingId(c.id); setIsReadOnly(false)
     setForm({
       name: c.name,
-      documentType: c.documentType,
+      taxId: c.taxId ?? "",
       documentNumber: c.documentNumber ?? "",
       phone: c.phone ?? "",
       email: c.email ?? "",
@@ -141,7 +143,22 @@ export function CustomersPage() {
     setFormError(null); setSaveSuccess(false); setShowModal(true)
   }
 
-  const closeModal = () => { setShowModal(false); setEditingId(null) }
+  const openView = (c: Customer) => {
+    setEditingId(null); setIsReadOnly(true)
+    setForm({
+      name: c.name,
+      taxId: c.taxId ?? "",
+      documentNumber: c.documentNumber ?? "",
+      phone: c.phone ?? "",
+      email: c.email ?? "",
+      address: c.address ?? "",
+      creditEnabled: c.creditEnabled,
+      creditLimit: String(c.creditLimit),
+    })
+    setFormError(null); setSaveSuccess(false); setShowModal(true)
+  }
+
+  const closeModal = () => { setShowModal(false); setEditingId(null); setIsReadOnly(false) }
 
   const setField = (field: keyof CustomerForm) =>
     (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
@@ -157,7 +174,7 @@ export function CustomersPage() {
 
     const payload = {
       name:           form.name.trim(),
-      documentType:   form.documentType,
+      taxId:          form.taxId.trim() || undefined,
       documentNumber: form.documentNumber.trim() || undefined,
       phone:          form.phone.trim()   || undefined,
       email:          form.email.trim()   || undefined,
@@ -224,7 +241,7 @@ export function CustomersPage() {
         <div className={styles.statsRow}>
           <div className={styles.statChip}>
             <div className={`${styles.statIcon} ${styles.statIconBlue}`}>
-              <Users size={20} />
+              <UsersRound size={20} />
             </div>
             <div className={styles.statInfo}>
               <span className={styles.statChipLabel}>Total clientes</span>
@@ -233,7 +250,7 @@ export function CustomersPage() {
           </div>
           <div className={styles.statChip}>
             <div className={`${styles.statIcon} ${styles.statIconGreen}`}>
-              <CreditCard size={20} />
+              <BadgeCheck size={20} />
             </div>
             <div className={styles.statInfo}>
               <span className={styles.statChipLabel}>Con crédito habilitado</span>
@@ -330,16 +347,27 @@ export function CustomersPage() {
                       {c.email && <div className={styles.customerSub}>{c.email}</div>}
                     </td>
                     <td className={tableStyles.tableCell}>
-                      {c.documentNumber ? (
-                        <div className={styles.docWrapper}>
-                          <span className={`${styles.docBadge} ${c.documentType === "RUC" ? styles.docBadgeRUC : styles.docBadgeCI}`}>
-                            {c.documentType}
-                          </span>
-                          <span className={styles.docNumber}>{c.documentNumber}</span>
-                        </div>
-                      ) : (
-                        <span className={styles.emptyText}>—</span>
-                      )}
+                      <div className={styles.docColumn}>
+                        {c.documentNumber && (
+                          <div className={styles.docWrapper}>
+                            <span className={`${styles.docBadge} ${styles.docBadgeCI}`}>
+                              CI
+                            </span>
+                            <span className={styles.docNumber}>{c.documentNumber}</span>
+                          </div>
+                        )}
+                        {c.taxId && (
+                          <div className={styles.docWrapper}>
+                            <span className={`${styles.docBadge} ${styles.docBadgeRUC}`}>
+                              RUC
+                            </span>
+                            <span className={styles.docNumber}>{c.taxId}</span>
+                          </div>
+                        )}
+                        {!c.documentNumber && !c.taxId && (
+                          <span className={styles.emptyText}>—</span>
+                        )}
+                      </div>
                     </td>
                     <td className={tableStyles.tableCell}>
                       <div className={styles.contactWrapper}>
@@ -373,6 +401,9 @@ export function CustomersPage() {
                     </td>
                     <td className={`${tableStyles.tableCell} ${tableStyles.tableCellRight}`}>
                       <div className={styles.rowActions}>
+                        <button type="button" className={styles.iconBtn} onClick={() => openView(c)} title="Ver detalles">
+                          <Eye size={14} />
+                        </button>
                         <button type="button" className={styles.iconBtn} onClick={() => openEdit(c)} title="Editar">
                           <Pencil size={14} />
                         </button>
@@ -420,7 +451,7 @@ export function CustomersPage() {
             <div className={styles.formModalHeader}>
               <span className={styles.formModalTitle}>
                 <UserPlus size={17} />
-                {editingId ? "Editar cliente" : "Nuevo cliente"}
+                {isReadOnly ? "Ver cliente" : editingId ? "Editar cliente" : "Nuevo cliente"}
               </span>
               <button type="button" className={styles.modalCloseBtn} onClick={closeModal}>
                 <X size={18} />
@@ -441,28 +472,19 @@ export function CustomersPage() {
                   <div className={`${tableStyles.formGroup} ${styles.formGridFull}`}>
                     <label className={tableStyles.label} htmlFor="name">Nombre completo *</label>
                     <input ref={firstInputRef} id="name" className={tableStyles.input}
-                      value={form.name} onChange={setField("name")} placeholder="Juan Pérez" />
+                      value={form.name} onChange={setField("name")} placeholder="Juan Pérez" disabled={isReadOnly} />
                   </div>
                   <div className={tableStyles.formGroup}>
-                    <label className={tableStyles.label}>Tipo de documento</label>
-                    <div className={styles.docTypeToggle}>
-                      <button type="button"
-                        className={`${styles.docTypeBtn} ${form.documentType === "CI" ? styles.docTypeBtnActive : ""}`}
-                        onClick={() => setForm(p => ({ ...p, documentType: "CI" }))}
-                      >Cédula (CI)</button>
-                      <button type="button"
-                        className={`${styles.docTypeBtn} ${form.documentType === "RUC" ? styles.docTypeBtnActive : ""}`}
-                        onClick={() => setForm(p => ({ ...p, documentType: "RUC" }))}
-                      >RUC</button>
-                    </div>
-                  </div>
-                  <div className={tableStyles.formGroup}>
-                    <label className={tableStyles.label} htmlFor="documentNumber">
-                      {form.documentType === "RUC" ? "Número de RUC" : "Número de Cédula"}
-                    </label>
+                    <label className={tableStyles.label} htmlFor="documentNumber">Número de Cédula (CI)</label>
                     <input id="documentNumber" className={tableStyles.input}
                       value={form.documentNumber} onChange={setField("documentNumber")}
-                      placeholder={form.documentType === "RUC" ? "80012345-1" : "5.123.456"} />
+                      placeholder="5.123.456" disabled={isReadOnly} />
+                  </div>
+                  <div className={tableStyles.formGroup}>
+                    <label className={tableStyles.label} htmlFor="taxId">Número de RUC</label>
+                    <input id="taxId" className={tableStyles.input}
+                      value={form.taxId} onChange={setField("taxId")}
+                      placeholder="80012345-1" disabled={isReadOnly} />
                   </div>
                 </div>
               </div>
@@ -474,12 +496,12 @@ export function CustomersPage() {
                   <div className={tableStyles.formGroup}>
                     <label className={tableStyles.label} htmlFor="phone">Teléfono / Celular</label>
                     <input id="phone" className={tableStyles.input} value={form.phone}
-                      onChange={setField("phone")} placeholder="(0981)234567" />
+                      onChange={setField("phone")} placeholder="(0981)234567" disabled={isReadOnly} />
                   </div>
                   <div className={tableStyles.formGroup}>
                     <label className={tableStyles.label} htmlFor="email">Email</label>
                     <input id="email" type="email" className={tableStyles.input}
-                      value={form.email} onChange={setField("email")} placeholder="juan@email.com" />
+                      value={form.email} onChange={setField("email")} placeholder="juan@email.com" disabled={isReadOnly} />
                   </div>
                 </div>
               </div>
@@ -490,7 +512,7 @@ export function CustomersPage() {
                 <div className={`${tableStyles.formGroup} ${styles.formGridFull}`}>
                   <label className={tableStyles.label} htmlFor="address">Dirección</label>
                   <input id="address" className={tableStyles.input} value={form.address}
-                    onChange={setField("address")} placeholder="Av. Mariscal López 1234, Asunción" />
+                    onChange={setField("address")} placeholder="Av. Mariscal López 1234, Asunción" disabled={isReadOnly} />
                 </div>
               </div>
 
@@ -504,14 +526,14 @@ export function CustomersPage() {
                   </div>
                   <input type="checkbox" className={styles.toggle}
                     checked={form.creditEnabled}
-                    onChange={e => setForm(p => ({ ...p, creditEnabled: e.target.checked }))} />
+                    onChange={e => setForm(p => ({ ...p, creditEnabled: e.target.checked }))} disabled={isReadOnly} />
                 </div>
                 {form.creditEnabled && (
                   <div className={styles.formGrid}>
                     <div className={tableStyles.formGroup}>
                       <label className={tableStyles.label} htmlFor="creditLimit">Límite de crédito (Gs.)</label>
                       <input id="creditLimit" type="number" min="0" className={tableStyles.input}
-                        value={form.creditLimit} onChange={setField("creditLimit")} placeholder="0" />
+                        value={form.creditLimit} onChange={setField("creditLimit")} placeholder="0" disabled={isReadOnly} />
                     </div>
                   </div>
                 )}
@@ -519,18 +541,26 @@ export function CustomersPage() {
             </div>
 
             <div className={styles.formModalFooter}>
-              <button type="button" className={tableStyles.cancelButton} onClick={closeModal} disabled={saving}>
-                Cancelar
-              </button>
-              <button type="button" className={tableStyles.submitButton}
-                onClick={handleSave} disabled={saving || saveSuccess}>
-                {saveSuccess
-                  ? <><Check size={15} /> Guardado</>
-                  : saving
-                    ? <><Loader2 size={15} className={tableStyles.spinner} /> Guardando…</>
-                    : <><Check size={15} /> {editingId ? "Guardar cambios" : "Crear cliente"}</>
-                }
-              </button>
+              {isReadOnly ? (
+                <button type="button" className={tableStyles.cancelButton} onClick={closeModal}>
+                  Cerrar
+                </button>
+              ) : (
+                <>
+                  <button type="button" className={tableStyles.cancelButton} onClick={closeModal} disabled={saving}>
+                    Cancelar
+                  </button>
+                  <button type="button" className={tableStyles.submitButton}
+                    onClick={handleSave} disabled={saving || saveSuccess}>
+                    {saveSuccess
+                      ? <><Check size={15} /> Guardado</>
+                      : saving
+                        ? <><Loader2 size={15} className={tableStyles.spinner} /> Guardando…</>
+                        : <><Check size={15} /> {editingId ? "Guardar cambios" : "Crear cliente"}</>
+                    }
+                  </button>
+                </>
+              )}
             </div>
           </div>
         </div>
@@ -539,7 +569,7 @@ export function CustomersPage() {
       <ConfirmDialog
         open={!!deleteTarget}
         title={`¿Eliminar a ${deleteTarget?.name}?`}
-        message="El cliente será marcado como inactivo. Esta acción no se puede deshacer."
+        message="El cliente se eliminará de forma permanente de la base de datos. Esta acción no se puede deshacer."
         confirmText="Eliminar"
         type="danger"
         loading={deleting}

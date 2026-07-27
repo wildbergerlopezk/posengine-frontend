@@ -24,7 +24,7 @@ export class CustomerService {
 
   // ── FindAll ─────────────────────────────────────────────────────────────────
   async findAll(tenantId: string, filters: CustomerFilterDto) {
-    const { search, documentType, creditEnabled, page = 1, limit = 20 } = filters
+    const { search, creditEnabled, page = 1, limit = 20 } = filters
     const skip = (page - 1) * limit
 
     const where: any = { tenantId, isActive: true }
@@ -33,13 +33,13 @@ export class CustomerService {
       where.OR = [
         { name:           { contains: search, mode: 'insensitive' } },
         { documentNumber: { contains: search, mode: 'insensitive' } },
+        { taxId:          { contains: search, mode: 'insensitive' } },
         { phone:          { contains: search, mode: 'insensitive' } },
         { email:          { contains: search, mode: 'insensitive' } },
         { address:        { contains: search, mode: 'insensitive' } },
       ]
     }
 
-    if (documentType !== undefined) where.documentType = documentType
     if (creditEnabled !== undefined) where.creditEnabled = creditEnabled
 
     const [items, total] = await Promise.all([
@@ -75,7 +75,7 @@ export class CustomerService {
   }
 
   private async checkDuplicates(tenantId: string, dto: Partial<CreateCustomerDto>, excludeId?: string) {
-    const { documentNumber, email, phone } = dto
+    const { documentNumber, taxId, email, phone } = dto
 
     if (documentNumber) {
       const conflict = await this.prisma.customer.findFirst({
@@ -86,7 +86,20 @@ export class CustomerService {
         },
       })
       if (conflict) {
-        throw new ConflictException(`Ya existe un cliente con el documento "${documentNumber}"`)
+        throw new ConflictException(`Ya existe un cliente con el número de cédula "${documentNumber}"`)
+      }
+    }
+
+    if (taxId) {
+      const conflict = await this.prisma.customer.findFirst({
+        where: {
+          taxId,
+          tenantId,
+          ...(excludeId && { NOT: { id: excludeId } })
+        },
+      })
+      if (conflict) {
+        throw new ConflictException(`Ya existe un cliente con el RUC "${taxId}"`)
       }
     }
 
@@ -117,13 +130,11 @@ export class CustomerService {
     }
   }
 
-  // ── Soft delete ─────────────────────────────────────────────────────────────
+  // ── Hard delete ─────────────────────────────────────────────────────────────
   async remove(id: string, tenantId: string) {
     await this.findOne(id, tenantId)
-    // Soft delete: marcar como inactivo para no romper historial de ventas
-    return this.prisma.customer.update({
+    return this.prisma.customer.delete({
       where: { id },
-      data: { isActive: false },
     })
   }
 }

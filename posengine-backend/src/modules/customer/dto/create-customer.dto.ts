@@ -19,30 +19,24 @@ import {
 } from 'class-validator'
 import { Type, Transform } from 'class-transformer'
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger'
-import { DocumentType } from '../../../generated/prisma/enums'
+@ValidatorConstraint({ name: 'isTaxIdValid', async: false })
+export class IsTaxIdValidConstraint implements ValidatorConstraintInterface {
+  validate(value: any) {
+    if (!value) return true
+    return /^\d{5,9}-\d$/.test(value)
+  }
+  defaultMessage() {
+    return 'RUC inválido. Formato esperado: 12345678-9'
+  }
+}
 
 @ValidatorConstraint({ name: 'isDocumentNumberValid', async: false })
-export class IsDocumentNumberValidConstraint
-  implements ValidatorConstraintInterface
-{
-  validate(value: any, args: ValidationArguments) {
-    const dto = args.object as any
-    const type = dto.documentType || DocumentType.CI
-    if (type === DocumentType.CI) {
-      return /^(\d{1,3}(\.?\d{3}){2})$|^\d{5,8}$/.test(value)
-    }
-    if (type === DocumentType.RUC) {
-      return /^\d{5,9}-\d$/.test(value)
-    }
-    return false
+export class IsDocumentNumberValidConstraint implements ValidatorConstraintInterface {
+  validate(value: any) {
+    if (!value) return true
+    return /^(\d{1,3}(\.?\d{3}){2})$|^\d{5,8}$/.test(value)
   }
-
-  defaultMessage(args: ValidationArguments) {
-    const dto = args.object as any
-    const type = dto.documentType || DocumentType.CI
-    if (type === DocumentType.RUC) {
-      return 'RUC inválido. Formato esperado: 12345678-9'
-    }
+  defaultMessage() {
     return 'CI inválido. Ejemplos: 1.234.567 o 1234567'
   }
 }
@@ -56,10 +50,12 @@ export class CreateCustomerDto {
   @Transform(({ value }) => value?.trim())
   name!: string
 
-  @ApiPropertyOptional({ enum: DocumentType, default: DocumentType.CI })
+  @ApiPropertyOptional({ example: '12345678-9' })
   @IsOptional()
-  @IsEnum(DocumentType, { message: 'tipo de documento debe ser RUC o CI' })
-  documentType?: DocumentType
+  @IsString({ message: 'el RUC debe ser una cadena de texto' })
+  @Validate(IsTaxIdValidConstraint)
+  @Transform(({ value }) => value?.trim() || undefined)
+  taxId?: string
 
   @ApiPropertyOptional({ example: '5.123.456' })
   @IsOptional()

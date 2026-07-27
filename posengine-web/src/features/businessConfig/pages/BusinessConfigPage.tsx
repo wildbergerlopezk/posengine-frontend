@@ -102,18 +102,27 @@ export default function BusinessConfigPage() {
     if (!accessToken) return
     setIsSaving(true)
 
-    // Formatear el slug si no está definido
-    const cleanSlug = formData.slug.trim().toLowerCase().replace(/[^a-z0-9-_]+/g, '-') || 
-                      formData.tradeName.trim().toLowerCase().replace(/[^a-z0-9-_]+/g, '-')
+    const websiteValue = formData.slug.trim()
+    const urlPattern = /^(https?:\/\/)?([a-zA-Z0-9-]+\.)+[a-zA-Z]{2,}(\/.*)?$/
 
-    if (!cleanSlug) {
-      toast.error("El slug o Nombre de Fantasía es requerido para generar la URL única")
+    if (!websiteValue) {
+      toast.error("El sitio web es requerido")
       setIsSaving(false)
       return
     }
 
+    if (!urlPattern.test(websiteValue)) {
+      toast.error("Por favor, ingrese un sitio web válido (ej: https://elytechpy.es/)")
+      setIsSaving(false)
+      return
+    }
+
+    const formattedWebsite = /^(https?:\/\/)/i.test(websiteValue) 
+      ? websiteValue 
+      : `https://${websiteValue}`
+
     const payload = {
-      slug: cleanSlug,
+      slug: formattedWebsite.toLowerCase(),
       legalName: formData.legalName.trim(),
       tradeName: formData.tradeName?.trim() || null,
       taxId: formData.taxId.trim(),
@@ -309,17 +318,18 @@ export default function BusinessConfigPage() {
                   </Field>
 
                   <Field className={styles.formRow}>
-                    <FieldLabel htmlFor="slug" className={styles.label}>Slug URL *</FieldLabel>
+                    <FieldLabel htmlFor="slug" className={styles.label}>Sitio Web *</FieldLabel>
                     <div className={styles.inputWrapper}>
                       <Globe className={styles.inputIcon} size={16} />
                       <Input
                         id="slug"
                         name="slug"
+                        type="url"
                         value={formData.slug}
                         onChange={handleInputChange}
                         className={`${styles.input} ${styles.inputWithIcon}`}
                         required
-                        placeholder="ej-mi-tiendita"
+                        placeholder="https://elytechpy.es/"
                       />
                     </div>
                   </Field>

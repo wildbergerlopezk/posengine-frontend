@@ -271,6 +271,12 @@
   margin-top: 0.1rem;
 }
 
+.docColumn {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
 .docWrapper {
   display: flex;
   align-items: center;

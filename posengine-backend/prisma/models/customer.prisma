@@ -3,8 +3,8 @@ model Customer {
   tenantId String
 
   name           String
-  documentType   DocumentType @default(RUC)
-  documentNumber String?
+  taxId          String? // RUC / Identificación tributaria
+  documentNumber String? // Número de cédula de identidad
   phone          String?
   email          String?
 
@@ -21,10 +21,6 @@ model Customer {
 
   //Agregar relación con ventas en el momento que sea necesario 
   @@unique([documentNumber, tenantId])
+  @@unique([taxId, tenantId])
   @@map("customers")
-}
-
-enum DocumentType {
-  RUC
-  CI
 }

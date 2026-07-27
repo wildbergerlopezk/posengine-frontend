@@ -2,18 +2,11 @@
 import { IsOptional, IsString, IsEnum, IsBoolean } from 'class-validator'
 import { Transform, Type } from 'class-transformer'
 import { ApiPropertyOptional } from '@nestjs/swagger'
-import { DocumentType } from '../../../generated/prisma/enums'
-
 export class CustomerFilterDto {
   @ApiPropertyOptional({ description: 'Busca en nombre, apellido, documento, teléfono, email' })
   @IsOptional()
   @IsString()
   search?: string
-
-  @ApiPropertyOptional({ enum: DocumentType })
-  @IsOptional()
-  @IsEnum(DocumentType)
-  documentType?: DocumentType
 
   @ApiPropertyOptional({ description: 'Filtrar por clientes con crédito habilitado' })
   @IsOptional()
