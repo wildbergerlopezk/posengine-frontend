@@ -1,0 +1,38 @@
+model Company {
+    id     String  @id @default(uuid()) // ID de la empresa
+    
+    slug   String  @unique              // Identificador único para URLs
+    active Boolean @default(true)       // Empresa activa
+
+    // --- Identification (Identificación) ---
+    legalName      String   // Razón social
+    tradeName      String?  // Nombre de fantasía
+    taxId          String   @unique // RUC / Identificación tributaria
+
+    // --- Contact and Location (Contacto y Ubicación) ---
+    address        String   // Dirección
+    city           String   // Ciudad
+    state          String?  // Departamento / Estado
+    phone          String?  // Teléfono
+    email          String?  // Correo electrónico
+
+    // --- Economic Activity (Actividad Económica) ---
+    economicActivity String? // Actividad económica principal
+
+    // --- Internal Invoice Configuration (Configuración de Comprobantes) ---
+    emissionPoint   String @default("001-001") // Punto de emisión
+    logoUrl         String?                    // URL del logo del negocio
+
+    // --- Fields reserved for e-kuatía integration (Reservado para e-Kuatía) ---
+    stampNumber    String?   // Número de timbrado
+    stampStartDate DateTime? // Inicio de vigencia del timbrado
+
+    // --- Audit (Auditoría) ---
+    createdAt DateTime @default(now())  // Fecha de creación
+    updatedAt DateTime @updatedAt        // Fecha de última actualización
+
+    // --- Relations (Relaciones) ---
+    tenants Tenant[] // Tenants asociados a esta empresa
+
+    @@map("companies")
+}

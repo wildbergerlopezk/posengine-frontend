@@ -19,6 +19,7 @@ import { CustomerModule } from './modules/customer/customer.module';
 import { CashSessionModule } from './modules/cash-session/cash-session.module';
 import { ThrottlerModule } from '@nestjs/throttler';
 import { SubscriptionModule } from './modules/subscription/subscription.module';
+import { CompanyModule } from './modules/company/company.module';
 
 @Module({
   imports: [
@@ -28,6 +29,7 @@ import { SubscriptionModule } from './modules/subscription/subscription.module';
     UserModule,
     AuthModule,
     SubscriptionModule,
+    CompanyModule,
     CategoryModule,
     SubcategoryModule,
     ProductModule,

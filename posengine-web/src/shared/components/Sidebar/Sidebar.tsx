@@ -200,11 +200,10 @@ export function Sidebar() {
                     // El item raíz solo se marca activo si:
                     // 1. La ruta coincide exactamente (pathname === item.href)
                     // 2. Y esa ruta NO está registrada como subItem de otro grupo (!subItemHrefs.has(item.href))
-                    className={`${styles.navItem} ${
-                      pathname === item.href && !subItemHrefs.has(item.href) 
-                        ? styles.active 
+                    className={`${styles.navItem} ${pathname === item.href && !subItemHrefs.has(item.href)
+                        ? styles.active
                         : ""
-                    }`}
+                      }`}
                     // -------------------------------------------------
                     title={!isOpen ? item.label : undefined}
                   >
@@ -228,6 +227,13 @@ export function Sidebar() {
                   <p className={styles.tenantName}>{user?.tenantName || "Mi Negocio"}</p>
                   <p className={styles.tenantPlan}>Plan Estándar</p>
                 </div>
+                <Link
+                  href="/dashboard/businessConfig"
+                  className={styles.settingsLink}
+                  title="Configurar negocio"
+                >
+                  <Settings size={16} className={styles.settingsIcon} />
+                </Link>
               </div>
               <button className={styles.logoutButton} onClick={handleLogout}>
                 <LogOut size={18} />

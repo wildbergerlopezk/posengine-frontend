@@ -27,10 +27,25 @@ export class UploadService {
   async uploadFile(file: Express.Multer.File): Promise<{ url: string }> {
     if (!file) throw new BadRequestException('Archivo requerido')
 
-    // Mock en desarrollo sin credenciales
+    // Mock en desarrollo sin credenciales (guardar localmente)
     if (IS_DEV && (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_KEY)) {
-      console.warn('[DEV] Supabase no configurado, devolviendo URL mock')
-      return { url: `http://localhost:3006/uploads/mock-${Date.now()}.webp` }
+      console.warn('[DEV] Supabase no configurado, guardando archivo localmente')
+      const fs = require('fs')
+      const path = require('path')
+      const uploadsDir = path.join(process.cwd(), 'uploads')
+      if (!fs.existsSync(uploadsDir)) {
+        fs.mkdirSync(uploadsDir, { recursive: true })
+      }
+      
+      const filename = `mock-${Date.now()}.webp`
+      const optimized = await sharp(file.buffer)
+        .resize(800, 800, { fit: 'inside', withoutEnlargement: true })
+        .webp({ quality: 80 })
+        .toBuffer()
+        
+      fs.writeFileSync(path.join(uploadsDir, filename), optimized)
+      const port = process.env.PORT || '3006'
+      return { url: `http://localhost:${port}/uploads/${filename}` }
     }
 
     const optimized = await sharp(file.buffer)
