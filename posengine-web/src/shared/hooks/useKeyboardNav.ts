@@ -14,7 +14,6 @@ const DEFAULT_SHORTCUTS: ShortcutMap = {
   "ctrl+c": "/dashboard/clients",
   "ctrl+p": "/dashboard/suppliers",
   "ctrl+k": "/dashboard/cash",
-  "ctrl+r": "/dashboard/reports",
 }
 
 export function useKeyboardNav(shortcuts: ShortcutMap = DEFAULT_SHORTCUTS) {

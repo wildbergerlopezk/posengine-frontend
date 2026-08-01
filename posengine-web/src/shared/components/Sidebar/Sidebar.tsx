@@ -71,6 +71,7 @@ const navItems = [
     icon: Printer,
     subItems: [
       { href: "/dashboard/printing/invoices", label: "Facturas", icon: List },
+      { href: "/dashboard/printing/internal-receipts", label: "Control interno", icon: Layers },
       { href: "/dashboard/printing/labels", label: "Etiquetas", icon: Tag },
     ],
   },

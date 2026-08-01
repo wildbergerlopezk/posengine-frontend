@@ -1,0 +1,33 @@
+model InternalReceipt {
+  id String @id @default(uuid())
+
+  tenantId  String
+  companyId String
+  saleId    String  @unique // un comprobante por venta
+  customerId String?
+
+  // Correlativo interno por empresa (no es timbrado fiscal, es solo
+  // para poder ordenar/buscar "Comprobante Interno Nro X")
+  docNumber Int
+
+  total Float
+
+  // Foto congelada de company + customer + sale + items al momento
+  // de la emisión. Es lo que el frontend usa para pintar el PDF.
+  // Tipado en internal-receipt.service.ts como InternalReceiptSnapshot.
+  snapshot Json
+
+  voided       Boolean   @default(false)
+  voidedAt     DateTime?
+  voidedReason String?
+
+  createdAt DateTime @default(now())
+
+  tenant   Tenant    @relation(fields: [tenantId], references: [id])
+  company  Company   @relation(fields: [companyId], references: [id])
+  sale     Sale      @relation(fields: [saleId], references: [id])
+  customer Customer? @relation(fields: [customerId], references: [id])
+
+  @@unique([companyId, docNumber])
+  @@map("internal_receipts")
+}

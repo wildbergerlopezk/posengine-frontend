@@ -27,6 +27,8 @@ model Product {
   tenant      Tenant       @relation(fields: [tenantId], references: [id])
   category    Category     @relation(fields: [categoryId], references: [id])
   subcategory Subcategory? @relation(fields: [subcategoryId], references: [id])
+  supplierId  String?
+  supplier    Supplier?    @relation(fields: [supplierId], references: [id])
 
   saleItems           SaleItem[]
   purchaseItems       PurchaseItem[]

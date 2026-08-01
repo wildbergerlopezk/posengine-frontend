@@ -12,14 +12,17 @@ model Customer {
 
   creditEnabled Boolean @default(false)
   creditLimit   Float   @default(0)
+  currentDebt   Float   @default(0)
 
   isActive  Boolean  @default(true)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  tenant Tenant @relation(fields: [tenantId], references: [id])
+  tenant           Tenant            @relation(fields: [tenantId], references: [id])
+  internalReceipts InternalReceipt[] // Relación con comprobantes internos
+  sales            Sale[]
+  payments         CustomerPayment[]
 
-  //Agregar relación con ventas en el momento que sea necesario 
   @@unique([documentNumber, tenantId])
   @@unique([taxId, tenantId])
   @@map("customers")

@@ -1,0 +1,16 @@
+model CustomerPayment {
+  id            String        @id @default(uuid())
+  tenantId      String
+  customerId    String
+  saleId        String?
+  amount        Float
+  paymentDate   DateTime      @default(now())
+  paymentMethod PaymentMethod
+  notes         String?
+
+  tenant   Tenant   @relation(fields: [tenantId], references: [id])
+  customer Customer @relation(fields: [customerId], references: [id])
+  sale     Sale?    @relation(fields: [saleId], references: [id])
+
+  @@map("customer_payments")
+}

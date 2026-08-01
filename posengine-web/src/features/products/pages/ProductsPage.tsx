@@ -2,6 +2,7 @@
 
 import type React from "react"
 import { useState, useRef, useEffect, useCallback } from "react"
+import { createPortal } from "react-dom"
 import { Header } from "@/src/shared/components/Header"
 import {
   Plus, Search, MoreHorizontal, Pencil, Trash2, Package,
@@ -47,6 +48,8 @@ function formatStock(value: number, unitType: UnitType = "UNIT") {
 interface ProductWithRelations extends Product {
   category?: { id: string; name: string }
   subcategory?: { id: string; name: string } | null
+  supplierId?: string | null
+  supplier?: { id: string; name: string } | null
   sku?: string
   taxRate?: number
   isActive: boolean
@@ -63,6 +66,7 @@ export function ProductsPage() {
   const { accessToken } = useAuthStore()
   const [products, setProducts] = useState<ProductWithRelations[]>([])
   const [categories, setCategories] = useState<Category[]>([])
+  const [suppliers, setSuppliers] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [searchQuery, setSearchQuery] = useState("")
@@ -73,7 +77,19 @@ export function ProductsPage() {
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [editingProduct, setEditingProduct] = useState<ProductWithRelations | null>(null)
   const [openDropdown, setOpenDropdown] = useState<string | null>(null)
+  const [dropdownPos, setDropdownPos] = useState<{ top: number; left: number } | null>(null)
   const dropdownRef = useRef<HTMLDivElement>(null)
+
+  const toggleDropdown = (productId: string, e: React.MouseEvent<HTMLButtonElement>) => {
+    if (openDropdown === productId) {
+      setOpenDropdown(null)
+      setDropdownPos(null)
+      return
+    }
+    const rect = e.currentTarget.getBoundingClientRect()
+    setDropdownPos({ top: rect.bottom + 4, left: rect.right - 160 })
+    setOpenDropdown(productId)
+  }
 
   const [submitting, setSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
@@ -89,7 +105,7 @@ export function ProductsPage() {
   const closeConfirm = () => setConfirm((prev) => ({ ...prev, open: false }))
 
   const [formData, setFormData] = useState({
-    name: "", barcode: "", categoryId: "", subcategoryId: "",
+    name: "", barcode: "", categoryId: "", subcategoryId: "", supplierId: "",
     price: "", cost: "", wholesalePrice: "",
     stock: "", stockMinimum: "", imageUrl: "",
     unitType: "UNIT" as UnitType, stockNotes: "",
@@ -102,6 +118,7 @@ export function ProductsPage() {
   const barcodeRef = useRef<HTMLInputElement>(null)
   const categoryRef = useRef<HTMLSelectElement>(null)
   const subcategoryRef = useRef<HTMLSelectElement>(null)
+  const supplierRef = useRef<HTMLSelectElement>(null)
   const costRef = useRef<HTMLInputElement>(null)
   const priceRef = useRef<HTMLInputElement>(null)
   const wholesalePriceRef = useRef<HTMLInputElement>(null)
@@ -112,10 +129,21 @@ export function ProductsPage() {
   const stockMinRef = useRef<HTMLInputElement>(null)
   const submitRef = useRef<HTMLButtonElement>(null)
 
-  const handleEnterKey = (e: React.KeyboardEvent, nextRef: React.RefObject<HTMLElement | null>) => {
+  const handleEnterKey = (
+    e: React.KeyboardEvent,
+    nextRef: React.RefObject<HTMLElement | null>,
+    fallbackRef?: React.RefObject<HTMLElement | null>
+  ) => {
     if (e.key === "Enter") {
       e.preventDefault()
-      setTimeout(() => nextRef.current?.focus(), 50)
+      setTimeout(() => {
+        const nextEl = nextRef.current
+        if (nextEl && !(nextEl as any).disabled) {
+          nextEl.focus()
+        } else if (fallbackRef?.current) {
+          fallbackRef.current.focus()
+        }
+      }, 50)
     }
   }
 
@@ -158,10 +186,23 @@ export function ProductsPage() {
     }
   }, [accessToken])
 
+  const fetchSuppliers = useCallback(async () => {
+    try {
+      const res = await fetch(`${API_BASE}/suppliers?limit=100`, { headers: authHeaders })
+      if (res.ok) {
+        const data = await res.json()
+        setSuppliers(data.items ?? data)
+      }
+    } catch (err) {
+      console.error("Error al cargar proveedores", err)
+    }
+  }, [accessToken])
+
   useEffect(() => {
     fetchProducts(1, searchQuery)
     fetchCategories()
-  }, [fetchCategories]) // solo al montar
+    fetchSuppliers()
+  }, [fetchCategories, fetchSuppliers]) // solo al montar
 
   // ── Búsqueda con debounce — agregá este useEffect ─────────────────────────
   useEffect(() => {
@@ -230,7 +271,7 @@ export function ProductsPage() {
 
   const resetForm = () => {
     setFormData({
-      name: "", barcode: "", categoryId: "", subcategoryId: "",
+      name: "", barcode: "", categoryId: "", subcategoryId: "", supplierId: "",
       price: "", cost: "", wholesalePrice: "",
       stock: "", stockMinimum: "", imageUrl: "",
       unitType: "UNIT", stockNotes: "",
@@ -255,6 +296,7 @@ export function ProductsPage() {
       barcode: product.barcode || "",
       categoryId: product.categoryId || "",
       subcategoryId: product.subcategoryId || "",
+      supplierId: product.supplierId || "",
       price: price.toString(),
       cost: cost.toString(),
       wholesalePrice: wholesale.toString(),
@@ -398,6 +440,7 @@ export function ProductsPage() {
       stockMinimum,
       imageUrl: formData.imageUrl || undefined,
       stockNotes: formData.stockNotes || undefined,
+      supplierId: formData.supplierId || null,
     }
     try {
       if (editingProduct) {
@@ -468,12 +511,24 @@ export function ProductsPage() {
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node))
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
         setOpenDropdown(null)
+        setDropdownPos(null)
+      }
     }
     document.addEventListener("mousedown", handleClickOutside)
     return () => document.removeEventListener("mousedown", handleClickOutside)
   }, [])
+
+  useEffect(() => {
+    if (!openDropdown) return
+    const close = () => {
+      setOpenDropdown(null)
+      setDropdownPos(null)
+    }
+    window.addEventListener("scroll", close, true)
+    return () => window.removeEventListener("scroll", close, true)
+  }, [openDropdown])
 
   return (
     <div className={styles.page}>
@@ -508,6 +563,7 @@ export function ProductsPage() {
               <button className={styles.newButton} onClick={() => fetchProducts()}>Reintentar</button>
             </div>
           ) : (
+            <div className={styles.tableScroll}>
             <table className={styles.table}>
               <thead className={styles.tableHeader}>
                 <tr>
@@ -576,6 +632,7 @@ export function ProductsPage() {
                         <div className={styles.categoryStack}>
                           <span>{product.category?.name ?? "—"}</span>
                           {product.subcategory && <span className={styles.subcategoryText}>{product.subcategory.name}</span>}
+                          {product.supplier && <span className={styles.supplierText}>{product.supplier.name}</span>}
                         </div>
                       </td>
                       <td className={styles.tableCell}>
@@ -605,43 +662,49 @@ export function ProductsPage() {
                         </div>
                       </td>
                       <td className={`${styles.tableCell} ${styles.tableCellRight}`}>
-                        <div className={styles.dropdown} ref={openDropdown === product.id ? dropdownRef : null}>
+                        <div className={styles.dropdown}>
                           <button
                             className={styles.actionButton}
-                            onClick={() => setOpenDropdown(openDropdown === product.id ? null : product.id)}
+                            onClick={(e) => toggleDropdown(product.id, e)}
                           >
                             <MoreHorizontal size={16} />
                           </button>
-                          {openDropdown === product.id && (
-                            <div className={styles.dropdownMenu}>
-                              <button className={styles.dropdownItem} onClick={() => handleEdit(product)}>
-                                <Pencil size={14} /> Editar
-                              </button>
-                              {product.isActive ? (
-                                <button className={styles.dropdownItem} onClick={() => handleDeactivate(product)}>
-                                  <EyeOff size={14} /> Desactivar
-                                </button>
-                              ) : (
-                                <button className={styles.dropdownItem} onClick={() => handleActivate(product)}>
-                                  <Eye size={14} /> Activar
-                                </button>
-                              )}
-                              <div className={styles.dropdownDivider} />
-                              <button
-                                className={`${styles.dropdownItem} ${styles.dropdownItemDestructive}`}
-                                onClick={() => handleDelete(product.id)}
-                              >
-                                <Trash2 size={14} /> Eliminar
-                              </button>
-                            </div>
-                          )}
                         </div>
+                        {openDropdown === product.id && dropdownPos && createPortal(
+                          <div
+                            className={styles.dropdownMenu}
+                            style={{ top: dropdownPos.top, left: dropdownPos.left }}
+                            ref={dropdownRef}
+                          >
+                            <button className={styles.dropdownItem} onClick={() => handleEdit(product)}>
+                              <Pencil size={14} /> Editar
+                            </button>
+                            {product.isActive ? (
+                              <button className={styles.dropdownItem} onClick={() => handleDeactivate(product)}>
+                                <EyeOff size={14} /> Desactivar
+                              </button>
+                            ) : (
+                              <button className={styles.dropdownItem} onClick={() => handleActivate(product)}>
+                                <Eye size={14} /> Activar
+                              </button>
+                            )}
+                            <div className={styles.dropdownDivider} />
+                            <button
+                              className={`${styles.dropdownItem} ${styles.dropdownItemDestructive}`}
+                              onClick={() => handleDelete(product.id)}
+                            >
+                              <Trash2 size={14} /> Eliminar
+                            </button>
+                          </div>,
+                          document.body
+                        )}
                       </td>
                     </tr>
                   ))
                 )}
               </tbody>
             </table>
+            </div>
           )}
           {total > LIMIT && (
             <div className={styles.pagination}>
@@ -727,7 +790,7 @@ export function ProductsPage() {
                     <label className={styles.label}>Categoría *</label>
                     <select ref={categoryRef} className={styles.select} value={formData.categoryId}
                       onChange={(e) => setFormData({ ...formData, categoryId: e.target.value, subcategoryId: "" })}
-                      onKeyDown={(e) => handleEnterKey(e, subcategoryRef)} required>
+                      onKeyDown={(e) => handleEnterKey(e, subcategoryRef, supplierRef)} required>
                       <option value="">Seleccionar</option>
                       {categories.map((cat) => <option key={cat.id} value={cat.id}>{cat.name}</option>)}
                     </select>
@@ -736,12 +799,21 @@ export function ProductsPage() {
                     <label className={styles.label}>Subcategoría</label>
                     <select ref={subcategoryRef} className={styles.select} value={formData.subcategoryId}
                       onChange={(e) => setFormData({ ...formData, subcategoryId: e.target.value })}
-                      onKeyDown={(e) => handleEnterKey(e, costRef)}
+                      onKeyDown={(e) => handleEnterKey(e, supplierRef)}
                       disabled={!formData.categoryId || subcategories.length === 0}>
                       <option value="">Seleccionar</option>
                       {subcategories.map((sub: any) => <option key={sub.id} value={sub.id}>{sub.name}</option>)}
                     </select>
                   </div>
+                </div>
+                <div className={styles.formGroup}>
+                  <label className={styles.label}>Proveedor</label>
+                  <select ref={supplierRef} className={styles.select} value={formData.supplierId}
+                    onChange={(e) => setFormData({ ...formData, supplierId: e.target.value })}
+                    onKeyDown={(e) => handleEnterKey(e, costRef)}>
+                    <option value="">Ninguno (Opcional)</option>
+                    {suppliers.map((sup: any) => <option key={sup.id} value={sup.id}>{sup.name}</option>)}
+                  </select>
                 </div>
                 <div className={styles.formGroup}>
                   <label className={styles.label}>Precio de costo</label>

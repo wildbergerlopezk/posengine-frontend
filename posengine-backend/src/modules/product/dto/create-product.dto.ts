@@ -110,4 +110,9 @@ export class CreateProductDto {
     return value;
   })
   isActive?: boolean;
+
+  @ApiPropertyOptional({ example: 'supplier-uuid' })
+  @IsOptional()
+  @IsString()
+  supplierId?: string;
 }

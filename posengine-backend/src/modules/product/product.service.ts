@@ -102,6 +102,16 @@ export class ProductService {
       }
     }
 
+    // Validate supplier
+    if (dto.supplierId) {
+      const supplier = await this.prisma.supplier.findFirst({
+        where: { id: dto.supplierId, tenantId },
+      });
+      if (!supplier) {
+        throw new NotFoundException(`Proveedor con id "${dto.supplierId}" no encontrado`);
+      }
+    }
+
     // Unique checks
     const nameConflict = await this.prisma.product.findFirst({
       where: { name: dto.name, tenantId },
@@ -143,6 +153,7 @@ export class ProductService {
         tenantId,
         categoryId: dto.categoryId,
         subcategoryId: dto.subcategoryId,
+        supplierId: dto.supplierId,
         name: dto.name,
         description: dto.description,
         sku,
@@ -165,6 +176,7 @@ export class ProductService {
       include: {
         category: { select: { id: true, name: true } },
         subcategory: { select: { id: true, name: true } },
+        supplier: { select: { id: true, name: true } },
       },
     });
   }
@@ -194,6 +206,7 @@ export class ProductService {
         include: {
           category: { select: { id: true, name: true } },
           subcategory: { select: { id: true, name: true } },
+          supplier: { select: { id: true, name: true } },
         },
         orderBy: { createdAt: 'desc' },
         take: limit,
@@ -221,6 +234,7 @@ export class ProductService {
       include: {
         category: { select: { id: true, name: true } },
         subcategory: { select: { id: true, name: true } },
+        supplier: { select: { id: true, name: true } },
       },
     });
 
@@ -238,6 +252,7 @@ export class ProductService {
       include: {
         category: { select: { id: true, name: true } },
         subcategory: { select: { id: true, name: true } },
+        supplier: { select: { id: true, name: true } },
       },
     });
 
@@ -329,6 +344,15 @@ export class ProductService {
       }
     }
 
+    if (dto.supplierId) {
+      const supplier = await this.prisma.supplier.findFirst({
+        where: { id: dto.supplierId, tenantId },
+      })
+      if (!supplier) {
+        throw new NotFoundException(`Proveedor con id "${dto.supplierId}" no encontrado`)
+      }
+    }
+
     // ── VALIDACIÓN STOCK ──────────────────────────────────────────────────
     const effectiveUnitType = dto.unitType ?? current.unitType
     const effectiveName = dto.name ?? current.name
@@ -375,6 +399,7 @@ export class ProductService {
           ...(restDto.subcategoryId !== undefined && {
             subcategoryId: restDto.subcategoryId,
           }),
+          supplierId: restDto.supplierId !== undefined ? restDto.supplierId : undefined,
           ...(restDto.name && { name: restDto.name }),
           ...(restDto.description !== undefined && {
             description: restDto.description,
@@ -394,6 +419,7 @@ export class ProductService {
         include: {
           category: { select: { id: true, name: true } },
           subcategory: { select: { id: true, name: true } },
+          supplier: { select: { id: true, name: true } },
         },
       })
     }
@@ -406,6 +432,7 @@ export class ProductService {
         ...(dto.subcategoryId !== undefined && {
           subcategoryId: dto.subcategoryId,
         }),
+        supplierId: dto.supplierId !== undefined ? dto.supplierId : undefined,
         ...(dto.name && { name: dto.name }),
         ...(dto.description !== undefined && {
           description: dto.description,
@@ -426,6 +453,7 @@ export class ProductService {
       include: {
         category: { select: { id: true, name: true } },
         subcategory: { select: { id: true, name: true } },
+        supplier: { select: { id: true, name: true } },
       },
     })
   }

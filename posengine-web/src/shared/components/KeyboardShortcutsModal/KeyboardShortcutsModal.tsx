@@ -3,7 +3,7 @@
 import React from "react"
 import { 
   X, Keyboard, LayoutDashboard, Package, Users, Truck, 
-  Wallet, BarChart2, PlusCircle, History 
+  Wallet, PlusCircle, History 
 } from "lucide-react"
 import styles from "./KeyboardShortcutsModal.module.css"
 
@@ -64,7 +64,6 @@ export function KeyboardShortcutsModal({ onClose }: KeyboardShortcutsModalProps)
               <ShortcutItem icon={Users} label="Clientes" keys={["Ctrl", "C"]} />
               <ShortcutItem icon={Truck} label="Proveedores" keys={["Ctrl", "P"]} />
               <ShortcutItem icon={Wallet} label="Caja" keys={["Ctrl", "K"]} />
-              <ShortcutItem icon={BarChart2} label="Reportes" keys={["Ctrl", "R"]} />
             </div>
           </section>
 

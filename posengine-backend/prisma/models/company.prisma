@@ -34,5 +34,6 @@ model Company {
     // --- Relations (Relaciones) ---
     tenants Tenant[] // Tenants asociados a esta empresa
 
+    internalReceipts InternalReceipt[] // Comprobantes internos asociados a esta empresa
     @@map("companies")
 }

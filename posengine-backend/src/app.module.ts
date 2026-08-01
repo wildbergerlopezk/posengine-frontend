@@ -20,6 +20,7 @@ import { CashSessionModule } from './modules/cash-session/cash-session.module';
 import { ThrottlerModule } from '@nestjs/throttler';
 import { SubscriptionModule } from './modules/subscription/subscription.module';
 import { CompanyModule } from './modules/company/company.module';
+import { InternalReceiptModule } from './modules/internal-receipts/internal-receipt.module';
 
 @Module({
   imports: [
@@ -44,6 +45,7 @@ import { CompanyModule } from './modules/company/company.module';
     StockMovementModule,
     CustomerModule,
     CashSessionModule,
+    InternalReceiptModule,
   ],
   controllers: [AppController],
   providers: [AppService],

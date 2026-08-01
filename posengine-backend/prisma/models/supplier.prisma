@@ -12,6 +12,7 @@ model Supplier {
 
   tenant    Tenant     @relation(fields: [tenantId], references: [id])
   purchases Purchase[]
+  products  Product[]
 
   @@unique([name, tenantId])
   @@map("suppliers")
