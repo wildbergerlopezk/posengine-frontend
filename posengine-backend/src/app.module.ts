@@ -16,6 +16,7 @@ import { PurchaseModule } from './modules/purchase/purchase.module';
 import { SaleModule } from './modules/sale/sale.module';
 import { StockMovementModule } from './modules/stock-movement/stock-movement.module';
 import { CustomerModule } from './modules/customer/customer.module';
+import { CustomerPaymentModule } from './modules/customer-payment/customer-payment.module';
 import { CashSessionModule } from './modules/cash-session/cash-session.module';
 import { ThrottlerModule } from '@nestjs/throttler';
 import { SubscriptionModule } from './modules/subscription/subscription.module';
@@ -25,7 +26,7 @@ import { InternalReceiptModule } from './modules/internal-receipts/internal-rece
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true, envFilePath: '.env' }),
-    ThrottlerModule.forRoot([{ ttl: 60000, limit: 20 }]),
+    ThrottlerModule.forRoot([{ ttl: 60000, limit: 120 }]),
     PrismaModule,
     UserModule,
     AuthModule,
@@ -44,6 +45,7 @@ import { InternalReceiptModule } from './modules/internal-receipts/internal-rece
     SaleModule,
     StockMovementModule,
     CustomerModule,
+    CustomerPaymentModule,
     CashSessionModule,
     InternalReceiptModule,
   ],

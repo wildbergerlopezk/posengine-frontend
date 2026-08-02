@@ -20,12 +20,19 @@ function formatDisplay(val: string) {
   return num.replace(/\B(?=(\d{3})+(?!\d))/g, '.')
 }
 
+interface ContentProps {
+  session: CashSession
+  loading: boolean
+  onClose: () => void
+  onConfirm: (closingAmount: number, notes?: string) => Promise<void>
+}
+
 function CloseCashModalContent({
   session,
   loading,
   onClose,
   onConfirm,
-}: Omit<Props, 'open'>) {
+}: ContentProps) {
   const [amount, setAmount] = useState('')
   const [notes, setNotes] = useState('')
   const [error, setError] = useState<string | null>(null)
@@ -90,11 +97,19 @@ function CloseCashModalContent({
               <span className={styles.summaryLabel}>Monto inicial</span>
               <span className={styles.summaryValue}>{formatGs(session.openingAmount)}</span>
             </div>
-            <div className={styles.summaryRow}>
+            <div className={styles.summaryRow} style={{ alignItems: 'flex-start' }}>
               <span className={styles.summaryLabel}>+ Ventas del día</span>
-              <span className={`${styles.summaryValue} ${styles.positive}`}>
-                {formatGs(session.totalSales)}
-              </span>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem', alignItems: 'flex-end' }}>
+                <span className={`${styles.summaryValue} ${styles.positive}`} style={{ fontSize: '0.82rem' }}>
+                  Al contado: {formatGs(session.totalCashSales ?? session.totalSales)}
+                </span>
+                <span className={`${styles.summaryValue} ${styles.positive}`} style={{ fontSize: '0.82rem' }}>
+                  Cobros deuda: {formatGs(session.totalDebtPayments ?? 0)}
+                </span>
+                <span className={`${styles.summaryValue}`} style={{ fontSize: '0.72rem', color: 'var(--color-muted-foreground)', fontWeight: 'normal' }}>
+                  Crédito pendiente: {formatGs(session.totalCreditSales ?? 0)}
+                </span>
+              </div>
             </div>
             <div className={styles.summaryRow}>
               <span className={styles.summaryLabel}>− Compras del día</span>

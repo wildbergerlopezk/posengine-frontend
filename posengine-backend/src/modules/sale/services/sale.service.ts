@@ -10,7 +10,7 @@ import { StockMovementService } from '../../stock-movement/stock-movement.servic
 import { ProductService } from '../../product/product.service'
 import { CreateSaleDto } from './../dto/create-sale.dto'
 import { SaleFilterDto } from './../dto/sale-filter.dto'
-import { CashSessionStatus, SaleStatus, PriceType } from '../../../generated/prisma/enums'
+import { CashSessionStatus, SaleStatus, PriceType, PaymentStatus, PaymentMethod } from '../../../generated/prisma/enums'
 import { Prisma } from '../../../generated/prisma/client'
 
 @Injectable()
@@ -98,13 +98,69 @@ export class SaleService {
       0,
     )
 
+    const paymentMethod = dto.paymentMethod ?? PaymentMethod.CASH
+    const amountPaid = dto.amountPaid ?? 0
+
+    // ── Validaciones de crédito ──────────────────────────────────────────
+    let customer: Awaited<ReturnType<typeof this.prisma.customer.findFirst>> | null = null
+    const remainingBalance = Math.max(0, total - amountPaid)
+
+    if (paymentMethod === PaymentMethod.CREDIT) {
+      if (!dto.customerId) {
+        throw new BadRequestException('Las ventas a crédito requieren un cliente asociado.')
+      }
+
+      customer = await this.prisma.customer.findFirst({
+        where: { id: dto.customerId, tenantId },
+      })
+      if (!customer) {
+        throw new NotFoundException(`Cliente con id "${dto.customerId}" no encontrado`)
+      }
+      if (!customer.isActive) {
+        throw new BadRequestException('El cliente está inactivo.')
+      }
+      if (!customer.creditEnabled) {
+        throw new BadRequestException(`El cliente "${customer.name}" no tiene crédito habilitado.`)
+      }
+      if (amountPaid > total) {
+        throw new BadRequestException('El monto abonado no puede superar el total de la venta.')
+      }
+
+      const projectedDebt = customer.currentDebt + remainingBalance
+      if (remainingBalance > 0 && projectedDebt > customer.creditLimit) {
+        const available = Math.max(0, customer.creditLimit - customer.currentDebt)
+        throw new BadRequestException(
+          `El cliente "${customer.name}" no tiene crédito suficiente. Disponible: Gs. ${available.toLocaleString('es-PY')}, requerido: Gs. ${remainingBalance.toLocaleString('es-PY')}.`,
+        )
+      }
+    } else if (dto.customerId) {
+      // Venta en efectivo/tarjeta/transferencia pero igual asociada a un cliente (opcional, para historial)
+      customer = await this.prisma.customer.findFirst({
+        where: { id: dto.customerId, tenantId },
+      })
+      if (!customer) {
+        throw new NotFoundException(`Cliente con id "${dto.customerId}" no encontrado`)
+      }
+    }
+
+    const paymentStatus =
+      remainingBalance <= 0
+        ? PaymentStatus.PAID
+        : amountPaid > 0
+          ? PaymentStatus.PARTIAL
+          : PaymentStatus.PENDING
+
     // 6. Crear la venta, sus items y los movimientos de stock en una transacción
     return this.prisma.$transaction(async (tx) => {
       const sale = await tx.sale.create({
         data: {
           tenantId,
           cashSessionId: cashSession.id,
+          customerId: customer?.id,
           total,
+          paymentMethod,
+          paymentStatus,
+          remainingBalance,
         },
       })
 
@@ -130,15 +186,37 @@ export class SaleService {
         )
       }
 
-      // Actualizar totalSales de la sesión de caja activa
+      // Solo lo cobrado en el momento entra a totalSales de la caja
       await tx.cashSession.update({
         where: { id: cashSession.id },
-        data: { totalSales: { increment: total } },
+        data: { totalSales: { increment: total - remainingBalance } },
       })
+
+      // Incrementar deuda del cliente si quedó saldo pendiente
+      if (customer && remainingBalance > 0) {
+        await tx.customer.update({
+          where: { id: customer.id },
+          data: { currentDebt: { increment: remainingBalance } },
+        })
+      }
+
+      // Si hubo seña, dejamos registro como CustomerPayment
+      if (customer && amountPaid > 0) {
+        await tx.customerPayment.create({
+          data: {
+            tenantId,
+            customerId: customer.id,
+            saleId: sale.id,
+            amount: amountPaid,
+            paymentMethod,
+          },
+        })
+      }
 
       return tx.sale.findUnique({
         where: { id: sale.id },
         include: {
+          customer: { select: { id: true, name: true } },
           items: {
             include: {
               product: { select: { id: true, name: true, sku: true, unitType: true } },
@@ -170,6 +248,7 @@ export class SaleService {
       this.prisma.sale.findMany({
         where,
         include: {
+          customer: { select: { id: true, name: true, documentNumber: true, taxId: true } },
           items: {
             include: {
               product: { select: { id: true, name: true, sku: true, unitType: true } },
@@ -191,6 +270,7 @@ export class SaleService {
     const sale = await this.prisma.sale.findFirst({
       where: { id, tenantId },
       include: {
+        customer: true,
         cashSession: {
           select: { id: true, openedAt: true, closedAt: true, status: true },
         },
@@ -249,7 +329,16 @@ export class SaleService {
         )
       }
 
-      const adjustedTotalSales = Math.max(0, sale.cashSession.totalSales - sale.total)
+      // Revertir deuda del cliente
+      if (sale.customerId && sale.remainingBalance > 0) {
+        await tx.customer.update({
+          where: { id: sale.customerId },
+          data: { currentDebt: { decrement: sale.remainingBalance } },
+        })
+      }
+
+      const collectedAmount = sale.total - sale.remainingBalance
+      const adjustedTotalSales = Math.max(0, sale.cashSession.totalSales - collectedAmount)
       const cashSessionUpdate: Prisma.CashSessionUpdateInput = {
         totalSales: adjustedTotalSales,
       }

@@ -28,6 +28,7 @@ interface Customer {
   address?: string
   creditEnabled: boolean
   creditLimit: number
+  currentDebt: number
 }
 
 interface CustomerForm {
@@ -39,6 +40,7 @@ interface CustomerForm {
   address: string
   creditEnabled: boolean
   creditLimit: string
+  currentDebt: number
 }
 
 const EMPTY_FORM: CustomerForm = {
@@ -50,6 +52,7 @@ const EMPTY_FORM: CustomerForm = {
   address: "",
   creditEnabled: false,
   creditLimit: "0",
+  currentDebt: 0,
 }
 
 function readApiError(body: unknown): string {
@@ -122,6 +125,16 @@ export function CustomersPage() {
     if (showModal && !isReadOnly) setTimeout(() => firstInputRef.current?.focus(), 80)
   }, [showModal, isReadOnly])
 
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && showModal) {
+        closeModal()
+      }
+    }
+    window.addEventListener("keydown", handleKeyDown)
+    return () => window.removeEventListener("keydown", handleKeyDown)
+  }, [showModal])
+
   // ── Modal helpers ──────────────────────────────────────────────────────────
   const openCreate = () => {
     setEditingId(null); setIsReadOnly(false); setForm(EMPTY_FORM)
@@ -138,7 +151,8 @@ export function CustomersPage() {
       email: c.email ?? "",
       address: c.address ?? "",
       creditEnabled: c.creditEnabled,
-      creditLimit: String(c.creditLimit),
+      creditLimit: c.creditLimit ? String(c.creditLimit).replace(/\B(?=(\d{3})+(?!\d))/g, ".") : "0",
+      currentDebt: c.currentDebt,
     })
     setFormError(null); setSaveSuccess(false); setShowModal(true)
   }
@@ -153,7 +167,8 @@ export function CustomersPage() {
       email: c.email ?? "",
       address: c.address ?? "",
       creditEnabled: c.creditEnabled,
-      creditLimit: String(c.creditLimit),
+      creditLimit: c.creditLimit ? String(c.creditLimit).replace(/\B(?=(\d{3})+(?!\d))/g, ".") : "0",
+      currentDebt: c.currentDebt,
     })
     setFormError(null); setSaveSuccess(false); setShowModal(true)
   }
@@ -161,8 +176,14 @@ export function CustomersPage() {
   const closeModal = () => { setShowModal(false); setEditingId(null); setIsReadOnly(false) }
 
   const setField = (field: keyof CustomerForm) =>
-    (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
-      setForm(prev => ({ ...prev, [field]: e.target.value }))
+    (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+      let val = e.target.value
+      if (field === "creditLimit") {
+        const clean = val.replace(/\D/g, "")
+        val = clean ? clean.replace(/\B(?=(\d{3})+(?!\d))/g, ".") : ""
+      }
+      setForm(prev => ({ ...prev, [field]: val }))
+    }
 
   // ── Save ───────────────────────────────────────────────────────────────────
   const handleSave = async () => {
@@ -180,7 +201,7 @@ export function CustomersPage() {
       email:          form.email.trim()   || undefined,
       address:        form.address.trim() || undefined,
       creditEnabled:  form.creditEnabled,
-      creditLimit:    parseFloat(form.creditLimit)  || 0,
+      creditLimit:    parseFloat(form.creditLimit.replace(/\./g, "")) || 0,
     }
 
     try {
@@ -313,9 +334,13 @@ export function CustomersPage() {
             <thead className={tableStyles.tableHeader}>
               <tr>
                 <th className={`${tableStyles.tableHeaderCell} ${styles.headerCellOverride}`}>Nombre</th>
-                <th className={`${tableStyles.tableHeaderCell} ${styles.headerCellOverride}`} style={{ width: 180 }}>Documento</th>
+                <th className={`${tableStyles.tableHeaderCell} ${styles.headerCellOverride}`}>Email</th>
+                <th className={`${tableStyles.tableHeaderCell} ${styles.headerCellOverride}`} style={{ width: 110 }}>CI</th>
+                <th className={`${tableStyles.tableHeaderCell} ${styles.headerCellOverride}`} style={{ width: 110 }}>RUC</th>
                 <th className={`${tableStyles.tableHeaderCell} ${styles.headerCellOverride}`}>Contacto</th>
-                <th className={`${tableStyles.tableHeaderCell} ${styles.headerCellOverride}`} style={{ width: 130 }}>Crédito</th>
+                <th className={`${tableStyles.tableHeaderCell} ${styles.headerCellOverride}`} style={{ width: 130 }}>Límite Crédito</th>
+                <th className={`${tableStyles.tableHeaderCell} ${styles.headerCellOverride}`} style={{ width: 120 }}>Deuda Total</th>
+                <th className={`${tableStyles.tableHeaderCell} ${styles.headerCellOverride}`} style={{ width: 130 }}>Crédito Disponible</th>
                 <th className={`${tableStyles.tableHeaderCell} ${styles.headerCellOverride}`} style={{ width: 220 }}>Dirección</th>
                 <th className={`${tableStyles.tableHeaderCell} ${styles.headerCellOverride}`} style={{ width: 80 }} />
               </tr>
@@ -323,7 +348,7 @@ export function CustomersPage() {
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={6}>
+                  <td colSpan={10}>
                     <div className={tableStyles.emptyState}>
                       <Loader2 size={28} className={tableStyles.spinner} />
                     </div>
@@ -331,7 +356,7 @@ export function CustomersPage() {
                 </tr>
               ) : customers.length === 0 ? (
                 <tr>
-                  <td colSpan={6}>
+                  <td colSpan={10}>
                     <div className={tableStyles.emptyState}>
                       <Users size={36} className={tableStyles.emptyStateIcon} />
                       <p className={tableStyles.emptyStateTitle}>Sin clientes</p>
@@ -344,30 +369,15 @@ export function CustomersPage() {
                   <tr key={c.id} className={tableStyles.tableRow}>
                     <td className={tableStyles.tableCell}>
                       <div className={styles.customerName}>{c.name}</div>
-                      {c.email && <div className={styles.customerSub}>{c.email}</div>}
                     </td>
                     <td className={tableStyles.tableCell}>
-                      <div className={styles.docColumn}>
-                        {c.documentNumber && (
-                          <div className={styles.docWrapper}>
-                            <span className={`${styles.docBadge} ${styles.docBadgeCI}`}>
-                              CI
-                            </span>
-                            <span className={styles.docNumber}>{c.documentNumber}</span>
-                          </div>
-                        )}
-                        {c.taxId && (
-                          <div className={styles.docWrapper}>
-                            <span className={`${styles.docBadge} ${styles.docBadgeRUC}`}>
-                              RUC
-                            </span>
-                            <span className={styles.docNumber}>{c.taxId}</span>
-                          </div>
-                        )}
-                        {!c.documentNumber && !c.taxId && (
-                          <span className={styles.emptyText}>—</span>
-                        )}
-                      </div>
+                      <div className={styles.customerSub}>{c.email || "—"}</div>
+                    </td>
+                    <td className={tableStyles.tableCell}>
+                      <span className={styles.docNumber}>{c.documentNumber || "—"}</span>
+                    </td>
+                    <td className={tableStyles.tableCell}>
+                      <span className={styles.docNumber}>{c.taxId || "—"}</span>
                     </td>
                     <td className={tableStyles.tableCell}>
                       <div className={styles.contactWrapper}>
@@ -393,6 +403,24 @@ export function CustomersPage() {
                           )}
                         </div>
                       </div>
+                    </td>
+                    <td className={tableStyles.tableCell}>
+                      {c.creditEnabled ? (
+                        <span className={styles.creditLimitText} style={{ color: c.currentDebt > 0 ? "#ef4444" : "inherit", fontWeight: c.currentDebt > 0 ? "bold" : "normal", fontSize: "0.875rem" }}>
+                          {formatCurrency(c.currentDebt)}
+                        </span>
+                      ) : (
+                        <span className={styles.emptyText}>—</span>
+                      )}
+                    </td>
+                    <td className={tableStyles.tableCell}>
+                      {c.creditEnabled ? (
+                        <span className={styles.creditLimitText} style={{ color: "#22c55e", fontWeight: "bold", fontSize: "0.875rem" }}>
+                          {formatCurrency(Math.max(0, c.creditLimit - c.currentDebt))}
+                        </span>
+                      ) : (
+                        <span className={styles.emptyText}>—</span>
+                      )}
                     </td>
                     <td className={tableStyles.tableCell}>
                       <div className={styles.addressWrapper}>
@@ -446,7 +474,7 @@ export function CustomersPage() {
       ══════════════════════════════════════════════════ */}
       {showModal && (
         <div className={styles.modalOverlay} onClick={closeModal}>
-          <div className={styles.formModal} onClick={e => e.stopPropagation()}>
+          <form className={styles.formModal} onSubmit={e => { e.preventDefault(); if (!saving && !saveSuccess) void handleSave(); }} onClick={e => e.stopPropagation()}>
 
             <div className={styles.formModalHeader}>
               <span className={styles.formModalTitle}>
@@ -528,12 +556,22 @@ export function CustomersPage() {
                     checked={form.creditEnabled}
                     onChange={e => setForm(p => ({ ...p, creditEnabled: e.target.checked }))} disabled={isReadOnly} />
                 </div>
-                {form.creditEnabled && (
+                 {form.creditEnabled && (
                   <div className={styles.formGrid}>
                     <div className={tableStyles.formGroup}>
                       <label className={tableStyles.label} htmlFor="creditLimit">Límite de crédito (Gs.)</label>
-                      <input id="creditLimit" type="number" min="0" className={tableStyles.input}
+                      <input id="creditLimit" type="text" className={tableStyles.input}
                         value={form.creditLimit} onChange={setField("creditLimit")} placeholder="0" disabled={isReadOnly} />
+                    </div>
+                    <div className={tableStyles.formGroup}>
+                      <label className={tableStyles.label} htmlFor="currentDebt">Deuda total (Gs.)</label>
+                      <input id="currentDebt" type="text" className={tableStyles.input}
+                        value={formatCurrency(form.currentDebt)} disabled={true} style={{ color: form.currentDebt > 0 ? "#ef4444" : "inherit", fontWeight: "bold" }} />
+                    </div>
+                    <div className={tableStyles.formGroup}>
+                      <label className={tableStyles.label} htmlFor="availableCredit">Crédito disponible (Gs.)</label>
+                      <input id="availableCredit" type="text" className={tableStyles.input}
+                        value={formatCurrency(Math.max(0, (parseFloat(form.creditLimit.replace(/\./g, "")) || 0) - form.currentDebt))} disabled={true} style={{ color: "#22c55e", fontWeight: "bold" }} />
                     </div>
                   </div>
                 )}
@@ -550,8 +588,8 @@ export function CustomersPage() {
                   <button type="button" className={tableStyles.cancelButton} onClick={closeModal} disabled={saving}>
                     Cancelar
                   </button>
-                  <button type="button" className={tableStyles.submitButton}
-                    onClick={handleSave} disabled={saving || saveSuccess}>
+                  <button type="submit" className={tableStyles.submitButton}
+                    disabled={saving || saveSuccess}>
                     {saveSuccess
                       ? <><Check size={15} /> Guardado</>
                       : saving
@@ -562,7 +600,7 @@ export function CustomersPage() {
                 </>
               )}
             </div>
-          </div>
+          </form>
         </div>
       )}
 

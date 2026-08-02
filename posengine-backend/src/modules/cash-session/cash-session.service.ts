@@ -3,7 +3,7 @@ import { PrismaService } from '../../prisma/prisma.service'
 import { OpenCashSessionDto } from './dto/open-cash-session.dto'
 import { CloseCashSessionDto } from './dto/close-cash-session.dto'
 import { CashSessionFilterDto } from './dto/cash-session-filter.dto'
-import { CashSessionStatus, SaleStatus } from '../../generated/prisma/enums'
+import { CashSessionStatus, SaleStatus, PaymentMethod } from '../../generated/prisma/enums'
 
 @Injectable()
 export class CashSessionService {
@@ -41,13 +41,13 @@ export class CashSessionService {
       return { session: null }
     }
 
-    const { totalSales, totalPurchases } = await this.calculateTotals(
+    const { totalSales, totalPurchases, totalCreditSales, totalCashSales, totalDebtPayments } = await this.calculateTotals(
       tenantId,
       session.id,
     )
 
     return {
-      session: { ...session, totalSales, totalPurchases },
+      session: { ...session, totalSales, totalPurchases, totalCreditSales, totalCashSales, totalDebtPayments },
     }
   }
 
@@ -106,7 +106,8 @@ export class CashSessionService {
     if (!session) {
       throw new NotFoundException(`Sesión de caja "${id}" no encontrada`)
     }
-    return session
+    const { totalCreditSales, totalCashSales, totalDebtPayments } = await this.calculateTotals(tenantId, id)
+    return { ...session, totalCreditSales, totalCashSales, totalDebtPayments }
   }
 
   // ── Helpers privados ─────────────────────────────────────────────────────────
@@ -123,22 +124,64 @@ export class CashSessionService {
   }
 
   private async calculateTotals(tenantId: string, sessionId: string) {
-    const [salesResult, purchasesResult] = await Promise.all([
+    const session = await this.prisma.cashSession.findUnique({
+      where: { id: sessionId },
+      select: { openedAt: true, closedAt: true },
+    })
+
+    if (!session) {
+      return { totalSales: 0, totalPurchases: 0, totalCreditSales: 0 }
+    }
+
+    const [salesResult, paymentsResult, purchasesResult, creditSalesResult] = await Promise.all([
+      // 1. Solo ventas en efectivo/tarjeta/transferencia que pertenezcan a esta sesión
       this.prisma.sale.aggregate({
         where: {
           tenantId,
           cashSessionId: sessionId,
           status: SaleStatus.COMPLETED,
+          paymentMethod: { in: [PaymentMethod.CASH, PaymentMethod.CARD, PaymentMethod.TRANSFER] },
         },
         _sum: { total: true },
       }),
+      // 2. Todos los pagos recibidos (señas de créditos y cobros posteriores) dentro del rango de tiempo de la sesión
+      this.prisma.customerPayment.aggregate({
+        where: {
+          tenantId,
+          paymentDate: {
+            gte: session.openedAt,
+            ...(session.closedAt && { lte: session.closedAt }),
+          },
+        },
+        _sum: { amount: true },
+      }),
+      // 3. Compras registradas en la sesión
       this.prisma.purchase.aggregate({
-        where: { tenantId, cashSessionId: sessionId }, _sum: { total: true } }),
+        where: { tenantId, cashSessionId: sessionId },
+        _sum: { total: true },
+      }),
+      // 4. Ventas a crédito de la sesión
+      this.prisma.sale.aggregate({
+        where: {
+          tenantId,
+          cashSessionId: sessionId,
+          status: SaleStatus.COMPLETED,
+          paymentMethod: PaymentMethod.CREDIT,
+        },
+        _sum: { remainingBalance: true },
+      }),
     ])
 
+    const totalCashSales = salesResult._sum.total ?? 0
+    const totalDebtPayments = paymentsResult._sum.amount ?? 0
+    const totalSales = totalCashSales + totalDebtPayments
+
     return {
-      totalSales: salesResult._sum.total ?? 0,
+      totalSales,
       totalPurchases: purchasesResult._sum.total ?? 0,
+      totalCreditSales: creditSalesResult._sum.remainingBalance ?? 0,
+      totalCashSales,
+      totalDebtPayments,
     }
   }
 

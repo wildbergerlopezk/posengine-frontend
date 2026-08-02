@@ -22,6 +22,14 @@ import { API_BASE_URL } from "@/src/shared/config/api"
 import styles from "./SalesPage.module.css"
 import tableStyles from "@/src/features/products/pages/ProductsPage.module.css"
 import { PriceTypeSelectorModal } from "../components/PriceTypeSelectorModal"
+import {
+  Autocomplete,
+  AutocompleteEmpty,
+  AutocompleteInput,
+  AutocompleteItem,
+  AutocompleteList,
+  AutocompletePopup,
+} from "@/components/ui/autocomplete"
 
 const API_BASE = API_BASE_URL
 const SALE_STORAGE_KEY = "posengine_sale_draft"
@@ -45,6 +53,15 @@ interface SaleItem {
   quantity: number
   unitPrice: number
   priceType: "PUBLIC" | "WHOLESALE"
+}
+
+interface Customer {
+  id: string
+  name: string
+  creditEnabled: boolean
+  creditLimit: number
+  currentDebt: number
+  documentNumber?: string
 }
 
 function readApiError(body: unknown): string {
@@ -100,6 +117,12 @@ export function SalesPage() {
   const [showConfirmModal, setShowConfirmModal] = useState(false)
   const [confirmSelectedBtn, setConfirmSelectedBtn] = useState<"accept" | "cancel">("accept")
 
+  // ── Crédito / Contado ──────────────────────────────────────────────────────
+  const [paymentMethod, setPaymentMethod] = useState<"CASH" | "CREDIT">("CASH")
+  const [selectedCustomerId, setSelectedCustomerId] = useState<string>("")
+  const [amountPaid, setAmountPaid] = useState<number>(0)
+  const [customers, setCustomers] = useState<Customer[]>([])
+
   // ── Barcode scanner ────────────────────────────────────────────────────────
   const [barcodeBuffer, setBarcodeBuffer] = useState("")
   const [barcodeError, setBarcodeError] = useState<string | null>(null)
@@ -109,6 +132,7 @@ export function SalesPage() {
   const editingInputRef = useRef<HTMLInputElement>(null)
   const confirmAcceptRef = useRef<HTMLButtonElement>(null)
   const confirmCancelRef = useRef<HTMLButtonElement>(null)
+  const amountPaidInputRef = useRef<HTMLInputElement>(null)
   const isHydrated = useHydrated()
   const [isDraftLoaded, setIsDraftLoaded] = useState(false)
 
@@ -167,6 +191,16 @@ export function SalesPage() {
       fetchProducts("")
     }
   }, [showProductModal, fetchProducts])
+
+  // ── Fetch clientes para crédito ─────────────────────────────────────────────
+  useEffect(() => {
+    if (paymentMethod === "CREDIT") {
+      fetch(`${API_BASE}/customers?limit=100&creditEnabled=true`, { headers: authHeaders })
+        .then(res => res.json())
+        .then(data => setCustomers(data.items ?? []))
+        .catch(err => console.error("Error loading customers", err))
+    }
+  }, [paymentMethod])
 
   // ── Edición inline ─────────────────────────────────────────────────────────
   const cancelEdit = useCallback(() => {
@@ -273,6 +307,10 @@ export function SalesPage() {
   const handleSubmit = async () => {
     if (!canOperate) { setSubmitError("Abrí caja antes de registrar ventas"); return }
     if (items.length === 0) { setSubmitError("Agregá al menos un producto"); return }
+    if (paymentMethod === "CREDIT" && !selectedCustomerId) {
+      setSubmitError("Debes seleccionar un cliente para ventas a crédito.")
+      return
+    }
 
     setSubmitting(true)
     setSubmitError(null)
@@ -285,6 +323,9 @@ export function SalesPage() {
           unitPrice: i.unitPrice,
           priceType: i.priceType,
         })),
+        paymentMethod,
+        customerId: paymentMethod === "CREDIT" ? selectedCustomerId : undefined,
+        amountPaid: paymentMethod === "CREDIT" ? amountPaid : undefined,
       }
 
       const res = await fetch(`${API_BASE}/sales`, {
@@ -303,6 +344,8 @@ export function SalesPage() {
         setItems([])
         sessionStorage.removeItem(SALE_STORAGE_KEY)
         setSuccess(false)
+        setSelectedCustomerId("")
+        setAmountPaid(0)
       }, 1200)
     } catch (err: unknown) {
       setSubmitError(err instanceof Error ? err.message : "Error al guardar la venta")
@@ -346,6 +389,10 @@ export function SalesPage() {
           return
         }
       }
+      if (e.key === "F9") {
+        e.preventDefault()
+        setPaymentMethod(prev => prev === "CASH" ? "CREDIT" : "CASH")
+      }
       if (e.key === "F2" && !showProductModal) {
         e.preventDefault()
         setShowProductModal(true)
@@ -358,26 +405,72 @@ export function SalesPage() {
     }
     window.addEventListener("keydown", handler)
     return () => window.removeEventListener("keydown", handler)
-  }, [showProductModal, showConfirmModal, barcodeBuffer, barcodeError, items, handleBarcodeAdd])
+  }, [showProductModal, showConfirmModal, barcodeBuffer, barcodeError, items, handleBarcodeAdd, paymentMethod])
 
   // ── Confirm modal teclado ──────────────────────────────────────────────────
   useEffect(() => {
     if (!showConfirmModal) return
     const handler = (e: KeyboardEvent) => {
+      const activeEl = document.activeElement
+      const isClientInput = activeEl?.id === "autocomplete-input-client"
+      const isAmountInput = activeEl?.id === "amount-paid-input"
+      const isButton = activeEl === confirmAcceptRef.current || activeEl === confirmCancelRef.current
+      const isPopupOpen = !!document.querySelector('[id^="autocomplete-popup-"]')
+
+      if (e.key === "ArrowDown") {
+        if (paymentMethod === "CREDIT") {
+          if (isClientInput && !isPopupOpen) {
+            e.preventDefault()
+            amountPaidInputRef.current?.focus()
+          } else if (isAmountInput) {
+            e.preventDefault()
+            confirmAcceptRef.current?.focus()
+            setConfirmSelectedBtn("accept")
+          } else if (isButton) {
+            e.preventDefault()
+            document.getElementById("autocomplete-input-client")?.focus()
+          }
+        } else {
+          e.preventDefault()
+          setConfirmSelectedBtn(prev => prev === "accept" ? "cancel" : "accept")
+        }
+      } else if (e.key === "ArrowUp") {
+        if (paymentMethod === "CREDIT") {
+          if (isAmountInput) {
+            e.preventDefault()
+            document.getElementById("autocomplete-input-client")?.focus()
+          } else if (isButton) {
+            e.preventDefault()
+            amountPaidInputRef.current?.focus()
+          }
+        } else {
+          e.preventDefault()
+          setConfirmSelectedBtn(prev => prev === "accept" ? "cancel" : "accept")
+        }
+      }
+
       if (e.key === "ArrowLeft" || e.key === "ArrowRight") {
         e.preventDefault()
         setConfirmSelectedBtn(prev => prev === "accept" ? "cancel" : "accept")
       }
+
       if (e.key === "Enter") {
         e.preventDefault()
-        if (confirmSelectedBtn === "accept") { setShowConfirmModal(false); handleSubmit() }
+        if (confirmSelectedBtn === "accept") {
+          if (paymentMethod === "CREDIT" && !selectedCustomerId) {
+            alert("Debes seleccionar un cliente para ventas a crédito.")
+            return
+          }
+          setShowConfirmModal(false)
+          void handleSubmit()
+        }
         else { setShowConfirmModal(false) }
       }
       if (e.key === "Escape") { e.preventDefault(); setShowConfirmModal(false) }
     }
     window.addEventListener("keydown", handler)
     return () => window.removeEventListener("keydown", handler)
-  }, [showConfirmModal, confirmSelectedBtn])
+  }, [showConfirmModal, confirmSelectedBtn, selectedCustomerId, paymentMethod, amountPaid, handleSubmit])
 
   useEffect(() => {
     if (showConfirmModal) {
@@ -444,14 +537,23 @@ export function SalesPage() {
               Productos <span className={styles.itemsCount}>{items.length}</span>
             </span>
             <div className={styles.itemsActions}>
-              <span className={styles.shortcutHint}><kbd>F2</kbd> Agregar</span>
               <span className={styles.shortcutHint}><kbd>F12</kbd> Cobrar</span>
+              <button
+                type="button"
+                className={`${tableStyles.newButton} ${paymentMethod === "CREDIT" ? styles.creditModeBtn : styles.cashModeBtn}`}
+                onClick={() => setPaymentMethod(prev => prev === "CASH" ? "CREDIT" : "CASH")}
+                style={{ marginLeft: 8 }}
+              >
+                Tipo de venta: {paymentMethod === "CASH" ? "Contado" : "Crédito"} <kbd className={styles.kbdInline} style={{ marginLeft: 6 }}>F9</kbd>
+              </button>
               <button
                 type="button"
                 className={tableStyles.newButton}
                 onClick={() => setShowProductModal(true)}
+                style={{ marginLeft: 8 }}
               >
-                <Plus size={15} /> Agregar producto
+
+                <Plus size={15} /> Agregar producto                               <span className={styles.shortcutHint}><kbd>F2</kbd></span>
               </button>
             </div>
           </div>
@@ -463,6 +565,7 @@ export function SalesPage() {
                 <th className={tableStyles.tableHeaderCell} style={{ width: 130 }}>Código</th>
                 <th className={tableStyles.tableHeaderCell}>Descripción</th>
                 <th className={`${tableStyles.tableHeaderCell} ${tableStyles.tableHeaderCellRight}`} style={{ width: 110 }}>Cant.</th>
+                <th className={tableStyles.tableHeaderCell} style={{ width: 100 }}>Venta</th>
                 <th className={tableStyles.tableHeaderCell} style={{ width: 100 }}>Tipo</th>
                 <th className={`${tableStyles.tableHeaderCell} ${tableStyles.tableHeaderCellRight}`} style={{ width: 140 }}>Precio unit.</th>
                 <th className={`${tableStyles.tableHeaderCell} ${tableStyles.tableHeaderCellRight}`} style={{ width: 140 }}>SubTotal</th>
@@ -472,7 +575,7 @@ export function SalesPage() {
             <tbody>
               {items.length === 0 ? (
                 <tr>
-                  <td colSpan={7}>
+                  <td colSpan={8}>
                     <div className={tableStyles.emptyState}>
                       <ShoppingCart size={36} className={tableStyles.emptyStateIcon} />
                       <p className={tableStyles.emptyStateTitle}>Sin productos</p>
@@ -530,6 +633,13 @@ export function SalesPage() {
                           {formatQuantity(item.quantity, item.product.unitType)}
                         </button>
                       )}
+                    </td>
+
+                    {/* Modo de venta (Contado / Crédito) */}
+                    <td className={tableStyles.tableCell}>
+                      <span className={paymentMethod === "CREDIT" ? styles.creditBadgeInline : styles.cashBadgeInline}>
+                        {paymentMethod === "CREDIT" ? "Crédito" : "Contado"}
+                      </span>
                     </td>
 
                     <td className={tableStyles.tableCell}>
@@ -659,6 +769,56 @@ export function SalesPage() {
             <p className={styles.confirmDescription}>
               Total: <strong>{formatCurrency(total)}</strong>
             </p>
+            {paymentMethod === "CREDIT" && (
+              <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem", width: "100%", marginBottom: "1rem", textAlign: "left" }}>
+                <div>
+                  <label style={{ fontSize: "0.825rem", color: "var(--color-muted-foreground)", fontWeight: 600, display: "block", marginBottom: "0.25rem" }}>
+                    Cliente *
+                  </label>
+                  <Autocomplete
+                    items={customers}
+                    onValueChange={(c: Customer) => setSelectedCustomerId(c?.id || "")}
+                  >
+                    <AutocompleteInput id="autocomplete-input-client" placeholder="Buscar por nombre, CI o RUC..." autoFocus={paymentMethod === "CREDIT"} />
+                    <AutocompletePopup>
+                      <AutocompleteEmpty>No se encontraron clientes.</AutocompleteEmpty>
+                      <AutocompleteList>
+                        {(c: Customer) => (
+                          <AutocompleteItem key={c.id} value={c}>
+                            {c.name} (CI: {c.documentNumber || "—"} | Disp: {formatCurrency(Math.max(0, c.creditLimit - c.currentDebt))})
+                          </AutocompleteItem>
+                        )}
+                      </AutocompleteList>
+                    </AutocompletePopup>
+                  </Autocomplete>
+                </div>
+                <div>
+                  <label style={{ fontSize: "0.825rem", color: "var(--color-muted-foreground)", fontWeight: 600, display: "block", marginBottom: "0.25rem" }}>
+                    Monto abonado / Seña (Gs.)
+                  </label>
+                  <input
+                    id="amount-paid-input"
+                    ref={amountPaidInputRef}
+                    type="number"
+                    min="0"
+                    max={total}
+                    value={amountPaid || ""}
+                    onChange={e => setAmountPaid(Number(e.target.value) || 0)}
+                    placeholder="0"
+                    style={{
+                      width: "100%",
+                      height: "2.5rem",
+                      borderRadius: "0.375rem",
+                      border: "1px solid var(--color-border)",
+                      background: "var(--color-background)",
+                      color: "var(--color-foreground)",
+                      padding: "0 0.5rem",
+                      fontSize: "0.875rem"
+                    }}
+                  />
+                </div>
+              </div>
+            )}
             <div className={styles.confirmButtons}>
               <button
                 ref={confirmCancelRef}
@@ -670,7 +830,14 @@ export function SalesPage() {
               <button
                 ref={confirmAcceptRef}
                 className={`${styles.confirmAccept} ${confirmSelectedBtn === "accept" ? styles.buttonFocused : ""}`}
-                onClick={() => { setShowConfirmModal(false); handleSubmit() }}
+                onClick={() => {
+                  if (paymentMethod === "CREDIT" && !selectedCustomerId) {
+                    alert("Debes seleccionar un cliente para ventas a crédito.")
+                    return
+                  }
+                  setShowConfirmModal(false)
+                  void handleSubmit()
+                }}
               >
                 Confirmar
               </button>

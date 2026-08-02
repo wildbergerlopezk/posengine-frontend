@@ -11,6 +11,9 @@ export interface CashSession {
   closingAmount?: number
   expectedAmount?: number
   totalSales: number
+  totalCreditSales?: number
+  totalCashSales?: number
+  totalDebtPayments?: number
   totalPurchases: number
   difference?: number
   status: CashSessionStatus

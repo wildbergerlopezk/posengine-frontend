@@ -5,7 +5,7 @@ import { Header } from "@/src/shared/components/Header"
 import {
   Search, Eye, Package, AlertCircle, Loader2,
   X, ChevronLeft, ChevronRight, CheckCircle2,
-  XCircle, Calendar, Receipt, Hash, Ban,
+  XCircle, Calendar, Receipt, Hash, Ban, User, CreditCard,
 } from "lucide-react"
 import { useAuthStore } from "@/src/features/auth/store/auth.store"
 import { formatCurrency } from "@/src/shared/hooks/useFormatCurrency"
@@ -33,6 +33,7 @@ interface SaleItem {
   quantity: number
   unitPrice: number
   total: number
+  priceType: string
   product: Product
 }
 
@@ -41,6 +42,10 @@ interface Sale {
   saleDate: string
   total: number
   status: SaleStatus
+  paymentMethod: string
+  paymentStatus: string
+  remainingBalance: number
+  customer?: { id: string; name: string; documentNumber?: string; taxId?: string }
   notes?: string
   createdAt: string
   cashSession?: { id: string; openedAt: string; status: string }
@@ -279,23 +284,25 @@ export function SalesHistoryPage() {
           <table className={`${tableStyles.table} ${styles.historyTable}`}>
             <thead className={tableStyles.tableHeader}>
               <tr>
-                <th className={`${tableStyles.tableHeaderCell} ${styles.headerCellOverride}`} style={{ width: 210 }}>ID Venta</th>
-                <th className={`${tableStyles.tableHeaderCell} ${styles.headerCellOverride}`} style={{ width: 170 }}>Fecha</th>
-                <th className={`${tableStyles.tableHeaderCell} ${styles.headerCellOverride}`} style={{ width: 80 }}>Items</th>
-                <th className={`${tableStyles.tableHeaderCell} ${styles.headerCellOverride}`} style={{ width: 120 }}>Estado</th>
-                <th className={`${tableStyles.tableHeaderCell} ${tableStyles.tableHeaderCellRight} ${styles.headerCellOverride}`} style={{ width: 150 }}>Total</th>
+                <th className={`${tableStyles.tableHeaderCell} ${styles.headerCellOverride}`} style={{ width: 170 }}>ID Venta</th>
+                <th className={`${tableStyles.tableHeaderCell} ${styles.headerCellOverride}`} style={{ width: 150 }}>Fecha</th>
+                <th className={`${tableStyles.tableHeaderCell} ${styles.headerCellOverride}`} style={{ width: 120 }}>Tipo de venta</th>
+                <th className={`${tableStyles.tableHeaderCell} ${styles.headerCellOverride}`} style={{ width: 180 }}>Cliente</th>
+                <th className={`${tableStyles.tableHeaderCell} ${styles.headerCellOverride}`} style={{ width: 70 }}>Items</th>
+                <th className={`${tableStyles.tableHeaderCell} ${styles.headerCellOverride}`} style={{ width: 110 }}>Estado</th>
+                <th className={`${tableStyles.tableHeaderCell} ${tableStyles.tableHeaderCellRight} ${styles.headerCellOverride}`} style={{ width: 130 }}>Total</th>
                 <th className={`${tableStyles.tableHeaderCell} ${styles.headerCellOverride}`} style={{ width: 60 }} />
               </tr>
             </thead>
             <tbody>
               {loading ? (
-                <tr><td colSpan={6}>
+                <tr><td colSpan={8}>
                   <div className={tableStyles.emptyState}>
                     <Loader2 size={28} className={tableStyles.spinner} />
                   </div>
                 </td></tr>
               ) : filteredSales.length === 0 ? (
-                <tr><td colSpan={6}>
+                <tr><td colSpan={8}>
                   <div className={tableStyles.emptyState}>
                     <Package size={36} className={tableStyles.emptyStateIcon} />
                     <p className={tableStyles.emptyStateTitle}>Sin ventas registradas</p>
@@ -312,6 +319,25 @@ export function SalesHistoryPage() {
                       </td>
                       <td className={tableStyles.tableCell}>
                         <span className={styles.dateText}>{formatDateTime(sale.saleDate)}</span>
+                      </td>
+                      <td className={tableStyles.tableCell}>
+                        <span style={{
+                          display: "inline-flex",
+                          alignItems: "center",
+                          padding: "0.25rem 0.6rem",
+                          borderRadius: "9999px",
+                          fontSize: "0.725rem",
+                          fontWeight: 600,
+                          backgroundColor: sale.paymentMethod === "CREDIT" ? "rgba(59, 130, 246, 0.12)" : "rgba(34, 197, 94, 0.12)",
+                          color: sale.paymentMethod === "CREDIT" ? "#3b82f6" : "#22c55e",
+                        }}>
+                          {sale.paymentMethod === "CREDIT" ? "Crédito" : "Contado"}
+                        </span>
+                      </td>
+                      <td className={tableStyles.tableCell}>
+                        <span style={{ fontSize: "0.825rem" }}>
+                          {sale.customer?.name || "—"}
+                        </span>
                       </td>
                       <td className={tableStyles.tableCell}>
                         <span className={styles.itemsCount}>{sale.items?.length ?? "—"}</span>
@@ -431,6 +457,43 @@ export function SalesHistoryPage() {
                       </div>
                     </div>
                   </div>
+                  <div className={styles.receiptInfoBlock}>
+                    <div className={styles.receiptInfoRow}>
+                      <CreditCard size={14} className={styles.receiptInfoIcon} />
+                      <div>
+                        <span className={styles.receiptInfoLabel}>Método de pago</span>
+                        <span className={styles.receiptInfoValue} style={{ fontWeight: 600, color: selectedSale.paymentMethod === "CREDIT" ? "var(--color-primary)" : "inherit" }}>
+                          {selectedSale.paymentMethod === "CREDIT" ? "Crédito" : selectedSale.paymentMethod === "CASH" ? "Contado (Efectivo)" : selectedSale.paymentMethod === "CARD" ? "Tarjeta" : selectedSale.paymentMethod === "TRANSFER" ? "Transferencia" : selectedSale.paymentMethod}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                  {selectedSale.customer && (
+                    <div className={`${styles.receiptInfoBlock} ${styles.receiptInfoBlockFull}`}>
+                      <div className={styles.receiptInfoRow}>
+                        <User size={14} className={styles.receiptInfoIcon} />
+                        <div>
+                          <span className={styles.receiptInfoLabel}>Cliente asociado</span>
+                          <span className={styles.receiptInfoValue} style={{ fontWeight: 600 }}>
+                            {selectedSale.customer.name} {selectedSale.customer.documentNumber ? `(CI: ${selectedSale.customer.documentNumber})` : selectedSale.customer.taxId ? `(RUC: ${selectedSale.customer.taxId})` : ""}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                  {selectedSale.paymentMethod === "CREDIT" && (
+                    <div className={`${styles.receiptInfoBlock} ${styles.receiptInfoBlockFull}`}>
+                      <div className={styles.receiptInfoRow}>
+                        <AlertCircle size={14} className={styles.receiptInfoIcon} />
+                        <div>
+                          <span className={styles.receiptInfoLabel}>Saldo pendiente de pago</span>
+                          <span className={styles.receiptInfoValue} style={{ color: selectedSale.remainingBalance > 0 ? "#ef4444" : "#22c55e", fontWeight: 600 }}>
+                            {formatCurrency(selectedSale.remainingBalance)} (Estado: {selectedSale.paymentStatus === "PAID" ? "Pagado" : selectedSale.paymentStatus === "PARTIAL" ? "Parcial" : "Pendiente"})
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                   {selectedSale.notes && (
                     <div className={`${styles.receiptInfoBlock} ${styles.receiptInfoBlockFull}`}>
                       <div className={styles.receiptInfoRow}>
@@ -485,7 +548,14 @@ export function SalesHistoryPage() {
                               {item.product.barcode || item.product.sku || "—"}
                             </span>
                           </td>
-                          <td className={styles.receiptTableName}>{item.product.name}</td>
+                          <td className={styles.receiptTableName}>
+                            <div>{item.product.name}</div>
+                            {item.priceType && (
+                              <span style={{ fontSize: "0.7rem", color: "var(--color-muted-foreground)", background: "rgba(100, 116, 139, 0.1)", padding: "2px 6px", borderRadius: "4px", display: "inline-block", marginTop: "2px" }}>
+                                {item.priceType === "WHOLESALE" ? "Mayorista" : "Minorista"}
+                              </span>
+                            )}
+                          </td>
                           <td className={styles.receiptTableRight}>
                             {formatQuantity(item.quantity, item.product.unitType)}
                             {item.product.unitType !== "UNIT" && (

@@ -618,3 +618,39 @@
   from { transform: rotate(0deg); }
   to { transform: rotate(360deg); }
 }
+
+.cashModeBtn {
+  background-color: #22c55e !important;
+  color: white !important;
+}
+.cashModeBtn:hover {
+  background-color: #16a34a !important;
+}
+
+.creditModeBtn {
+  background-color: #3b82f6 !important;
+  color: white !important;
+}
+.creditModeBtn:hover {
+  background-color: #2563eb !important;
+}
+
+.cashBadgeInline {
+  display: inline-flex;
+  padding: 0.125rem 0.5rem;
+  border-radius: 0.375rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  background-color: rgba(34, 197, 94, 0.1);
+  color: #22c55e;
+}
+
+.creditBadgeInline {
+  display: inline-flex;
+  padding: 0.125rem 0.5rem;
+  border-radius: 0.375rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  background-color: rgba(59, 130, 246, 0.1);
+  color: #3b82f6;
+}

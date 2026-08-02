@@ -85,7 +85,20 @@ export function CashSessionPage() {
                   </div>
                   <div className={styles.statItem}>
                     <span className={styles.statLabel}>Ventas registradas</span>
-                    <span className={`${styles.statValue} ${styles.positive}`}>+ {formatGs(session.totalSales)}</span>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem', alignItems: 'flex-end' }}>
+                      <span className={`${styles.statValue} ${styles.positive}`} style={{ fontSize: '0.85rem' }}>
+                        Al contado: + {formatGs(session.totalCashSales ?? session.totalSales)}
+                      </span>
+                      <span className={`${styles.statValue}`} style={{ fontSize: '0.75rem', color: 'var(--color-muted-foreground)', fontWeight: 'normal' }}>
+                        Crédito pendiente: + {formatGs(session.totalCreditSales ?? 0)}
+                      </span>
+                    </div>
+                  </div>
+                  <div className={styles.statItem}>
+                    <span className={styles.statLabel}>Cobros de deudas</span>
+                    <span className={`${styles.statValue} ${styles.positive}`}>
+                      + {formatGs(session.totalDebtPayments ?? 0)}
+                    </span>
                   </div>
                   <div className={styles.statItem}>
                     <span className={styles.statLabel}>Compras registradas</span>
