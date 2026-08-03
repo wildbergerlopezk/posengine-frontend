@@ -54,7 +54,7 @@ interface PaymentResult {
 }
 
 export default function ClientsPaymentsPage() {
-  const { accessToken } = useAuthStore()
+  const { accessToken, user } = useAuthStore()
   const authHeaders = {
     "Content-Type": "application/json",
     Authorization: `Bearer ${accessToken}`,
@@ -75,6 +75,11 @@ export default function ClientsPaymentsPage() {
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [successResult, setSuccessResult] = useState<PaymentResult | null>(null)
+
+  const [activeTab, setActiveTab] = useState<"pending" | "payments">("pending")
+  const [voidingPaymentId, setVoidingPaymentId] = useState<string | null>(null)
+  const [voidReason, setVoidReason] = useState("")
+  const [voiding, setVoiding] = useState(false)
 
   // ── Fetch Customers ────────────────────────────────────────────────────────
   const fetchCustomers = useCallback(async () => {
@@ -176,6 +181,41 @@ export default function ClientsPaymentsPage() {
       setError(err.message)
     } finally {
       setSubmitting(false)
+    }
+  }
+
+  // ── Handle Void Payment ────────────────────────────────────────────────────
+  const handleVoidPayment = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!voidingPaymentId) return
+    setVoiding(true)
+    setError(null)
+    try {
+      const res = await fetch(`${API_BASE}/customer-payments/${voidingPaymentId}/void`, {
+        method: "POST",
+        headers: authHeaders,
+        body: JSON.stringify({
+          reason: voidReason.trim() || undefined,
+        }),
+      })
+
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}))
+        throw new Error(body.message || "Error al anular el pago")
+      }
+
+      setVoidingPaymentId(null)
+      setVoidReason("")
+      
+      // Refresh current customer's account and general customer list
+      void fetchCustomers()
+      if (selectedCustomerId) {
+        void fetchCustomerAccount(selectedCustomerId)
+      }
+    } catch (err: any) {
+      setError(err.message)
+    } finally {
+      setVoiding(false)
     }
   }
 
@@ -355,46 +395,128 @@ export default function ClientsPaymentsPage() {
                 </div>
               </div>
 
-              {/* Facturas Pendientes */}
-              <div className={styles.salesSection}>
-                <h4 className={styles.sectionTitle}>Ventas pendientes con saldo (Antigüedad ascendente)</h4>
-                {selectedCustomer.pendingSales.length === 0 ? (
-                  <div className={styles.emptySales}>
-                    <p>No se encontraron facturas pendientes individuales para este cliente.</p>
-                  </div>
-                ) : (
-                  <div className={styles.salesList}>
-                    {selectedCustomer.pendingSales.map((sale, idx) => (
-                      <div key={sale.id} className={styles.saleItem}>
-                        <div className={styles.saleMain}>
-                          <div className={styles.saleIcon}>
-                            <FileText size={16} />
-                          </div>
-                          <div>
-                            <span className={styles.saleDate}>
-                              {new Date(sale.saleDate).toLocaleDateString("es-PY", {
-                                year: "numeric", month: "long", day: "numeric"
-                              })}
-                            </span>
-                            <div className={styles.saleMeta}>
-                              <span className={styles.saleLabel}>Total: {formatCurrency(sale.total)}</span>
-                              <span className={styles.salePriority}>FIFO #{idx + 1}</span>
+              {/* Tab Selector */}
+              <div className={styles.tabsContainer}>
+                <button
+                  type="button"
+                  className={`${styles.tabButton} ${activeTab === "pending" ? styles.tabActive : ""}`}
+                  onClick={() => setActiveTab("pending")}
+                >
+                  <FileText size={14} />
+                  <span>Facturas Pendientes ({selectedCustomer.pendingSales.length})</span>
+                </button>
+                <button
+                  type="button"
+                  className={`${styles.tabButton} ${activeTab === "payments" ? styles.tabActive : ""}`}
+                  onClick={() => setActiveTab("payments")}
+                >
+                  <Coins size={14} />
+                  <span>Historial de Pagos ({selectedCustomer.payments.length})</span>
+                </button>
+              </div>
+
+              {activeTab === "pending" ? (
+                <div className={styles.salesSection}>
+                  {selectedCustomer.pendingSales.length === 0 ? (
+                    <div className={styles.emptySales}>
+                      <p>No se encontraron facturas pendientes individuales para este cliente.</p>
+                    </div>
+                  ) : (
+                    <div className={styles.salesList}>
+                      {selectedCustomer.pendingSales.map((sale, idx) => (
+                        <div key={sale.id} className={styles.saleItem}>
+                          <div className={styles.saleMain}>
+                            <div className={styles.saleIcon}>
+                              <FileText size={16} />
+                            </div>
+                            <div>
+                              <span className={styles.saleDate}>
+                                {new Date(sale.saleDate).toLocaleDateString("es-PY", {
+                                  year: "numeric", month: "long", day: "numeric"
+                                })}
+                              </span>
+                              <div className={styles.saleMeta}>
+                                <span className={styles.saleLabel}>Total: {formatCurrency(sale.total)}</span>
+                                <span className={styles.salePriority}>FIFO #{idx + 1}</span>
+                              </div>
                             </div>
                           </div>
+                          <div className={styles.saleStatus}>
+                            <span className={styles.saleRemaining}>
+                              Pendiente: {formatCurrency(sale.remainingBalance)}
+                            </span>
+                            <span className={`${styles.badge} ${sale.paymentStatus === "PARTIAL" ? styles.badgePartial : styles.badgePending}`}>
+                              {sale.paymentStatus === "PARTIAL" ? "Parcial" : "Pendiente"}
+                            </span>
+                          </div>
                         </div>
-                        <div className={styles.saleStatus}>
-                          <span className={styles.saleRemaining}>
-                            Pendiente: {formatCurrency(sale.remainingBalance)}
-                          </span>
-                          <span className={`${styles.badge} ${sale.paymentStatus === "PARTIAL" ? styles.badgePartial : styles.badgePending}`}>
-                            {sale.paymentStatus === "PARTIAL" ? "Parcial" : "Pendiente"}
-                          </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className={styles.paymentsSection}>
+                  {selectedCustomer.payments.length === 0 ? (
+                    <div className={styles.emptySales}>
+                      <p>No se han registrado cobros para este cliente.</p>
+                    </div>
+                  ) : (
+                    <div className={styles.paymentsList}>
+                      {selectedCustomer.payments.map((payment) => (
+                        <div key={payment.id} className={`${styles.paymentItem} ${payment.isVoided ? styles.paymentVoided : ""}`}>
+                          <div className={styles.paymentMain}>
+                            <div className={styles.paymentIcon}>
+                              <Coins size={16} />
+                            </div>
+                            <div>
+                              <span className={styles.paymentDate}>
+                                {new Date(payment.paymentDate).toLocaleString("es-PY", {
+                                  year: "numeric", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit"
+                                })}
+                              </span>
+                              <div className={styles.paymentMeta}>
+                                <span className={styles.paymentMethodLabel}>
+                                  {payment.paymentMethod === "CASH" ? "Efectivo" : payment.paymentMethod === "CARD" ? "Tarjeta" : "Transferencia"}
+                                </span>
+                                {payment.sale && (
+                                  <span className={styles.paymentSaleLabel}>
+                                    Factura: {new Date(payment.sale.saleDate).toLocaleDateString("es-PY")}
+                                  </span>
+                                )}
+                                {payment.notes && (
+                                  <span className={styles.paymentNotesLabel}>"{payment.notes}"</span>
+                                )}
+                              </div>
+                              {payment.isVoided && (
+                                <div className={styles.voidReasonLabel}>
+                                  <strong>Anulado:</strong> {payment.voidReason || "Sin motivo especificado"} ({new Date(payment.voidedAt).toLocaleDateString("es-PY")})
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                          <div className={styles.paymentActions}>
+                            <span className={`${styles.paymentAmount} ${payment.isVoided ? styles.voidedText : ""}`}>
+                              {formatCurrency(payment.amount)}
+                            </span>
+                            {!payment.isVoided && (user?.role === "ADMIN" || user?.role === "SUPERADMIN") && (
+                              <button
+                                type="button"
+                                className={styles.voidBtn}
+                                onClick={() => {
+                                  setVoidingPaymentId(payment.id)
+                                  setVoidReason("")
+                                }}
+                              >
+                                Anular
+                              </button>
+                            )}
+                          </div>
                         </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           ) : (
             <div className={styles.emptyState}>
@@ -468,6 +590,61 @@ export default function ClientsPaymentsPage() {
             >
               Entendido
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* Modal para anular pago */}
+      {voidingPaymentId && (
+        <div className={styles.modalOverlay} onClick={() => setVoidingPaymentId(null)}>
+          <div className={styles.voidModal} onClick={(e) => e.stopPropagation()}>
+            <div className={styles.voidIconWrap}>
+              <AlertCircle size={28} />
+            </div>
+            <h2 className={styles.voidTitle}>Anular Pago</h2>
+            <p className={styles.voidSubtitle}>
+              Esta acción revertirá la deuda asignada al cliente y restaurará los saldos en las ventas afectadas.
+            </p>
+
+            <form onSubmit={handleVoidPayment} className={styles.voidForm}>
+              <div className={styles.formGroup}>
+                <label className={styles.label}>Motivo de la anulación (opcional)</label>
+                <input
+                  type="text"
+                  placeholder="Ej: Monto incorrecto, error de digitación..."
+                  className={styles.voidInput}
+                  value={voidReason}
+                  onChange={(e) => setVoidReason(e.target.value)}
+                  maxLength={300}
+                  disabled={voiding}
+                />
+              </div>
+
+              <div className={styles.voidActions}>
+                <button
+                  type="button"
+                  className={styles.voidCancelBtn}
+                  onClick={() => setVoidingPaymentId(null)}
+                  disabled={voiding}
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className={styles.voidSubmitBtn}
+                  disabled={voiding}
+                >
+                  {voiding ? (
+                    <>
+                      <Loader2 size={14} className={styles.spinner} />
+                      <span>Anulando...</span>
+                    </>
+                  ) : (
+                    <span>Confirmar Anulación</span>
+                  )}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

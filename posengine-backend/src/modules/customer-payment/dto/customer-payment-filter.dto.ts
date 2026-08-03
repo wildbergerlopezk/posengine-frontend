@@ -1,4 +1,4 @@
-import { IsOptional, IsString, IsInt, Min, IsDateString } from 'class-validator'
+import { IsOptional, IsString, IsInt, Min, IsDateString, IsBoolean } from 'class-validator'
 import { Type } from 'class-transformer'
 import { ApiPropertyOptional } from '@nestjs/swagger'
 
@@ -36,4 +36,10 @@ export class CustomerPaymentFilterDto {
   @IsInt()
   @Min(1)
   limit?: number
+
+  @ApiPropertyOptional({ description: 'Filtrar por pagos anulados o activos' })
+  @IsOptional()
+  @Type(() => Boolean)
+  @IsBoolean()
+  isVoided?: boolean
 }

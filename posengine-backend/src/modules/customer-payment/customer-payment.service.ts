@@ -5,6 +5,7 @@ import { Prisma } from '../../generated/prisma/client'
 import { CreateCustomerPaymentDto } from './dto/create-customer-payment.dto'
 import { CustomerPaymentFilterDto } from './dto/customer-payment-filter.dto'
 import { PayToAccountDto } from './dto/pay-to-account.dto'
+import { VoidPaymentDto } from './dto/void-payment.dto'
 
 @Injectable()
 export class CustomerPaymentService {
@@ -89,11 +90,12 @@ export class CustomerPaymentService {
 
   // ── FindAll ─────────────────────────────────────────────────────────────────
   async findAll(tenantId: string, filters: CustomerPaymentFilterDto) {
-    const { customerId, saleId, dateFrom, dateTo, page = 1, limit = 20 } = filters
+    const { customerId, saleId, dateFrom, dateTo, isVoided, page = 1, limit = 20 } = filters
     const skip = (page - 1) * limit
 
     const where: Prisma.CustomerPaymentWhereInput = {
       tenantId,
+      isVoided: isVoided !== undefined ? isVoided : false,
       ...(customerId && { customerId }),
       ...(saleId && { saleId }),
       ...((dateFrom || dateTo) && {
@@ -250,6 +252,58 @@ export class CustomerPaymentService {
         salesAffected: paymentsCreated.length,
         payments: paymentsCreated,
       }
+    })
+  }
+
+  // ── Anular un pago con reversión de deudas ───────────────────────────────────
+  async voidPayment(id: string, tenantId: string, dto: VoidPaymentDto) {
+    return this.prisma.$transaction(async (tx) => {
+      const payment = await tx.customerPayment.findFirst({
+        where: { id, tenantId },
+      })
+      if (!payment) {
+        throw new NotFoundException(`Pago con id "${id}" no encontrado`)
+      }
+      if (payment.isVoided) {
+        throw new BadRequestException('Este pago ya fue anulado.')
+      }
+
+      // Revertir la deuda del cliente
+      await tx.customer.update({
+        where: { id: payment.customerId },
+        data: { currentDebt: { increment: payment.amount } },
+      })
+
+      // Revertir el saldo de la venta puntual, si el pago estaba asociado a una
+      if (payment.saleId) {
+        const sale = await tx.sale.findUnique({ where: { id: payment.saleId } })
+        if (sale) {
+          const newRemaining = sale.remainingBalance + payment.amount
+          await tx.sale.update({
+            where: { id: sale.id },
+            data: {
+              remainingBalance: newRemaining,
+              paymentStatus:
+                newRemaining >= sale.total
+                  ? PaymentStatus.PENDING
+                  : PaymentStatus.PARTIAL,
+            },
+          })
+        }
+      }
+
+      return tx.customerPayment.update({
+        where: { id },
+        data: {
+          isVoided: true,
+          voidedAt: new Date(),
+          voidReason: dto.reason,
+        },
+        include: {
+          customer: { select: { id: true, name: true } },
+          sale: { select: { id: true, saleDate: true, total: true, remainingBalance: true } },
+        },
+      })
     })
   }
 }

@@ -20,6 +20,7 @@ import { CustomerPaymentService } from './customer-payment.service'
 import { CreateCustomerPaymentDto } from './dto/create-customer-payment.dto'
 import { CustomerPaymentFilterDto } from './dto/customer-payment-filter.dto'
 import { PayToAccountDto } from './dto/pay-to-account.dto'
+import { VoidPaymentDto } from './dto/void-payment.dto'
 import {
   CurrentUser,
   type AuthenticatedUser,
@@ -95,5 +96,22 @@ export class CustomerPaymentController {
     @Body() dto: PayToAccountDto,
   ) {
     return this.customerPaymentService.payToAccount(user.tenantId, dto)
+  }
+
+  @Post(':id/void')
+  @Roles(UserRole.ADMIN, UserRole.SUPERADMIN)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Anular un pago (revierte deuda del cliente y saldo de la venta asociada)' })
+  @ApiParam({ name: 'id', description: 'Payment ID' })
+  @ApiBody({ type: VoidPaymentDto })
+  @ApiResponse({ status: 200, description: 'Pago anulado correctamente' })
+  @ApiResponse({ status: 400, description: 'El pago ya estaba anulado' })
+  @ApiResponse({ status: 404, description: 'Pago no encontrado' })
+  voidPayment(
+    @Param('id') id: string,
+    @CurrentUser('tenantId') tenantId: string,
+    @Body() dto: VoidPaymentDto,
+  ) {
+    return this.customerPaymentService.voidPayment(id, tenantId, dto)
   }
 }

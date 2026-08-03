@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from 'react'
+import Link from 'next/link'
 import { Wallet, Lock, Unlock, History, Info, AlertCircle } from 'lucide-react'
 import { useCashSession } from '../hooks/useCashSession'
 import { OpenCashModal } from '../components/OpenCashModal'
@@ -84,7 +85,12 @@ export function CashSessionPage() {
                     <span className={styles.statValue}>{formatGs(session.openingAmount)}</span>
                   </div>
                   <div className={styles.statItem}>
-                    <span className={styles.statLabel}>Ventas registradas</span>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', marginBottom: '0.2rem' }}>
+                      <span className={styles.statLabel}>Ventas registradas</span>
+                      <Link href="/dashboard/sales/history" className={styles.viewLink}>
+                        Visualizar ventas
+                      </Link>
+                    </div>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem', alignItems: 'flex-end' }}>
                       <span className={`${styles.statValue} ${styles.positive}`} style={{ fontSize: '0.85rem' }}>
                         Al contado: + {formatGs(session.totalCashSales ?? session.totalSales)}
@@ -95,13 +101,23 @@ export function CashSessionPage() {
                     </div>
                   </div>
                   <div className={styles.statItem}>
-                    <span className={styles.statLabel}>Cobros de deudas</span>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', marginBottom: '0.2rem' }}>
+                      <span className={styles.statLabel}>Cobros de deudas</span>
+                      <Link href="/dashboard/clients/payments" className={styles.viewLink}>
+                        Visualizar cobros
+                      </Link>
+                    </div>
                     <span className={`${styles.statValue} ${styles.positive}`}>
                       + {formatGs(session.totalDebtPayments ?? 0)}
                     </span>
                   </div>
                   <div className={styles.statItem}>
-                    <span className={styles.statLabel}>Compras registradas</span>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', marginBottom: '0.2rem' }}>
+                      <span className={styles.statLabel}>Compras registradas</span>
+                      <Link href="/dashboard/purchases/history" className={styles.viewLink}>
+                        Visualizar compras
+                      </Link>
+                    </div>
                     <span className={`${styles.statValue} ${styles.negative}`}>- {formatGs(session.totalPurchases)}</span>
                   </div>
                   <div className={`${styles.statItem} ${styles.statTotal}`}>

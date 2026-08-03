@@ -96,6 +96,7 @@ export class RegisterService {
         tenantId: user.tenantId,
         tenantName: tenant.name,
         emailVerified: user.emailVerified,
+        role: user.role,
       },
     };
   }

@@ -187,6 +187,21 @@
 .positive { color: #10b981; }
 .negative { color: #ef4444; }
 
+.viewLink {
+  font-size: 0.65rem;
+  font-weight: 700;
+  color: var(--color-primary);
+  text-decoration: none;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  transition: opacity 0.2s;
+}
+
+.viewLink:hover {
+  text-decoration: underline;
+  opacity: 0.8;
+}
+
 .cardFooter {
   margin-top: 2.5rem;
   padding-top: 1.5rem;

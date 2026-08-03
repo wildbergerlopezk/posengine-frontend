@@ -702,3 +702,267 @@
 .closeModalBtn:hover {
   opacity: 0.9;
 }
+
+/* Tabs */
+.tabsContainer {
+  display: flex;
+  gap: 1rem;
+  border-bottom: 1.5px solid var(--color-border);
+  margin-bottom: 1rem;
+  padding-bottom: 0.25rem;
+}
+
+.tabButton {
+  background: none;
+  border: none;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.25rem;
+  color: var(--color-muted-foreground);
+  font-size: 0.8rem;
+  font-weight: 700;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  transition: all 0.2s ease;
+}
+
+.tabButton:hover {
+  color: var(--color-foreground);
+}
+
+.tabActive {
+  color: var(--color-primary) !important;
+  border-bottom-color: var(--color-primary);
+}
+
+/* Payments list */
+.paymentsSection {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.paymentsList {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.paymentItem {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.75rem;
+  background-color: var(--color-background);
+  border: 1px solid var(--color-border);
+  border-radius: 0.625rem;
+  gap: 1rem;
+}
+
+.paymentVoided {
+  border-color: color-mix(in srgb, var(--color-destructive) 20%, var(--color-border));
+  background-color: color-mix(in srgb, var(--color-destructive) 3%, transparent);
+}
+
+.paymentMain {
+  display: flex;
+  gap: 0.75rem;
+  align-items: flex-start;
+}
+
+.paymentIcon {
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: 0.4rem;
+  background-color: color-mix(in srgb, #22c55e 10%, transparent);
+  color: #22c55e;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  margin-top: 0.1rem;
+}
+
+.paymentVoided .paymentIcon {
+  background-color: color-mix(in srgb, var(--color-destructive) 10%, transparent);
+  color: var(--color-destructive);
+}
+
+.paymentDate {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--color-foreground);
+}
+
+.paymentMeta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-top: 0.2rem;
+}
+
+.paymentMethodLabel {
+  font-size: 0.65rem;
+  font-weight: 700;
+  background-color: var(--color-muted);
+  padding: 0.1rem 0.35rem;
+  border-radius: 0.25rem;
+}
+
+.paymentSaleLabel {
+  font-size: 0.65rem;
+  color: var(--color-muted-foreground);
+}
+
+.paymentNotesLabel {
+  font-size: 0.65rem;
+  color: var(--color-muted-foreground);
+  font-style: italic;
+}
+
+.voidReasonLabel {
+  font-size: 0.68rem;
+  color: var(--color-destructive);
+  margin-top: 0.35rem;
+  line-height: 1.2;
+}
+
+.paymentActions {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.35rem;
+  flex-shrink: 0;
+}
+
+.paymentAmount {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #22c55e;
+}
+
+.voidedText {
+  text-decoration: line-through;
+  color: var(--color-muted-foreground);
+}
+
+.voidBtn {
+  background: none;
+  border: none;
+  color: var(--color-destructive);
+  font-size: 0.68rem;
+  font-weight: 700;
+  cursor: pointer;
+  padding: 0.1rem 0.25rem;
+  border-radius: 0.25rem;
+  transition: background-color 0.15s ease;
+}
+
+.voidBtn:hover {
+  background-color: color-mix(in srgb, var(--color-destructive) 10%, transparent);
+}
+
+/* Void Modal specific styles */
+.voidModal {
+  background-color: var(--color-card);
+  border: 1px solid var(--color-border);
+  border-radius: 0.875rem;
+  padding: 1.5rem;
+  width: 100%;
+  max-width: 400px;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.voidIconWrap {
+  width: 3.25rem;
+  height: 3.25rem;
+  border-radius: 50%;
+  background-color: color-mix(in srgb, var(--color-destructive) 12%, transparent);
+  color: var(--color-destructive);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto;
+}
+
+.voidTitle {
+  font-size: 1.15rem;
+  font-weight: 800;
+  color: var(--color-foreground);
+  text-align: center;
+  margin: 0;
+}
+
+.voidSubtitle {
+  font-size: 0.78rem;
+  color: var(--color-muted-foreground);
+  text-align: center;
+  margin: 0.25rem 0 0 0;
+  line-height: 1.4;
+}
+
+.voidForm {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.voidInput {
+  width: 100%;
+  padding: 0.5rem 0.75rem;
+  border: 1.5px solid var(--color-border);
+  border-radius: 0.5rem;
+  background-color: var(--color-background);
+  font-size: 0.85rem;
+  color: var(--color-foreground);
+}
+
+.voidInput:focus {
+  outline: none;
+  border-color: var(--color-destructive);
+}
+
+.voidActions {
+  display: flex;
+  gap: 0.75rem;
+  margin-top: 0.25rem;
+}
+
+.voidCancelBtn {
+  flex: 1;
+  height: 2.25rem;
+  border: 1px solid var(--color-border);
+  background-color: var(--color-card);
+  color: var(--color-foreground);
+  font-size: 0.8rem;
+  font-weight: 600;
+  border-radius: 0.5rem;
+  cursor: pointer;
+}
+
+.voidSubmitBtn {
+  flex: 1;
+  height: 2.25rem;
+  background-color: var(--color-destructive);
+  color: white;
+  border: none;
+  font-size: 0.8rem;
+  font-weight: 700;
+  border-radius: 0.5rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+}
+
+.voidSubmitBtn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}

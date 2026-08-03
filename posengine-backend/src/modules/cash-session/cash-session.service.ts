@@ -148,6 +148,7 @@ export class CashSessionService {
       this.prisma.customerPayment.aggregate({
         where: {
           tenantId,
+          isVoided: false,
           paymentDate: {
             gte: session.openedAt,
             ...(session.closedAt && { lte: session.closedAt }),

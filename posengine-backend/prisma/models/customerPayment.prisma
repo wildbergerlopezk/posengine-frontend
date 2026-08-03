@@ -8,6 +8,10 @@ model CustomerPayment {
   paymentMethod PaymentMethod
   notes         String?
 
+  isVoided   Boolean   @default(false)
+  voidedAt   DateTime?
+  voidReason String?
+
   tenant   Tenant   @relation(fields: [tenantId], references: [id])
   customer Customer @relation(fields: [customerId], references: [id])
   sale     Sale?    @relation(fields: [saleId], references: [id])

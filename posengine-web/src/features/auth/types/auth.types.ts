@@ -21,5 +21,6 @@ export interface AuthResponse {
     tenantId: string | null
     tenantName?: string | null
     emailVerified: boolean
+    role: string
   }
 }
