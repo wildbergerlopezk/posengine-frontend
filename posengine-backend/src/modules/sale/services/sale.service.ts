@@ -7,7 +7,8 @@ import {
 } from '@nestjs/common'
 import { PrismaService } from '../../../prisma/prisma.service'
 import { StockMovementService } from '../../stock-movement/stock-movement.service'
-import { ProductService } from '../../product/product.service'
+import { SaleValidationService } from './sale-validation.service'
+import { SaleCreditService } from './sale-credit.service'
 import { CreateSaleDto } from './../dto/create-sale.dto'
 import { SaleFilterDto } from './../dto/sale-filter.dto'
 import { CashSessionStatus, SaleStatus, PriceType, PaymentStatus, PaymentMethod } from '../../../generated/prisma/enums'
@@ -18,22 +19,13 @@ export class SaleService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly stockMovementService: StockMovementService,
-    private readonly productService: ProductService,
+    private readonly saleValidationService: SaleValidationService,
+    private readonly saleCreditService: SaleCreditService,
   ) {}
 
   // ── Create ───────────────────────────────────────────────────────────────
-  async create(tenantId: string, dto: CreateSaleDto) {
-    // 1. Verificar que existe sesión de caja abierta
-    const cashSession = await this.prisma.cashSession.findFirst({
-      where: { tenantId, status: CashSessionStatus.OPEN },
-    })
-    if (!cashSession) {
-      throw new BadRequestException(
-        'No hay una caja abierta. Realizá la apertura de caja antes de registrar ventas.',
-      )
-    }
-
-    // 2. Validar que no haya productId duplicado en el mismo request
+  async create(tenantId: string, cashSessionId: string, dto: CreateSaleDto) {
+    // 1. Validar que no haya productId duplicado en el mismo request
     const productIds = dto.items.map((i) => i.productId)
     const uniqueIds = new Set(productIds)
     if (uniqueIds.size !== productIds.length) {
@@ -42,106 +34,33 @@ export class SaleService {
       )
     }
 
-    // 3. Cargar todos los productos de una sola consulta
-    const products = await this.prisma.product.findMany({
-      where: { id: { in: productIds }, tenantId },
-    })
+    // 2. Cargar todos los productos de una sola consulta y validar
+    const products = await this.saleValidationService.validateAndFetchProducts(tenantId, dto.items)
 
-    if (products.length !== productIds.length) {
-      const foundIds = products.map((p) => p.id)
-      const missing = productIds.filter((id) => !foundIds.includes(id))
-      throw new NotFoundException(
-        `Los siguientes productos no fueron encontrados: ${missing.join(', ')}`,
-      )
-    }
-
-    // 4. Validaciones por item
-    const productMap = new Map(products.map((p) => [p.id, p]))
-
-    for (const item of dto.items) {
-      const product = productMap.get(item.productId)!
-
-      // 4a. Producto activo
-      if (!product.isActive) {
-        throw new BadRequestException(
-          `El producto "${product.name}" está inactivo y no puede venderse.`,
-        )
-      }
-
-      // 4b. Cantidad válida según unitType (entero para UNIT, float para el resto)
-      this.productService.validateQuantity(item.quantity, product.unitType, product.name)
-
-      // 4c. Stock suficiente
-      if (product.stock < item.quantity) {
-        throw new BadRequestException(
-          `Stock insuficiente para "${product.name}". Disponible: ${product.stock}, solicitado: ${item.quantity}.`,
-        )
-      }
-
-      // 4d. El precio no puede ser menor al precio base según el tipo seleccionado
-      const basePrice = item.priceType === PriceType.WHOLESALE
-        ? product.wholesalePrice
-        : product.price
-
-      if (item.unitPrice < basePrice) {
-        throw new BadRequestException(
-          `El precio de "${product.name}" no puede ser menor al precio ${
-            item.priceType === PriceType.WHOLESALE ? 'mayorista' : 'público'
-          } (Gs. ${basePrice.toLocaleString('es-PY')}). Recibido: Gs. ${item.unitPrice.toLocaleString('es-PY')}.`,
-        )
-      }
-    }
-
-    // 5. Calcular total de la venta
+    // 3. Calcular total de la venta
     const total = dto.items.reduce(
       (sum, item) => sum + item.quantity * item.unitPrice,
       0,
     )
 
+    // 4. Validar crédito si corresponde
+    const customer = await this.saleCreditService.validateCreditLimit(tenantId, dto, total)
+
+    // 5. Ejecutar la transacción
+    return this.executeSaleTransaction(tenantId, cashSessionId, dto, products, customer, total)
+  }
+
+  private async executeSaleTransaction(
+    tenantId: string,
+    cashSessionId: string,
+    dto: CreateSaleDto,
+    products: any[],
+    customer: any,
+    total: number,
+  ) {
     const paymentMethod = dto.paymentMethod ?? PaymentMethod.CASH
     const amountPaid = dto.amountPaid ?? 0
-
-    // ── Validaciones de crédito ──────────────────────────────────────────
-    let customer: Awaited<ReturnType<typeof this.prisma.customer.findFirst>> | null = null
     const remainingBalance = Math.max(0, total - amountPaid)
-
-    if (paymentMethod === PaymentMethod.CREDIT) {
-      if (!dto.customerId) {
-        throw new BadRequestException('Las ventas a crédito requieren un cliente asociado.')
-      }
-
-      customer = await this.prisma.customer.findFirst({
-        where: { id: dto.customerId, tenantId },
-      })
-      if (!customer) {
-        throw new NotFoundException(`Cliente con id "${dto.customerId}" no encontrado`)
-      }
-      if (!customer.isActive) {
-        throw new BadRequestException('El cliente está inactivo.')
-      }
-      if (!customer.creditEnabled) {
-        throw new BadRequestException(`El cliente "${customer.name}" no tiene crédito habilitado.`)
-      }
-      if (amountPaid > total) {
-        throw new BadRequestException('El monto abonado no puede superar el total de la venta.')
-      }
-
-      const projectedDebt = customer.currentDebt + remainingBalance
-      if (remainingBalance > 0 && projectedDebt > customer.creditLimit) {
-        const available = Math.max(0, customer.creditLimit - customer.currentDebt)
-        throw new BadRequestException(
-          `El cliente "${customer.name}" no tiene crédito suficiente. Disponible: Gs. ${available.toLocaleString('es-PY')}, requerido: Gs. ${remainingBalance.toLocaleString('es-PY')}.`,
-        )
-      }
-    } else if (dto.customerId) {
-      // Venta en efectivo/tarjeta/transferencia pero igual asociada a un cliente (opcional, para historial)
-      customer = await this.prisma.customer.findFirst({
-        where: { id: dto.customerId, tenantId },
-      })
-      if (!customer) {
-        throw new NotFoundException(`Cliente con id "${dto.customerId}" no encontrado`)
-      }
-    }
 
     const paymentStatus =
       remainingBalance <= 0
@@ -150,12 +69,14 @@ export class SaleService {
           ? PaymentStatus.PARTIAL
           : PaymentStatus.PENDING
 
-    // 6. Crear la venta, sus items y los movimientos de stock en una transacción
+    // Sort items by productId to prevent deadlocks
+    const sortedItems = [...dto.items].sort((a, b) => a.productId.localeCompare(b.productId))
+
     return this.prisma.$transaction(async (tx) => {
       const sale = await tx.sale.create({
         data: {
           tenantId,
-          cashSessionId: cashSession.id,
+          cashSessionId,
           customerId: customer?.id,
           total,
           paymentMethod,
@@ -164,7 +85,7 @@ export class SaleService {
         },
       })
 
-      for (const item of dto.items) {
+      for (const item of sortedItems) {
         const saleItem = await tx.saleItem.create({
           data: {
             saleId: sale.id,
@@ -188,30 +109,20 @@ export class SaleService {
 
       // Solo lo cobrado en el momento entra a totalSales de la caja
       await tx.cashSession.update({
-        where: { id: cashSession.id },
+        where: { id: cashSessionId },
         data: { totalSales: { increment: total - remainingBalance } },
       })
 
-      // Incrementar deuda del cliente si quedó saldo pendiente
-      if (customer && remainingBalance > 0) {
-        await tx.customer.update({
-          where: { id: customer.id },
-          data: { currentDebt: { increment: remainingBalance } },
-        })
-      }
-
-      // Si hubo seña, dejamos registro como CustomerPayment
-      if (customer && amountPaid > 0) {
-        await tx.customerPayment.create({
-          data: {
-            tenantId,
-            customerId: customer.id,
-            saleId: sale.id,
-            amount: amountPaid,
-            paymentMethod,
-          },
-        })
-      }
+      // Registrar deuda y señas/entregas del cliente
+      await this.saleCreditService.processCreditDebtAndPayments(
+        tx,
+        tenantId,
+        sale.id,
+        customer,
+        remainingBalance,
+        amountPaid,
+        paymentMethod,
+      )
 
       return tx.sale.findUnique({
         where: { id: sale.id },
@@ -310,6 +221,11 @@ export class SaleService {
         throw new ConflictException('La venta ya está anulada')
       }
 
+      // Validar inmutabilidad de sesión de caja cerrada
+      if (sale.cashSession.status === CashSessionStatus.CLOSED) {
+        throw new BadRequestException('No se puede anular una venta de una sesión de caja ya cerrada.')
+      }
+
       const statusUpdate = await tx.sale.updateMany({
         where: { id, tenantId, status: SaleStatus.COMPLETED },
         data: { status: SaleStatus.CANCELLED },
@@ -319,7 +235,10 @@ export class SaleService {
         throw new ConflictException('La venta ya está anulada')
       }
 
-      for (const item of sale.items) {
+      // Prevent deadlocks by sorting items deterministically
+      const sortedItems = [...sale.items].sort((a, b) => a.productId.localeCompare(b.productId))
+
+      for (const item of sortedItems) {
         await this.stockMovementService.registerSaleCancellation(
           tenantId,
           item.productId,
@@ -329,13 +248,8 @@ export class SaleService {
         )
       }
 
-      // Revertir deuda del cliente
-      if (sale.customerId && sale.remainingBalance > 0) {
-        await tx.customer.update({
-          where: { id: sale.customerId },
-          data: { currentDebt: { decrement: sale.remainingBalance } },
-        })
-      }
+      // Revertir deuda de cliente y anular pagos
+      await this.saleCreditService.revertCreditDebtAndPayments(tx, tenantId, sale)
 
       const collectedAmount = sale.total - sale.remainingBalance
       const adjustedTotalSales = Math.max(0, sale.cashSession.totalSales - collectedAmount)
@@ -400,33 +314,16 @@ export class SaleService {
         throw new ConflictException('La venta no está anulada')
       }
 
-      // 1. Validar stock suficiente para todos los productos
-      for (const item of sale.items) {
-        if (item.product.stock < item.quantity) {
-          throw new BadRequestException(
-            `Stock insuficiente para restaurar la venta. El producto "${item.product.name}" tiene ${item.product.stock} unidades disponibles, pero la venta requiere ${item.quantity}.`
-          )
-        }
+      // Validar inmutabilidad de sesión de caja cerrada
+      if (sale.cashSession.status === CashSessionStatus.CLOSED) {
+        throw new BadRequestException('No se puede restaurar una venta de una sesión de caja ya cerrada.')
       }
 
-      // 2. Validar límite de crédito del cliente si la venta es a crédito
-      if (sale.customerId && sale.remainingBalance > 0) {
-        const customer = await tx.customer.findFirst({
-          where: { id: sale.customerId },
-        })
-        if (customer) {
-          if (!customer.isActive) {
-            throw new BadRequestException('El cliente asociado está inactivo.')
-          }
-          const projectedDebt = customer.currentDebt + sale.remainingBalance
-          if (projectedDebt > customer.creditLimit) {
-            const available = Math.max(0, customer.creditLimit - customer.currentDebt)
-            throw new BadRequestException(
-              `El cliente "${customer.name}" no tiene crédito suficiente para restaurar la venta. Disponible: Gs. ${available.toLocaleString('es-PY')}, requerido: Gs. ${sale.remainingBalance.toLocaleString('es-PY')}.`,
-            )
-          }
-        }
-      }
+      // 1. Validar stock suficiente y que el producto esté activo
+      this.saleValidationService.validateStockAndActiveState(sale.items)
+
+      // 2. Restaurar límite de crédito del cliente e incrementar deuda
+      await this.saleCreditService.restoreCreditDebtAndPayments(tx, tenantId, sale)
 
       // 3. Cambiar estado a COMPLETED
       const statusUpdate = await tx.sale.updateMany({
@@ -438,8 +335,11 @@ export class SaleService {
         throw new ConflictException('La venta no está anulada o ya fue modificada')
       }
 
+      // Sort items to prevent deadlocks
+      const sortedItems = [...sale.items].sort((a, b) => a.productId.localeCompare(b.productId))
+
       // 4. Descontar stock y registrar movimientos
-      for (const item of sale.items) {
+      for (const item of sortedItems) {
         await this.stockMovementService.registerSale(
           tenantId,
           item.productId,
@@ -449,15 +349,7 @@ export class SaleService {
         )
       }
 
-      // 5. Incrementar deuda del cliente si corresponde
-      if (sale.customerId && sale.remainingBalance > 0) {
-        await tx.customer.update({
-          where: { id: sale.customerId },
-          data: { currentDebt: { increment: sale.remainingBalance } },
-        })
-      }
-
-      // 6. Ajustar ventas de la sesión de caja
+      // 5. Ajustar ventas de la sesión de caja
       const collectedAmount = sale.total - sale.remainingBalance
       const adjustedTotalSales = sale.cashSession.totalSales + collectedAmount
       const cashSessionUpdate: Prisma.CashSessionUpdateInput = {

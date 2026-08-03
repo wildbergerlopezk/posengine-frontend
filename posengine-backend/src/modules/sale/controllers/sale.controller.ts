@@ -9,6 +9,8 @@ import {
   Query,
   HttpCode,
   HttpStatus,
+  UseGuards,
+  Request,
 } from '@nestjs/common'
 import {
   ApiTags,
@@ -28,6 +30,7 @@ import {
 } from '../../../common/decorators/current-user.decorator'
 import { Roles } from '../../../common/decorators/roles.decorator'
 import { UserRole } from '../../../generated/prisma/enums'
+import { CashSessionGuard } from '../../../common/guards/cash-session.guard'
 
 @ApiTags('Sales')
 @ApiBearerAuth('access-token')
@@ -36,6 +39,7 @@ export class SaleController {
   constructor(private readonly saleService: SaleService) {}
 
   @Post()
+  @UseGuards(CashSessionGuard)
   @Roles(UserRole.ADMIN, UserRole.SUPERADMIN)
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Registrar una nueva venta' })
@@ -45,9 +49,10 @@ export class SaleController {
   @ApiResponse({ status: 404, description: 'Producto no encontrado' })
   create(
     @CurrentUser() user: AuthenticatedUser,
+    @Request() req: any,
     @Body() dto: CreateSaleDto,
   ) {
-    return this.saleService.create(user.tenantId, dto)
+    return this.saleService.create(user.tenantId, req.cashSession.id, dto)
   }
 
   @Get()
