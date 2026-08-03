@@ -621,3 +621,20 @@
 }
 .cancelBtn:hover:not(:disabled) { background: #ef4444; color: white; }
 .cancelBtn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.restoreBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1.125rem;
+  border: 1px solid #10b981;
+  background: transparent;
+  color: #10b981;
+  border-radius: 0.5rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.restoreBtn:hover:not(:disabled) { background: #10b981; color: white; }
+.restoreBtn:disabled { opacity: 0.5; cursor: not-allowed; }

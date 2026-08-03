@@ -96,7 +96,7 @@ export function CashSessionPage() {
                         Al contado: + {formatGs(session.totalCashSales ?? session.totalSales)}
                       </span>
                       <span className={`${styles.statValue}`} style={{ fontSize: '0.75rem', color: 'var(--color-muted-foreground)', fontWeight: 'normal' }}>
-                        Crédito pendiente: + {formatGs(session.totalCreditSales ?? 0)}
+                        A crédito: + {formatGs(session.totalCreditSales ?? 0)}
                       </span>
                     </div>
                   </div>

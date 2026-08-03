@@ -111,6 +111,7 @@ export function SalesHistoryPage() {
   const [loadingDetail, setLoadingDetail] = useState(false)
   const [detailError, setDetailError] = useState<string | null>(null)
   const [cancelling, setCancelling] = useState(false)
+  const [restoring, setRestoring] = useState(false)
   const [cancelError, setCancelError] = useState<string | null>(null)
 
   // ── Fetch list ─────────────────────────────────────────────────────────────
@@ -198,6 +199,29 @@ export function SalesHistoryPage() {
       setCancelError(err instanceof Error ? err.message : "Error desconocido")
     } finally {
       setCancelling(false)
+    }
+  }
+
+  // ── Restore / Uncancel sale ────────────────────────────────────────────────
+  const handleRestore = async () => {
+    if (!selectedSale) return
+    setRestoring(true)
+    setCancelError(null)
+    try {
+      const res = await fetch(`${API_BASE}/sales/${selectedSale.id}/uncancel`, {
+        method: "PATCH",
+        headers: authHeaders,
+      })
+      if (!res.ok) {
+        const data = await res.json()
+        throw new Error(data.message || "Error al desanular la venta")
+      }
+      await fetchSales()
+      closeDetail()
+    } catch (err) {
+      setCancelError(err instanceof Error ? err.message : "Error desconocido")
+    } finally {
+      setRestoring(false)
     }
   }
 
@@ -600,6 +624,22 @@ export function SalesHistoryPage() {
                         {cancelling
                           ? <><Loader2 size={15} className={tableStyles.spinner} /> Anulando…</>
                           : <><Ban size={15} /> Anular venta</>
+                        }
+                      </button>
+                    </div>
+                  )}
+
+                  {selectedSale.status === "CANCELLED" && (
+                    <div className={styles.modalActions}>
+                      <button
+                        type="button"
+                        className={styles.restoreBtn}
+                        onClick={handleRestore}
+                        disabled={restoring}
+                      >
+                        {restoring
+                          ? <><Loader2 size={15} className={tableStyles.spinner} /> Restaurando…</>
+                          : <><CheckCircle2 size={15} /> Desanular venta</>
                         }
                       </button>
                     </div>

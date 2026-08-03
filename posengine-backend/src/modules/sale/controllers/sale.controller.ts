@@ -100,4 +100,18 @@ export class SaleController {
   ) {
     return this.saleService.cancel(id, tenantId)
   }
+
+  @Patch(':id/uncancel')
+  @Roles(UserRole.ADMIN, UserRole.SUPERADMIN)
+  @ApiOperation({ summary: 'Desanular/Restaurar una venta anulada' })
+  @ApiParam({ name: 'id', description: 'ID de la venta' })
+  @ApiResponse({ status: 200, description: 'Venta restaurada correctamente' })
+  @ApiResponse({ status: 404, description: 'Venta no encontrada' })
+  @ApiResponse({ status: 409, description: 'La venta no está anulada' })
+  uncancel(
+    @Param('id') id: string,
+    @CurrentUser('tenantId') tenantId: string,
+  ) {
+    return this.saleService.uncancel(id, tenantId)
+  }
 }

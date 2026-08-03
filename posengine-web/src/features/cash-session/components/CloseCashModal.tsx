@@ -107,7 +107,7 @@ function CloseCashModalContent({
                   Cobros deuda: {formatGs(session.totalDebtPayments ?? 0)}
                 </span>
                 <span className={`${styles.summaryValue}`} style={{ fontSize: '0.72rem', color: 'var(--color-muted-foreground)', fontWeight: 'normal' }}>
-                  Crédito pendiente: {formatGs(session.totalCreditSales ?? 0)}
+                  A crédito: {formatGs(session.totalCreditSales ?? 0)}
                 </span>
               </div>
             </div>

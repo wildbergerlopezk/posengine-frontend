@@ -377,6 +377,127 @@ export class SaleService {
     })
   }
 
+  // ── Uncancel / Restore Sale ──────────────────────────────────────────────
+  async uncancel(id: string, tenantId: string) {
+    return this.prisma.$transaction(async (tx) => {
+      const sale = await tx.sale.findFirst({
+        where: { id, tenantId },
+        include: {
+          cashSession: true,
+          items: {
+            include: {
+              product: true,
+            },
+          },
+        },
+      })
+
+      if (!sale) {
+        throw new NotFoundException(`Venta con id "${id}" no encontrada`)
+      }
+
+      if (sale.status !== SaleStatus.CANCELLED) {
+        throw new ConflictException('La venta no está anulada')
+      }
+
+      // 1. Validar stock suficiente para todos los productos
+      for (const item of sale.items) {
+        if (item.product.stock < item.quantity) {
+          throw new BadRequestException(
+            `Stock insuficiente para restaurar la venta. El producto "${item.product.name}" tiene ${item.product.stock} unidades disponibles, pero la venta requiere ${item.quantity}.`
+          )
+        }
+      }
+
+      // 2. Validar límite de crédito del cliente si la venta es a crédito
+      if (sale.customerId && sale.remainingBalance > 0) {
+        const customer = await tx.customer.findFirst({
+          where: { id: sale.customerId },
+        })
+        if (customer) {
+          if (!customer.isActive) {
+            throw new BadRequestException('El cliente asociado está inactivo.')
+          }
+          const projectedDebt = customer.currentDebt + sale.remainingBalance
+          if (projectedDebt > customer.creditLimit) {
+            const available = Math.max(0, customer.creditLimit - customer.currentDebt)
+            throw new BadRequestException(
+              `El cliente "${customer.name}" no tiene crédito suficiente para restaurar la venta. Disponible: Gs. ${available.toLocaleString('es-PY')}, requerido: Gs. ${sale.remainingBalance.toLocaleString('es-PY')}.`,
+            )
+          }
+        }
+      }
+
+      // 3. Cambiar estado a COMPLETED
+      const statusUpdate = await tx.sale.updateMany({
+        where: { id, tenantId, status: SaleStatus.CANCELLED },
+        data: { status: SaleStatus.COMPLETED },
+      })
+
+      if (statusUpdate.count === 0) {
+        throw new ConflictException('La venta no está anulada o ya fue modificada')
+      }
+
+      // 4. Descontar stock y registrar movimientos
+      for (const item of sale.items) {
+        await this.stockMovementService.registerSale(
+          tenantId,
+          item.productId,
+          item.quantity,
+          item.id,
+          tx,
+        )
+      }
+
+      // 5. Incrementar deuda del cliente si corresponde
+      if (sale.customerId && sale.remainingBalance > 0) {
+        await tx.customer.update({
+          where: { id: sale.customerId },
+          data: { currentDebt: { increment: sale.remainingBalance } },
+        })
+      }
+
+      // 6. Ajustar ventas de la sesión de caja
+      const collectedAmount = sale.total - sale.remainingBalance
+      const adjustedTotalSales = sale.cashSession.totalSales + collectedAmount
+      const cashSessionUpdate: Prisma.CashSessionUpdateInput = {
+        totalSales: adjustedTotalSales,
+      }
+
+      if (sale.cashSession.closingAmount !== null) {
+        const expectedAmount =
+          sale.cashSession.openingAmount +
+          adjustedTotalSales -
+          sale.cashSession.totalPurchases
+
+        cashSessionUpdate.expectedAmount = expectedAmount
+        cashSessionUpdate.difference =
+          sale.cashSession.closingAmount - expectedAmount
+      }
+
+      await tx.cashSession.update({
+        where: { id: sale.cashSessionId },
+        data: cashSessionUpdate,
+      })
+
+      return tx.sale.findUnique({
+        where: { id },
+        include: {
+          cashSession: {
+            select: { id: true, openedAt: true, closedAt: true, status: true },
+          },
+          items: {
+            include: {
+              product: {
+                select: { id: true, name: true, sku: true, barcode: true, unitType: true },
+              },
+            },
+          },
+        },
+      })
+    })
+  }
+
   // ── FindByCashSession ────────────────────────────────────────────────────
   // Útil para mostrar las ventas del día en el resumen de cierre
   async findByCashSession(cashSessionId: string, tenantId: string) {
