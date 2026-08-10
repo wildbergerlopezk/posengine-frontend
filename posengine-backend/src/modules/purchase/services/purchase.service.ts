@@ -6,20 +6,21 @@ import {
 } from '@nestjs/common'
 
 import { PrismaService } from '../../../prisma/prisma.service'
-import { CreatePurchaseDto } from '../dto/purchase/create-purchase.dto'
-import { UpdatePurchaseDto } from '../dto/purchase/update-purchase.dto'
-import { PurchaseFilterDto } from '../dto/purchase/purchase-filter.dto'
+import { CreatePurchaseDto } from '../dto/create-purchase.dto'
+import { PurchaseFilterDto } from '../dto/purchase-filter.dto'
 import { PurchaseStatus } from '../../../generated/prisma/enums'
 import { Prisma } from '../../../generated/prisma/client'
 import { StockMovementService } from '../../stock-movement/stock-movement.service'
-import { ProductService } from '../../product/product.service'
+import { PurchaseValidationService } from './purchase-validation.service'
+import { PurchaseDebtService } from './purchase-debt.service'
 
 @Injectable()
 export class PurchaseService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly stockMovementService: StockMovementService,
-    private readonly productService: ProductService,
+    private readonly purchaseValidationService: PurchaseValidationService,
+    private readonly purchaseDebtService: PurchaseDebtService,
   ) {}
 
   async generateInvoiceNumber(tenantId: string): Promise<{ invoiceNumber: string }> {
@@ -47,64 +48,11 @@ export class PurchaseService {
   }
 
   async create(tenantId: string, cashSessionId: string, dto: CreatePurchaseDto) {
-    const existing = await this.prisma.purchase.findUnique({
-      where: {
-        invoiceNumber_tenantId: {
-          invoiceNumber: dto.invoiceNumber,
-          tenantId,
-        },
-      },
-    })
+    // 1. Validar reglas de negocio utilizando el validador
+    const productIds = await this.purchaseValidationService.validateCreatePurchase(tenantId, dto)
 
-    if (existing) {
-      throw new ConflictException(
-        `Ya existe una compra con el número de factura "${dto.invoiceNumber}"`,
-      )
-    }
-
-    const itemProductIds = dto.items.map((item) => item.productId)
-    const uniqueProductIds = new Set(itemProductIds)
-    if (uniqueProductIds.size !== itemProductIds.length) {
-      throw new BadRequestException(
-        'No puede haber productos duplicados en la misma compra',
-      )
-    }
-
-    const productIds = Array.from(uniqueProductIds)
-    const products = await this.prisma.product.findMany({
-      where: { id: { in: productIds }, tenantId },
-      select: { id: true, name: true, unitType: true },
-    })
-    const productMap = new Map(products.map((product) => [product.id, product]))
-
-    let calculatedTotal = 0
-    for (const item of dto.items) {
-      if (!Number.isFinite(item.quantity) || !Number.isFinite(item.unitCost)) {
-        throw new BadRequestException(
-          `El producto "${item.productId}" contiene valores numéricos inválidos`,
-        )
-      }
-
-      if (item.quantity <= 0 || item.unitCost <= 0) {
-        throw new BadRequestException(
-          `El producto "${item.productId}" debe tener cantidad y costo mayores a 0`,
-        )
-      }
-
-      const product = productMap.get(item.productId)
-      if (!product) {
-        throw new NotFoundException(`Producto con id "${item.productId}" no encontrado`)
-      }
-
-      this.productService.validateQuantity(item.quantity, product.unitType, product.name)
-      calculatedTotal += item.quantity * item.unitCost
-    }
-
-    if (Math.abs(calculatedTotal - dto.total) > 1) {
-      throw new BadRequestException(
-        `El total de la compra no coincide con la suma de los items (${calculatedTotal} vs ${dto.total})`,
-      )
-    }
+    // 2. Ordenar items para evitar deadlocks
+    const sortedItems = [...dto.items].sort((a, b) => a.productId.localeCompare(b.productId))
 
     return this.prisma.$transaction(async (tx) => {
       const purchase = await tx.purchase.create({
@@ -121,66 +69,58 @@ export class PurchaseService {
         },
       })
 
+      if (dto.paymentType === 'CREDIT') {
+        await this.purchaseDebtService.createForPurchase(tx, tenantId, purchase.id, dto.total, dto.debt!)
+      }
+
       const productStocks = await tx.product.findMany({
-        where: { id: { in: dto.items.map((item) => item.productId) }, tenantId },
+        where: { id: { in: productIds }, tenantId },
         select: { id: true, stock: true },
       })
       const stockMap = new Map(productStocks.map((product) => [product.id, product.stock]))
 
-      const purchaseItemsCreated = await Promise.all(
-        dto.items.map(async (item) => {
-          const before = stockMap.get(item.productId) ?? 0
-          const after = before + item.quantity
-          stockMap.set(item.productId, after)
+      // Process items sequentially to ensure deterministic execution order
+      for (const item of sortedItems) {
+        const before = stockMap.get(item.productId) ?? 0
+        const after = before + item.quantity
+        stockMap.set(item.productId, after)
 
-          const purchaseItem = await tx.purchaseItem.create({
-            data: {
-              purchaseId: purchase.id,
-              productId: item.productId,
-              quantity: item.quantity,
-              unitCost: item.unitCost,
-              total: item.quantity * item.unitCost,
-            },
-          })
+        const purchaseItem = await tx.purchaseItem.create({
+          data: {
+            purchaseId: purchase.id,
+            productId: item.productId,
+            quantity: item.quantity,
+            unitCost: item.unitCost,
+            total: item.quantity * item.unitCost,
+          },
+        })
 
-          return {
-            item,
-            purchaseItemId: purchaseItem.id,
+        await tx.stockMovement.create({
+          data: {
+            tenantId,
+            productId: item.productId,
+            type: 'PURCHASE',
+            quantity: item.quantity,
             before,
             after,
-          }
-        }),
-      )
+            referenceId: purchaseItem.id,
+            notes: 'Ingreso por compra',
+            sourceType: 'PURCHASE',
+          },
+        })
 
-      await Promise.all(
-        purchaseItemsCreated.map(async ({ item, purchaseItemId, before, after }) => {
-          await Promise.all([
-            tx.stockMovement.create({
-              data: {
-                tenantId,
-                productId: item.productId,
-                type: 'PURCHASE',
-                quantity: item.quantity,
-                before,
-                after,
-                referenceId: purchaseItemId,
-                notes: 'Ingreso por compra',
-                sourceType: 'PURCHASE',
-              },
-            }),
-            tx.product.update({
-              where: { id: item.productId },
-              data: { stock: after },
-            }),
-          ])
-        }),
-      )
+        await tx.product.update({
+          where: { id: item.productId },
+          data: { stock: after },
+        })
+      }
 
       return tx.purchase.findUnique({
         where: { id: purchase.id },
         include: {
           supplier: true,
           items: true,
+          debt: true,
         },
       })
     }, {
@@ -255,6 +195,12 @@ export class PurchaseService {
             }
           }
         },
+        debt: {
+          include: {
+            installments: { orderBy: { number: 'asc' } },
+            payments: { orderBy: { paymentDate: 'desc' } },
+          },
+        },
       },
     })
 
@@ -271,6 +217,7 @@ export class PurchaseService {
       include: {
         items: true,
         returns: true,
+        debt: { include: { payments: true } },
       },
     })
 
@@ -288,9 +235,21 @@ export class PurchaseService {
       )
     }
 
+    if (purchase.debt && purchase.debt.paidAmount > 0) {
+      throw new BadRequestException(
+        'No se puede cancelar una compra a crédito que ya tiene pagos registrados',
+      )
+    }
+
+    // Sort items to prevent deadlocks
+    const sortedItems = [...purchase.items].sort((a, b) => a.productId.localeCompare(b.productId))
+
     return this.prisma.$transaction(async (tx) => {
-      // Revert stock for each item
-      for (const item of purchase.items) {
+      // Validate stock availability using the validation service
+      await this.purchaseValidationService.validateCancelStockAvailability(tx, purchase, tenantId)
+
+      // Revert stock for each item sequentially in sorted order
+      for (const item of sortedItems) {
         await this.stockMovementService.registerPurchaseCancellation(
           tenantId,
           item.productId,

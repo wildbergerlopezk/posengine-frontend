@@ -3,6 +3,7 @@ import {
   Get,
   Post,
   Patch,
+  Delete,
   Param,
   Body,
   Query,
@@ -115,6 +116,20 @@ export class InternalReceiptController {
     @Body('reason') reason?: string,
   ) {
     return this.internalReceiptService.void(id, tenantId, reason)
+  }
+
+  @Delete(':id')
+  @Roles(UserRole.ADMIN, UserRole.SUPERADMIN)
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({ summary: 'Eliminar completamente un comprobante interno' })
+  @ApiParam({ name: 'id', description: 'Internal Receipt ID' })
+  @ApiResponse({ status: 204, description: 'Comprobante eliminado' })
+  @ApiResponse({ status: 404, description: 'Comprobante no encontrado' })
+  remove(
+    @Param('id') id: string,
+    @CurrentUser('tenantId') tenantId: string,
+  ) {
+    return this.internalReceiptService.remove(id, tenantId)
   }
 }
 

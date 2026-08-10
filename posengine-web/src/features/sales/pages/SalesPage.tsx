@@ -11,9 +11,11 @@ import {
   AlertCircle,
   Plus,
   Loader2,
+  User,
 } from "lucide-react"
 import { Header } from "@/src/shared/components/Header"
 import { ProductSearchModal } from "@/src/shared/components/ProductSearchModal"
+import { CustomerSearchModal } from "@/src/shared/components/CustomerSearchModal"
 import { formatCurrency } from "@/src/shared/hooks/useFormatCurrency"
 import { useRouter } from "next/navigation"
 import { useCashSession } from "@/src/features/cash-session/hooks/useCashSession"
@@ -120,8 +122,11 @@ export function SalesPage() {
   // ── Crédito / Contado ──────────────────────────────────────────────────────
   const [paymentMethod, setPaymentMethod] = useState<"CASH" | "CREDIT">("CASH")
   const [selectedCustomerId, setSelectedCustomerId] = useState<string>("")
+  const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null)
   const [amountPaid, setAmountPaid] = useState<number>(0)
   const [customers, setCustomers] = useState<Customer[]>([])
+  const [showCustomerModal, setShowCustomerModal] = useState(false)
+  const [customerSearch, setCustomerSearch] = useState("")
 
   // ── Barcode scanner ────────────────────────────────────────────────────────
   const [barcodeBuffer, setBarcodeBuffer] = useState("")
@@ -192,15 +197,17 @@ export function SalesPage() {
     }
   }, [showProductModal, fetchProducts])
 
-  // ── Fetch clientes para crédito ─────────────────────────────────────────────
+
+
+  // ── Fetch clientes para el punto de venta ───────────────────────────────────
   useEffect(() => {
-    if (paymentMethod === "CREDIT") {
-      fetch(`${API_BASE}/customers?limit=100&creditEnabled=true`, { headers: authHeaders })
+    if (accessToken) {
+      fetch(`${API_BASE}/customers?limit=150`, { headers: authHeaders })
         .then(res => res.json())
         .then(data => setCustomers(data.items ?? []))
         .catch(err => console.error("Error loading customers", err))
     }
-  }, [paymentMethod])
+  }, [accessToken])
 
   // ── Edición inline ─────────────────────────────────────────────────────────
   const cancelEdit = useCallback(() => {
@@ -324,7 +331,7 @@ export function SalesPage() {
           priceType: i.priceType,
         })),
         paymentMethod,
-        customerId: paymentMethod === "CREDIT" ? selectedCustomerId : undefined,
+        customerId: selectedCustomerId || undefined,
         amountPaid: paymentMethod === "CREDIT" ? amountPaid : undefined,
       }
 
@@ -345,6 +352,7 @@ export function SalesPage() {
         sessionStorage.removeItem(SALE_STORAGE_KEY)
         setSuccess(false)
         setSelectedCustomerId("")
+        setSelectedCustomer(null)
         setAmountPaid(0)
       }, 1200)
     } catch (err: unknown) {
@@ -393,19 +401,27 @@ export function SalesPage() {
         e.preventDefault()
         setPaymentMethod(prev => prev === "CASH" ? "CREDIT" : "CASH")
       }
+      if (e.key === "F8" && !showProductModal && !showConfirmModal) {
+        e.preventDefault()
+        setShowCustomerModal(true)
+      }
       if (e.key === "F2" && !showProductModal) {
         e.preventDefault()
         setShowProductModal(true)
       }
       if (e.key === "F12" && !showProductModal && items.length > 0 && !showConfirmModal) {
         e.preventDefault()
+        if (paymentMethod === "CREDIT" && !selectedCustomerId) {
+          setSubmitError("Debes seleccionar un cliente (F8) para realizar una venta a crédito.")
+          return
+        }
         setShowConfirmModal(true)
         setConfirmSelectedBtn("accept")
       }
     }
     window.addEventListener("keydown", handler)
     return () => window.removeEventListener("keydown", handler)
-  }, [showProductModal, showConfirmModal, barcodeBuffer, barcodeError, items, handleBarcodeAdd, paymentMethod])
+  }, [showProductModal, showConfirmModal, barcodeBuffer, barcodeError, items, handleBarcodeAdd, paymentMethod, selectedCustomerId])
 
   // ── Confirm modal teclado ──────────────────────────────────────────────────
   useEffect(() => {
@@ -461,6 +477,9 @@ export function SalesPage() {
             alert("Debes seleccionar un cliente para ventas a crédito.")
             return
           }
+          if (paymentMethod === "CREDIT" && selectedCustomer && (selectedCustomer.currentDebt + Math.max(0, total - amountPaid) > selectedCustomer.creditLimit)) {
+            return
+          }
           setShowConfirmModal(false)
           void handleSubmit()
         }
@@ -470,7 +489,7 @@ export function SalesPage() {
     }
     window.addEventListener("keydown", handler)
     return () => window.removeEventListener("keydown", handler)
-  }, [showConfirmModal, confirmSelectedBtn, selectedCustomerId, paymentMethod, amountPaid, handleSubmit])
+  }, [showConfirmModal, confirmSelectedBtn, selectedCustomerId, selectedCustomer, paymentMethod, amountPaid, handleSubmit, total])
 
   useEffect(() => {
     if (showConfirmModal) {
@@ -540,6 +559,14 @@ export function SalesPage() {
               <span className={styles.shortcutHint}><kbd>F12</kbd> Cobrar</span>
               <button
                 type="button"
+                className={`${tableStyles.newButton} ${selectedCustomer ? styles.creditModeBtn : styles.cashModeBtn}`}
+                onClick={() => setShowCustomerModal(true)}
+                style={{ marginLeft: 8 }}
+              >
+                Cliente: {selectedCustomer ? selectedCustomer.name : "Consumidor Final"} <kbd className={styles.kbdInline} style={{ marginLeft: 6 }}>F8</kbd>
+              </button>
+              <button
+                type="button"
                 className={`${tableStyles.newButton} ${paymentMethod === "CREDIT" ? styles.creditModeBtn : styles.cashModeBtn}`}
                 onClick={() => setPaymentMethod(prev => prev === "CASH" ? "CREDIT" : "CASH")}
                 style={{ marginLeft: 8 }}
@@ -552,11 +579,16 @@ export function SalesPage() {
                 onClick={() => setShowProductModal(true)}
                 style={{ marginLeft: 8 }}
               >
-
-                <Plus size={15} /> Agregar producto                               <span className={styles.shortcutHint}><kbd>F2</kbd></span>
+                <Plus size={15} /> Agregar producto <span className={styles.shortcutHint}><kbd>F2</kbd></span>
               </button>
             </div>
           </div>
+          {paymentMethod === "CREDIT" && selectedCustomer && (selectedCustomer.currentDebt + Math.max(0, total - amountPaid) > selectedCustomer.creditLimit) && (
+            <div className={tableStyles.errorBanner} style={{ marginTop: 8, marginBottom: 8 }}>
+              <AlertCircle size={16} />
+              Límite de crédito superado para {selectedCustomer.name}. Disponible: {formatCurrency(Math.max(0, selectedCustomer.creditLimit - selectedCustomer.currentDebt))}, Requerido: {formatCurrency(Math.max(0, total - amountPaid))}
+            </div>
+          )}
 
           <table className={tableStyles.table}>
             <thead className={tableStyles.tableHeader}>
@@ -758,6 +790,24 @@ export function SalesPage() {
         priceColumn="price"
       />
 
+      {/* ══ MODAL SELECCIÓN CLIENTE (F8) ═════════════════════════════════════ */}
+      <CustomerSearchModal
+        open={showCustomerModal}
+        customers={customers}
+        searchValue={customerSearch}
+        onSearchChange={(v) => setCustomerSearch(v)}
+        onSelect={(c) => {
+          setSelectedCustomer(c)
+          setSelectedCustomerId(c?.id || "")
+          setShowCustomerModal(false)
+          setCustomerSearch("")
+        }}
+        onClose={() => {
+          setShowCustomerModal(false)
+          setCustomerSearch("")
+        }}
+      />
+
       {/* ══ MODAL CONFIRMAR VENTA ════════════════════════════════════════════ */}
       {showConfirmModal && (
         <div className={styles.modalOverlay}>
@@ -772,25 +822,12 @@ export function SalesPage() {
             {paymentMethod === "CREDIT" && (
               <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem", width: "100%", marginBottom: "1rem", textAlign: "left" }}>
                 <div>
-                  <label style={{ fontSize: "0.825rem", color: "var(--color-muted-foreground)", fontWeight: 600, display: "block", marginBottom: "0.25rem" }}>
-                    Cliente *
-                  </label>
-                  <Autocomplete
-                    items={customers}
-                    onValueChange={(c: Customer) => setSelectedCustomerId(c?.id || "")}
-                  >
-                    <AutocompleteInput id="autocomplete-input-client" placeholder="Buscar por nombre, CI o RUC..." autoFocus={paymentMethod === "CREDIT"} />
-                    <AutocompletePopup>
-                      <AutocompleteEmpty>No se encontraron clientes.</AutocompleteEmpty>
-                      <AutocompleteList>
-                        {(c: Customer) => (
-                          <AutocompleteItem key={c.id} value={c}>
-                            {c.name} (CI: {c.documentNumber || "—"} | Disp: {formatCurrency(Math.max(0, c.creditLimit - c.currentDebt))})
-                          </AutocompleteItem>
-                        )}
-                      </AutocompleteList>
-                    </AutocompletePopup>
-                  </Autocomplete>
+                  <span style={{ fontSize: "0.825rem", color: "var(--color-muted-foreground)", fontWeight: 600, display: "block" }}>
+                    Cliente seleccionado
+                  </span>
+                  <div style={{ fontSize: "1rem", fontWeight: 700, padding: "0.5rem", borderRadius: "0.25rem", background: "var(--color-muted, #f3f4f6)", color: "var(--color-foreground)" }}>
+                    {selectedCustomer ? selectedCustomer.name : "Consumidor Final"}
+                  </div>
                 </div>
                 <div>
                   <label style={{ fontSize: "0.825rem", color: "var(--color-muted-foreground)", fontWeight: 600, display: "block", marginBottom: "0.25rem" }}>
@@ -830,6 +867,11 @@ export function SalesPage() {
               <button
                 ref={confirmAcceptRef}
                 className={`${styles.confirmAccept} ${confirmSelectedBtn === "accept" ? styles.buttonFocused : ""}`}
+                disabled={paymentMethod === "CREDIT" && selectedCustomer !== null && (selectedCustomer.currentDebt + Math.max(0, total - amountPaid) > selectedCustomer.creditLimit)}
+                style={{
+                  opacity: (paymentMethod === "CREDIT" && selectedCustomer !== null && (selectedCustomer.currentDebt + Math.max(0, total - amountPaid) > selectedCustomer.creditLimit)) ? 0.5 : 1,
+                  cursor: (paymentMethod === "CREDIT" && selectedCustomer !== null && (selectedCustomer.currentDebt + Math.max(0, total - amountPaid) > selectedCustomer.creditLimit)) ? "not-allowed" : "pointer"
+                }}
                 onClick={() => {
                   if (paymentMethod === "CREDIT" && !selectedCustomerId) {
                     alert("Debes seleccionar un cliente para ventas a crédito.")

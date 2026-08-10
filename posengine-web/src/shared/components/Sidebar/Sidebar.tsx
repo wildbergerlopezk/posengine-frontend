@@ -53,7 +53,7 @@ const navItems = [
     icon: Users,
     subItems: [
       { href: "/dashboard/clients", label: "Lista de clientes", icon: List },
-      { href: "/dashboard/clients/payments", label: "Pagos de deuda", icon: Wallet },
+      { href: "/dashboard/clients/payments", label: "Cobro de deudas", icon: Wallet },
     ],
   },
 

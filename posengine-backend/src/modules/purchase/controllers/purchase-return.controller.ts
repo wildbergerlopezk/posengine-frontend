@@ -7,7 +7,7 @@ import {
   ApiBearerAuth, ApiBody, ApiParam, ApiQuery,
 } from '@nestjs/swagger';
 import { PurchaseReturnService } from '../services/purchase-return.service';
-import { CreatePurchaseReturnDto } from '../dto/return/create-purchase-return.dto';
+import { CreatePurchaseReturnDto } from '../dto/create-purchase-return.dto';
 import { CurrentUser } from '../../../common/decorators/current-user.decorator';
 import { Roles } from '../../../common/decorators/roles.decorator';
 import { UserRole } from '../../../generated/prisma/enums';

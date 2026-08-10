@@ -76,14 +76,14 @@ export function CashSessionPage() {
                   <div className={styles.mainDetails}>
                     <h3>Sesión activa</h3>
                     <p>Iniciada el {new Date(session.openedAt).toLocaleString('es-PY')}</p>
+                    <div className={styles.openingAmountCard}>
+                      <span className={styles.statLabel}>Monto inicial</span>
+                      <span className={styles.openingAmountValue}>{formatGs(session.openingAmount)}</span>
+                    </div>
                   </div>
                 </div>
 
                 <div className={styles.statsGrid}>
-                  <div className={styles.statItem}>
-                    <span className={styles.statLabel}>Monto inicial</span>
-                    <span className={styles.statValue}>{formatGs(session.openingAmount)}</span>
-                  </div>
                   <div className={styles.statItem}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', marginBottom: '0.2rem' }}>
                       <span className={styles.statLabel}>Ventas registradas</span>
@@ -118,7 +118,20 @@ export function CashSessionPage() {
                         Visualizar compras
                       </Link>
                     </div>
-                    <span className={`${styles.statValue} ${styles.negative}`}>- {formatGs(session.totalPurchases)}</span>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.1rem' }}>
+                      <span className={`${styles.statValue} ${styles.negative}`} style={{ fontSize: '0.85rem' }}>
+                        Al contado: - {formatGs(session.totalCashPurchases ?? session.totalPurchases)}
+                      </span>
+                      <span className={`${styles.statValue}`} style={{ fontSize: '0.75rem', color: 'var(--color-muted-foreground)', fontWeight: 'normal' }}>
+                        A crédito: - {formatGs(session.totalCreditPurchases ?? 0)}
+                      </span>
+                    </div>
+                  </div>
+                  <div className={styles.statItem}>
+                    <span className={styles.statLabel}>Pagos de deudas a proveedores</span>
+                    <span className={`${styles.statValue} ${styles.negative}`}>
+                      - {formatGs(session.totalPurchaseDebtPayments ?? 0)}
+                    </span>
                   </div>
                   <div className={`${styles.statItem} ${styles.statTotal}`}>
                     <span className={styles.statLabel}>Efectivo esperado</span>

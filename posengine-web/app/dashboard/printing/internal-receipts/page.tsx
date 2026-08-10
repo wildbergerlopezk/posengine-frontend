@@ -16,7 +16,9 @@ import {
   X,
   AlertTriangle,
   RefreshCw,
-  Download
+  Download,
+  Layers,
+  Ban,
 } from "lucide-react"
 
 interface InternalReceipt {
@@ -93,12 +95,18 @@ export default function InternalReceiptsPage() {
   // PDF Preview States
   const [previewReceipt, setPreviewReceipt] = useState<InternalReceipt | null>(null)
   const [pdfUrl, setPdfUrl] = useState<string | null>(null)
+  const [pdfBlob, setPdfBlob] = useState<Blob | null>(null)
   const [loadingPdf, setLoadingPdf] = useState(false)
 
   // Void States
   const [isVoidOpen, setIsVoidOpen] = useState(false)
   const [voidReason, setVoidReason] = useState("")
   const [voidingId, setVoidingId] = useState<string | null>(null)
+
+  // Delete States
+  const [isDeleteOpen, setIsDeleteOpen] = useState(false)
+  const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [isDeleting, setIsDeleting] = useState(false)
 
   // Fetch Receipts
   const fetchReceipts = useCallback(async () => {
@@ -242,11 +250,44 @@ export default function InternalReceiptsPage() {
     }
   }
 
+  // Delete receipt handler
+  const handleDeleteReceipt = async () => {
+    if (!deletingId || !accessToken) return
+    setIsDeleting(true)
+    try {
+      const res = await fetch(`${API_BASE_URL}/internal-receipts/${deletingId}`, {
+        method: "DELETE",
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
+      })
+
+      if (!res.ok) {
+        let msg = "Error al eliminar comprobante"
+        try {
+          const data = await res.json()
+          msg = data.message || msg
+        } catch (_) {}
+        throw new Error(msg)
+      }
+
+      toast.success("Comprobante eliminado completamente")
+      setIsDeleteOpen(false)
+      setDeletingId(null)
+      fetchReceipts()
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Error al eliminar")
+    } finally {
+      setIsDeleting(false)
+    }
+  }
+
   // Preview PDF from backend
   const handlePreviewPdf = async (receipt: InternalReceipt) => {
     setPreviewReceipt(receipt)
     setLoadingPdf(true)
     setPdfUrl(null)
+    setPdfBlob(null)
     try {
       const res = await fetch(`${API_BASE_URL}/internal-receipts/${receipt.id}/pdf`, {
         headers: {
@@ -255,6 +296,7 @@ export default function InternalReceiptsPage() {
       })
       if (!res.ok) throw new Error("No se pudo obtener el PDF del servidor")
       const blob = await res.blob()
+      setPdfBlob(blob)
       setPdfUrl(URL.createObjectURL(blob))
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Error al cargar PDF")
@@ -264,20 +306,32 @@ export default function InternalReceiptsPage() {
     }
   }
 
-  // Print PDF from iframe
-  const handlePrintPdf = () => {
-    const iframe = document.getElementById("pdf-iframe") as HTMLIFrameElement
-    if (iframe) {
+  // Print PDF using printService (silent local or browser fallback)
+  const handlePrintPdf = async () => {
+    if (pdfBlob && previewReceipt) {
       try {
-        iframe.contentWindow?.focus()
-        iframe.contentWindow?.print()
-      } catch (e) {
-        // Fallback: open print view in a new window/tab
-        const printWindow = window.open(pdfUrl || '')
-        if (printWindow) {
-          printWindow.print()
-        }
+        const { printPdfBlob } = await import("@/src/shared/utils/printService")
+        await printPdfBlob(pdfBlob, `comprobante-interno-${previewReceipt.docNumber}.pdf`)
+      } catch (err) {
+        console.error("Error at handlePrintPdf:", err)
+        toast.error("Error al iniciar impresión")
       }
+    }
+  }
+
+  // Quick direct print from row without opening preview modal
+  const handleQuickPrint = async (receipt: InternalReceipt) => {
+    try {
+      toast.info("Descargando PDF para impresión rápida...")
+      const res = await fetch(`${API_BASE_URL}/internal-receipts/${receipt.id}/pdf`, {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      })
+      if (!res.ok) throw new Error("No se pudo obtener el PDF del servidor")
+      const blob = await res.blob()
+      const { printPdfBlob } = await import("@/src/shared/utils/printService")
+      await printPdfBlob(blob, `comprobante-interno-${receipt.docNumber}.pdf`)
+    } catch (err) {
+      toast.error("Error al procesar la impresión rápida")
     }
   }
 
@@ -427,6 +481,13 @@ export default function InternalReceiptsPage() {
                           >
                             <Printer size={16} />
                           </button>
+                          <button
+                            onClick={() => handleQuickPrint(receipt)}
+                            title="Impresión rápida directa (silenciosa)"
+                            style={{ padding: "0.5rem", borderRadius: "0.375rem", color: "var(--color-primary-hover)", cursor: "pointer" }}
+                          >
+                            <Layers size={16} />
+                          </button>
                           {!receipt.voided && (
                             <button
                               onClick={() => {
@@ -434,11 +495,21 @@ export default function InternalReceiptsPage() {
                                 setIsVoidOpen(true)
                               }}
                               title="Anular Comprobante"
-                              style={{ padding: "0.5rem", borderRadius: "0.375rem", color: "var(--destructive)", cursor: "pointer" }}
+                              style={{ padding: "0.5rem", borderRadius: "0.375rem", color: "#f59e0b", cursor: "pointer" }}
                             >
-                              <Trash2 size={16} />
+                              <Ban size={16} />
                             </button>
                           )}
+                          <button
+                            onClick={() => {
+                              setDeletingId(receipt.id)
+                              setIsDeleteOpen(true)
+                            }}
+                            title="Eliminar Comprobante Definitivamente"
+                            style={{ padding: "0.5rem", borderRadius: "0.375rem", color: "var(--destructive)", cursor: "pointer" }}
+                          >
+                            <Trash2 size={16} />
+                          </button>
                         </div>
                       </td>
                     </tr>
@@ -571,6 +642,43 @@ export default function InternalReceiptsPage() {
                 style={{ backgroundColor: "var(--destructive)", color: "#fff" }}
               >
                 Confirmar Anulación
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: DELETE RECEIPT */}
+      {isDeleteOpen && (
+        <div className={styles.modalOverlay}>
+          <div className={styles.modalContent} style={{ padding: "1.25rem", gap: "1rem" }}>
+            <h2 className="text-lg font-bold flex items-center gap-2" style={{ color: "var(--destructive)", fontSize: "1.125rem", fontWeight: 700 }}>
+              <Trash2 size={20} />
+              Eliminar Comprobante Definitivamente
+            </h2>
+            <p style={{ fontSize: "0.875rem", color: "var(--muted-foreground)" }}>
+              ¿Estás seguro de que deseas eliminar este comprobante completamente del sistema? Esta acción es irreversible y permitirá emitir un nuevo comprobante para la misma venta.
+            </p>
+            <div className={styles.buttonGroup}>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsDeleteOpen(false)
+                  setDeletingId(null)
+                }}
+                className={styles.btnCancel}
+                disabled={isDeleting}
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={handleDeleteReceipt}
+                className={styles.btnSubmit}
+                style={{ backgroundColor: "var(--destructive)", color: "#fff" }}
+                disabled={isDeleting}
+              >
+                {isDeleting ? "Eliminando..." : "Eliminar Definitivamente"}
               </button>
             </div>
           </div>

@@ -4,7 +4,7 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { PrismaService } from '../../../prisma/prisma.service';
-import { CreatePurchaseReturnDto } from '../dto/return/create-purchase-return.dto';
+import { CreatePurchaseReturnDto } from '../dto/create-purchase-return.dto';
 import { PurchaseReturnStatus, PurchaseStatus } from '../../../generated/prisma/enums';
 import { StockMovementService } from '../../stock-movement/stock-movement.service';
 

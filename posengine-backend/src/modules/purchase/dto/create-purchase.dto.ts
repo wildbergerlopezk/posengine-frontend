@@ -11,11 +11,14 @@ import {
   ValidateNested,
   ArrayNotEmpty,
   IsArray,
+  ValidateIf,
 } from 'class-validator'
+
+import { CreatePurchaseDebtDto } from './create-purchase-debt.dto'
 
 import { Type, Transform } from 'class-transformer'
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger'
-import { PurchasePaymentType } from '../../../../generated/prisma/enums'
+import { PurchasePaymentType } from '../../../generated/prisma/enums'
 
 class CreatePurchaseItemDto {
   @ApiProperty({ example: 'uuid-producto' })
@@ -79,4 +82,11 @@ export class CreatePurchaseDto {
   @ValidateNested({ each: true })
   @Type(() => CreatePurchaseItemDto)
   items!: CreatePurchaseItemDto[]
+
+  @ApiPropertyOptional({ type: CreatePurchaseDebtDto })
+  @ValidateIf((o) => o.paymentType === PurchasePaymentType.CREDIT)
+  @IsNotEmpty({ message: 'debt es requerido cuando paymentType es CREDIT' })
+  @ValidateNested()
+  @Type(() => CreatePurchaseDebtDto)
+  debt?: CreatePurchaseDebtDto
 }

@@ -799,3 +799,285 @@
   opacity: 0.5;
   cursor: not-allowed;
 }
+
+/* ── Modal Tabs ──────────────────────────────────────────────────────────── */
+.modalTabs {
+  display: flex;
+  gap: 0.5rem;
+  padding: 0.75rem 1.5rem;
+  border-bottom: 1px solid var(--color-border);
+  background-color: rgba(255, 255, 255, 0.01);
+}
+
+.modalTabBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.5rem 1rem;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--color-muted-foreground);
+  font-size: 0.825rem;
+  font-weight: 600;
+  border-radius: 0.375rem;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.modalTabBtn:hover {
+  background: var(--color-accent);
+  color: var(--color-foreground);
+}
+
+.modalTabBtnActive {
+  background: var(--color-accent);
+  color: var(--color-primary);
+  border-color: var(--color-border);
+}
+
+/* ── Debt Section Layout ─────────────────────────────────────────────────── */
+.debtSection {
+  padding: 1.25rem 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.debtSummaryGrid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1rem;
+}
+
+.debtSummaryCard {
+  background: var(--color-card, rgba(30, 41, 59, 0.4));
+  border: 1px solid var(--color-border);
+  border-radius: 0.5rem;
+  padding: 0.875rem 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  backdrop-filter: blur(8px);
+}
+
+.debtSummaryLabel {
+  font-size: 0.675rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: var(--color-muted-foreground);
+}
+
+.debtSummaryValue {
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: var(--color-foreground);
+}
+
+.debtSummaryValuePaid {
+  color: #10b981;
+}
+
+.debtSummaryValuePending {
+  color: #f59e0b;
+}
+
+.debtSummaryValueSettled {
+  color: #10b981;
+}
+
+.debtDetailsLayout {
+  display: grid;
+  grid-template-columns: 280px 1fr;
+  gap: 1.5rem;
+  align-items: start;
+}
+
+@media (max-width: 768px) {
+  .debtDetailsLayout {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ── Payment Form ────────────────────────────────────────────────────────── */
+.paymentFormCard {
+  background: var(--color-card, rgba(30, 41, 59, 0.3));
+  border: 1px solid var(--color-border);
+  border-radius: 0.5rem;
+  padding: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.875rem;
+}
+
+.paymentFormTitle {
+  font-size: 0.875rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-foreground);
+  margin-bottom: 0.25rem;
+  border-bottom: 1px solid var(--color-border);
+  padding-bottom: 0.5rem;
+}
+
+.submitPaymentBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.625rem;
+  background-color: var(--color-primary);
+  color: white;
+  border: none;
+  border-radius: 0.375rem;
+  font-size: 0.825rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.15s ease;
+}
+
+.submitPaymentBtn:hover {
+  opacity: 0.9;
+}
+
+.submitPaymentBtn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* ── Schedule Column ─────────────────────────────────────────────────────── */
+.scheduleCol {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.singleDueDateMsg {
+  padding: 0.875rem 1.25rem;
+  background: rgba(245, 158, 11, 0.05);
+  border: 1px solid rgba(245, 158, 11, 0.15);
+  color: #f59e0b;
+  border-radius: 0.5rem;
+  font-size: 0.85rem;
+}
+
+.installmentsTableWrapper {
+  border: 1px solid var(--color-border);
+  border-radius: 0.5rem;
+  overflow: hidden;
+}
+
+.debtTable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.825rem;
+}
+
+.debtTable th,
+.debtTable td {
+  padding: 0.625rem 0.875rem;
+  text-align: left;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.debtTable th {
+  background-color: rgba(255, 255, 255, 0.02);
+  font-weight: 600;
+  color: var(--color-muted-foreground);
+}
+
+.debtTable tr:last-child td {
+  border-bottom: none;
+}
+
+.rowPaid {
+  opacity: 0.65;
+  background-color: rgba(16, 185, 129, 0.02);
+}
+
+/* ── Badges ──────────────────────────────────────────────────────────────── */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.125rem 0.5rem;
+  border-radius: 9999px;
+  font-size: 0.7rem;
+  font-weight: 600;
+}
+
+.badgePaid {
+  background-color: rgba(16, 185, 129, 0.15);
+  color: #10b981;
+}
+
+.badgePartial {
+  background-color: rgba(245, 158, 11, 0.15);
+  color: #f59e0b;
+}
+
+.badgePending {
+  background-color: rgba(239, 68, 68, 0.1);
+  color: #ef4444;
+}
+
+/* ── Payments List ───────────────────────────────────────────────────────── */
+.emptyPayments {
+  font-size: 0.825rem;
+  color: var(--color-muted-foreground);
+  padding: 0.5rem 0;
+}
+
+.paymentsList {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.paymentItem {
+  padding: 0.625rem 0.875rem;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid var(--color-border);
+  border-radius: 0.375rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+}
+
+.paymentItemHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.paymentItemDate {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--color-foreground);
+}
+
+.paymentItemAmount {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #10b981;
+}
+
+.paymentItemNotes {
+  font-size: 0.75rem;
+  color: var(--color-muted-foreground);
+}
+
+.paymentFormError {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.625rem 0.875rem;
+  background-color: rgba(239, 68, 68, 0.08);
+  border: 1px solid rgba(239, 68, 68, 0.2);
+  color: #ef4444;
+  border-radius: 0.375rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+  line-height: 1.3;
+}
+
+

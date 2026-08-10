@@ -1,0 +1,84 @@
+enum PurchaseDebtScheduleType {
+  NONE               // pago único, sin cuotas, con o sin fecha límite
+  OWNER_REMINDER     // el dueño se define su propio recordatorio de cuotas
+  SUPPLIER_SCHEDULE  // cuotas que ya vienen impuestas por el proveedor
+}
+
+enum PurchaseDebtStatus {
+  PENDING
+  PARTIAL
+  PAID
+  CANCELLED
+}
+
+enum PurchaseDebtInstallmentStatus {
+  PENDING
+  PARTIAL
+  PAID
+}
+
+model PurchaseDebt {
+  id         String @id @default(uuid())
+  tenantId   String
+  purchaseId String @unique
+
+  totalAmount Float
+  paidAmount  Float @default(0)
+  balance     Float
+
+  scheduleType PurchaseDebtScheduleType @default(NONE)
+  dueDate      DateTime? // solo se usa cuando scheduleType es NONE
+
+  status PurchaseDebtStatus @default(PENDING)
+  notes  String?
+
+  purchase     Purchase                  @relation(fields: [purchaseId], references: [id])
+  tenant       Tenant                    @relation(fields: [tenantId], references: [id])
+  installments PurchaseDebtInstallment[]
+  payments     PurchaseDebtPayment[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([tenantId])
+  @@map("purchase_debts")
+}
+
+model PurchaseDebtInstallment {
+  id             String @id @default(uuid())
+  purchaseDebtId String
+
+  number     Int
+  amount     Float
+  paidAmount Float @default(0)
+  dueDate    DateTime
+
+  status PurchaseDebtInstallmentStatus @default(PENDING)
+
+  purchaseDebt PurchaseDebt          @relation(fields: [purchaseDebtId], references: [id])
+  payments     PurchaseDebtPayment[]
+
+  @@index([purchaseDebtId])
+  @@map("purchase_debt_installments")
+}
+
+model PurchaseDebtPayment {
+  id             String  @id @default(uuid())
+  tenantId       String
+  purchaseDebtId String
+  installmentId  String?
+  cashSessionId  String?
+
+  amount      Float
+  paymentDate DateTime @default(now())
+  notes       String?
+
+  purchaseDebt PurchaseDebt             @relation(fields: [purchaseDebtId], references: [id])
+  installment  PurchaseDebtInstallment? @relation(fields: [installmentId], references: [id])
+
+  createdAt DateTime @default(now())
+
+  @@index([tenantId])
+  @@index([purchaseDebtId])
+  @@map("purchase_debt_payments")
+}

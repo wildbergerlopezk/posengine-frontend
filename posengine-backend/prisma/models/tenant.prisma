@@ -22,4 +22,5 @@ model Tenant {
   subscription    Subscription?
   company         Company[]
   internalReceipts InternalReceipt[]
+  purchaseDebts   PurchaseDebt[]
 }

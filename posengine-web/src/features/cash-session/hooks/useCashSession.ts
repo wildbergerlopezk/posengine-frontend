@@ -15,6 +15,9 @@ export interface CashSession {
   totalCashSales?: number
   totalDebtPayments?: number
   totalPurchases: number
+  totalCashPurchases?: number
+  totalCreditPurchases?: number
+  totalPurchaseDebtPayments?: number
   difference?: number
   status: CashSessionStatus
   openedBy: string
@@ -53,6 +56,11 @@ export function useCashSession() {
 
   const fetchCurrent = useCallback(async () => {
     if (!accessToken) return
+    if (typeof navigator !== "undefined" && !navigator.onLine) {
+      setError("Sin conexión a internet")
+      setLoading(false)
+      return
+    }
     setLoading(true)
     setError(null)
     try {

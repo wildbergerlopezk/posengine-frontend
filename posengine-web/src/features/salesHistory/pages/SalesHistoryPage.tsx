@@ -6,6 +6,8 @@ import {
   Search, Eye, Package, AlertCircle, Loader2,
   X, ChevronLeft, ChevronRight, CheckCircle2,
   XCircle, Calendar, Receipt, Hash, Ban, User, CreditCard,
+  Printer, Plus,
+
 } from "lucide-react"
 import { useAuthStore } from "@/src/features/auth/store/auth.store"
 import { formatCurrency } from "@/src/shared/hooks/useFormatCurrency"
@@ -114,6 +116,14 @@ export function SalesHistoryPage() {
   const [restoring, setRestoring] = useState(false)
   const [cancelError, setCancelError] = useState<string | null>(null)
 
+  // ── Control Interno e Impresión ─────────────────────────────────────────────
+  const [internalReceipt, setInternalReceipt] = useState<any | null>(null)
+  const [checkingReceipt, setCheckingReceipt] = useState(false)
+  const [companies, setCompanies] = useState<any[]>([])
+  const [selectedCompanyId, setSelectedCompanyId] = useState<string>("")
+  const [emittingReceipt, setEmittingReceipt] = useState(false)
+  const [printingReceipt, setPrintingReceipt] = useState(false)
+
   // ── Fetch list ─────────────────────────────────────────────────────────────
   const fetchSales = useCallback(async () => {
     setLoading(true)
@@ -138,6 +148,109 @@ export function SalesHistoryPage() {
 
   useEffect(() => { void fetchSales() }, [fetchSales])
   useEffect(() => { setPage(1) }, [statusFilter, dateFrom, dateTo, search])
+
+  // ── Fetch companies for receipt emission ────────────────────────────────────
+  useEffect(() => {
+    if (!accessToken) return
+    const fetchCompanies = async () => {
+      try {
+        const res = await fetch(`${API_BASE_URL}/companies?limit=10`, {
+          headers: { Authorization: `Bearer ${accessToken}` },
+        })
+        if (res.ok) {
+          const data = await res.json()
+          const items = data.items || data
+          setCompanies(items)
+          if (items.length > 0) {
+            setSelectedCompanyId(items[0].id)
+          }
+        }
+      } catch (err) {
+        console.error("Error al cargar empresas:", err)
+      }
+    }
+    void fetchCompanies()
+  }, [accessToken])
+
+  // ── Check if sale has internal receipt ──────────────────────────────────────
+  useEffect(() => {
+    if (!selectedSale || !accessToken) {
+      setInternalReceipt(null)
+      return
+    }
+    const checkReceipt = async () => {
+      setCheckingReceipt(true)
+      try {
+        const res = await fetch(`${API_BASE_URL}/internal-receipts?saleId=${selectedSale.id}`, {
+          headers: { Authorization: `Bearer ${accessToken}` },
+        })
+        if (res.ok) {
+          const data = await res.json()
+          if (data.items && data.items.length > 0) {
+            setInternalReceipt(data.items[0])
+          } else {
+            setInternalReceipt(null)
+          }
+        }
+      } catch (e) {
+        console.error("Error checking internal receipt", e)
+      } finally {
+        setCheckingReceipt(false)
+      }
+    }
+    void checkReceipt()
+  }, [selectedSale, accessToken])
+
+  const handleEmitReceipt = async () => {
+    if (!selectedSale || !selectedCompanyId || !accessToken) return
+    setEmittingReceipt(true)
+    try {
+      const res = await fetch(`${API_BASE_URL}/internal-receipts`, {
+        method: "POST",
+        headers: authHeaders,
+        body: JSON.stringify({
+          companyId: selectedCompanyId,
+          saleId: selectedSale.id,
+          customerId: selectedSale.customer?.id || undefined,
+        }),
+      })
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        throw new Error(data.message || "Error al emitir el comprobante interno")
+      }
+
+      const receipt = await res.json()
+      setInternalReceipt(receipt)
+      
+      // Auto print after emitting
+      await handlePrintReceipt(receipt)
+    } catch (err: any) {
+      alert(err.message || "Error al emitir")
+    } finally {
+      setEmittingReceipt(false)
+    }
+  }
+
+  const handlePrintReceipt = async (receiptOverride?: any) => {
+    const targetReceipt = receiptOverride || internalReceipt
+    if (!targetReceipt || !accessToken) return
+    setPrintingReceipt(true)
+    try {
+      const res = await fetch(`${API_BASE_URL}/internal-receipts/${targetReceipt.id}/pdf`, {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      })
+      if (!res.ok) throw new Error("No se pudo obtener el PDF del servidor")
+      const blob = await res.blob()
+      
+      const { printPdfBlob } = await import("@/src/shared/utils/printService")
+      await printPdfBlob(blob, `comprobante-interno-${targetReceipt.docNumber}.pdf`)
+    } catch (err: any) {
+      alert(err.message || "Error al cargar/imprimir PDF")
+    } finally {
+      setPrintingReceipt(false)
+    }
+  }
 
   // ── Helpers ────────────────────────────────────────────────────────────────
   const hasActiveFilters = statusFilter !== "ALL" || dateFrom || dateTo || search
@@ -360,7 +473,7 @@ export function SalesHistoryPage() {
                       </td>
                       <td className={tableStyles.tableCell}>
                         <span style={{ fontSize: "0.825rem" }}>
-                          {sale.customer?.name || "—"}
+                          {sale.customer?.name || "Consumidor Final"}
                         </span>
                       </td>
                       <td className={tableStyles.tableCell}>
@@ -492,19 +605,23 @@ export function SalesHistoryPage() {
                       </div>
                     </div>
                   </div>
-                  {selectedSale.customer && (
-                    <div className={`${styles.receiptInfoBlock} ${styles.receiptInfoBlockFull}`}>
-                      <div className={styles.receiptInfoRow}>
-                        <User size={14} className={styles.receiptInfoIcon} />
-                        <div>
-                          <span className={styles.receiptInfoLabel}>Cliente asociado</span>
-                          <span className={styles.receiptInfoValue} style={{ fontWeight: 600 }}>
-                            {selectedSale.customer.name} {selectedSale.customer.documentNumber ? `(CI: ${selectedSale.customer.documentNumber})` : selectedSale.customer.taxId ? `(RUC: ${selectedSale.customer.taxId})` : ""}
-                          </span>
-                        </div>
+                  <div className={`${styles.receiptInfoBlock} ${styles.receiptInfoBlockFull}`}>
+                    <div className={styles.receiptInfoRow}>
+                      <User size={14} className={styles.receiptInfoIcon} />
+                      <div>
+                        <span className={styles.receiptInfoLabel}>Cliente asociado</span>
+                        <span className={styles.receiptInfoValue} style={{ fontWeight: 600 }}>
+                          {selectedSale.customer ? (
+                            <>
+                              {selectedSale.customer.name} {selectedSale.customer.documentNumber ? `(CI: ${selectedSale.customer.documentNumber})` : selectedSale.customer.taxId ? `(RUC: ${selectedSale.customer.taxId})` : ""}
+                            </>
+                          ) : (
+                            "Consumidor Final"
+                          )}
+                        </span>
                       </div>
                     </div>
-                  )}
+                  </div>
                   {selectedSale.paymentMethod === "CREDIT" && (
                     <div className={`${styles.receiptInfoBlock} ${styles.receiptInfoBlockFull}`}>
                       <div className={styles.receiptInfoRow}>
@@ -606,6 +723,97 @@ export function SalesHistoryPage() {
                       <span className={styles.receiptTotalValue}>{formatCurrency(selectedSale.total)}</span>
                     </div>
                   </div>
+
+                  {/* Comprobante de Control Interno Section */}
+                  {selectedSale.status === "COMPLETED" && (
+                    <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem", padding: "1rem 1.5rem", borderTop: "1px dashed var(--color-border)", marginTop: "1rem" }}>
+                      <span style={{ fontSize: "0.825rem", color: "var(--color-muted-foreground)", fontWeight: 700, textTransform: "uppercase" }}>
+                        Comprobante de Control Interno
+                      </span>
+                      {checkingReceipt ? (
+                        <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", fontSize: "0.875rem", color: "var(--color-muted-foreground)" }}>
+                          <Loader2 size={14} className={tableStyles.spinner} />
+                          <span>Verificando comprobantes asociados...</span>
+                        </div>
+                      ) : internalReceipt ? (
+                        <div style={{ display: "flex", gap: "0.75rem", alignItems: "center" }}>
+                          <span style={{ fontSize: "0.875rem", color: "var(--color-foreground)" }}>
+                            Nro: <strong>CI-{String(internalReceipt.docNumber).padStart(7, "0")}</strong>
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => handlePrintReceipt()}
+                            disabled={printingReceipt}
+                            style={{
+                              display: "flex",
+                              alignItems: "center",
+                              gap: "0.375rem",
+                              background: "var(--color-primary)",
+                              color: "var(--color-primary-foreground)",
+                              padding: "0.375rem 0.75rem",
+                              borderRadius: "0.375rem",
+                              fontSize: "0.75rem",
+                              fontWeight: 600,
+                              cursor: "pointer",
+                              border: "none"
+                            }}
+                          >
+                            {printingReceipt ? <Loader2 size={12} className={tableStyles.spinner} /> : <Printer size={12} />}
+                            Imprimir PDF
+                          </button>
+                        </div>
+                      ) : (
+                        <div style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
+                          {companies.length > 0 ? (
+                            <>
+                              <select
+                                value={selectedCompanyId}
+                                onChange={e => setSelectedCompanyId(e.target.value)}
+                                style={{
+                                  height: "2rem",
+                                  borderRadius: "0.375rem",
+                                  border: "1px solid var(--color-border)",
+                                  background: "var(--color-background)",
+                                  color: "var(--color-foreground)",
+                                  padding: "0 0.5rem",
+                                  fontSize: "0.75rem"
+                                }}
+                              >
+                                {companies.map((c: any) => (
+                                  <option key={c.id} value={c.id}>{c.legalName}</option>
+                                ))}
+                              </select>
+                              <button
+                                type="button"
+                                onClick={handleEmitReceipt}
+                                disabled={emittingReceipt}
+                                style={{
+                                  display: "flex",
+                                  alignItems: "center",
+                                  gap: "0.375rem",
+                                  background: "none",
+                                  border: "1px solid var(--color-border)",
+                                  color: "var(--color-foreground)",
+                                  padding: "0.375rem 0.75rem",
+                                  borderRadius: "0.375rem",
+                                  fontSize: "0.75rem",
+                                  fontWeight: 600,
+                                  cursor: "pointer"
+                                }}
+                              >
+                                {emittingReceipt ? <Loader2 size={12} className={tableStyles.spinner} /> : <Plus size={12} />}
+                                Emitir Control Interno
+                              </button>
+                            </>
+                          ) : (
+                            <span style={{ fontSize: "0.75rem", color: "var(--color-muted-foreground)", fontStyle: "italic" }}>
+                              Crea una empresa en la configuración para emitir comprobantes.
+                            </span>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )}
 
                   {cancelError && (
                     <div className={styles.cancelError}>

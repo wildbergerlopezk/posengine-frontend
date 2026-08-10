@@ -59,6 +59,34 @@ interface PurchaseItem {
     returnItems?: { quantity: number }[]
 }
 
+interface PurchaseDebtPayment {
+    id: string
+    amount: number
+    paymentDate: string
+    notes?: string
+}
+
+interface PurchaseDebtInstallment {
+    id: string
+    number: number
+    amount: number
+    paidAmount: number
+    dueDate: string
+    status: "PENDING" | "PARTIAL" | "PAID"
+}
+
+interface PurchaseDebt {
+    id: string
+    totalAmount: number
+    paidAmount: number
+    balance: number
+    scheduleType: "NONE" | "OWNER_REMINDER" | "SUPPLIER_SCHEDULE"
+    dueDate?: string
+    status: "PENDING" | "PARTIAL" | "PAID" | "CANCELLED"
+    installments: PurchaseDebtInstallment[]
+    payments: PurchaseDebtPayment[]
+}
+
 interface Purchase {
     id: string
     invoiceNumber: string
@@ -70,6 +98,7 @@ interface Purchase {
     createdAt: string
     supplier: Supplier
     items?: PurchaseItem[]
+    debt?: PurchaseDebt
 }
 
 interface PaginatedResponse {
@@ -151,6 +180,15 @@ export function PurchaseHistoryPage() {
     const [showReturnModal, setShowReturnModal] = useState(false)
     const [cancelling, setCancelling] = useState(false)
 
+    // ── Debt state ──────────────────────────────────────────────────────────────
+    const [activeDetailTab, setActiveDetailTab] = useState<"items" | "debt">("items")
+    const [registeringPayment, setRegisteringPayment] = useState(false)
+    const [paymentError, setPaymentError] = useState<string | null>(null)
+    const [paymentAmount, setPaymentAmount] = useState("")
+    const [paymentNotes, setPaymentNotes] = useState("")
+    const [paymentDateInput, setPaymentDateInput] = useState(() => new Date().toISOString().slice(0, 10))
+    const [targetInstallmentId, setTargetInstallmentId] = useState("")
+
     // ── Fetch list ─────────────────────────────────────────────────────────────
     const fetchPurchases = useCallback(async () => {
         setLoading(true)
@@ -215,6 +253,11 @@ export function PurchaseHistoryPage() {
     // ── Open detail modal ──────────────────────────────────────────────────────
     const openDetail = async (purchase: Purchase) => {
         setSelectedPurchase({ ...purchase, items: undefined })
+        setActiveDetailTab("items")
+        setPaymentAmount("")
+        setPaymentNotes("")
+        setTargetInstallmentId("")
+        setPaymentError(null)
         setLoadingDetail(true)
         setDetailError(null)
 
@@ -264,6 +307,51 @@ export function PurchaseHistoryPage() {
             alert(err instanceof Error ? err.message : "Error desconocido")
         } finally {
             setCancelling(false)
+        }
+    }
+
+    const handleRegisterPayment = async (e: React.FormEvent) => {
+        e.preventDefault()
+        if (!selectedPurchase || !selectedPurchase.debt) return
+        const cleanAmount = paymentAmount.replace(/\D/g, "")
+        const amountNum = parseFloat(cleanAmount)
+        if (isNaN(amountNum) || amountNum <= 0) return
+
+        setRegisteringPayment(true)
+        setPaymentError(null)
+        try {
+            const res = await fetch(`${API_BASE}/purchases/${selectedPurchase.id}/debt/payments`, {
+                method: "POST",
+                headers: authHeaders,
+                body: JSON.stringify({
+                    amount: amountNum,
+                    paymentDate: new Date(paymentDateInput).toISOString(),
+                    installmentId: targetInstallmentId || undefined,
+                    notes: paymentNotes.trim() || undefined,
+                })
+            })
+
+            if (!res.ok) {
+                const data = await res.json().catch(() => ({}))
+                throw new Error(data.message || "Error al registrar el pago")
+            }
+
+            // Reload detailed view
+            const updatedPurchaseRes = await fetch(`${API_BASE}/purchases/${selectedPurchase.id}`, { headers: authHeaders })
+            if (updatedPurchaseRes.ok) {
+                const updatedPurchase = await updatedPurchaseRes.json()
+                setSelectedPurchase(updatedPurchase)
+            }
+            // Clear payment input fields
+            setPaymentAmount("")
+            setPaymentNotes("")
+            setTargetInstallmentId("")
+            // Refresh main purchases history list
+            await fetchPurchases()
+        } catch (err) {
+            setPaymentError(err instanceof Error ? err.message : "Error al registrar pago")
+        } finally {
+            setRegisteringPayment(false)
         }
     }
 
@@ -618,14 +706,37 @@ export function PurchaseHistoryPage() {
                                 </div>
                             </div>
 
-                            <div className={styles.receiptItemsSection}>
-                                <div className={styles.receiptItemsTitle}>
-                                    <Package size={14} />
-                                    Productos
-                                    {selectedPurchase.items && (
-                                        <span className={styles.receiptItemsCount}>{selectedPurchase.items.length}</span>
-                                    )}
+                            {/* Tabs para Crédito */}
+                            {selectedPurchase.paymentType === "CREDIT" && !loadingDetail && !detailError && (
+                                <div className={styles.modalTabs}>
+                                    <button
+                                        type="button"
+                                        className={`${styles.modalTabBtn} ${activeDetailTab === "items" ? styles.modalTabBtnActive : ""}`}
+                                        onClick={() => setActiveDetailTab("items")}
+                                    >
+                                        <Package size={14} />
+                                        Productos
+                                    </button>
+                                    <button
+                                        type="button"
+                                        className={`${styles.modalTabBtn} ${activeDetailTab === "debt" ? styles.modalTabBtnActive : ""}`}
+                                        onClick={() => setActiveDetailTab("debt")}
+                                    >
+                                        <CreditCard size={14} />
+                                        Control de Deuda
+                                    </button>
                                 </div>
+                            )}
+
+                            {activeDetailTab === "items" ? (
+                                <div className={styles.receiptItemsSection}>
+                                    <div className={styles.receiptItemsTitle}>
+                                        <Package size={14} />
+                                        Productos
+                                        {selectedPurchase.items && (
+                                            <span className={styles.receiptItemsCount}>{selectedPurchase.items.length}</span>
+                                        )}
+                                    </div>
 
                                 {loadingDetail ? (
                                     <div className={styles.detailLoading}>
@@ -669,7 +780,194 @@ export function PurchaseHistoryPage() {
                                         </tbody>
                                     </table>
                                 )}
-                            </div>
+                                </div>
+                            ) : (
+                                !loadingDetail && !detailError && selectedPurchase.debt && (
+                                    <div className={styles.debtSection}>
+                                        {/* Resumen Deuda Card */}
+                                        <div className={styles.debtSummaryGrid}>
+                                            <div className={styles.debtSummaryCard}>
+                                                <span className={styles.debtSummaryLabel}>Total Deuda</span>
+                                                <span className={styles.debtSummaryValue}>{formatCurrency(selectedPurchase.debt.totalAmount)}</span>
+                                            </div>
+                                            <div className={styles.debtSummaryCard}>
+                                                <span className={styles.debtSummaryLabel}>Monto Abonado</span>
+                                                <span className={`${styles.debtSummaryValue} ${styles.debtSummaryValuePaid}`}>{formatCurrency(selectedPurchase.debt.paidAmount)}</span>
+                                            </div>
+                                            <div className={styles.debtSummaryCard}>
+                                                <span className={styles.debtSummaryLabel}>Saldo Pendiente</span>
+                                                <span className={`${styles.debtSummaryValue} ${selectedPurchase.debt.balance > 0 ? styles.debtSummaryValuePending : styles.debtSummaryValueSettled}`}>
+                                                    {formatCurrency(selectedPurchase.debt.balance)}
+                                                </span>
+                                            </div>
+                                        </div>
+
+                                        {/* Fila con Formulario y Listado */}
+                                        <div className={styles.debtDetailsLayout}>
+                                            {/* Columna Izquierda: Formulario Registrar Pago */}
+                                            {selectedPurchase.debt.balance > 0 && selectedPurchase.status === "RECEIVED" && (
+                                                <form className={styles.paymentFormCard} onSubmit={handleRegisterPayment}>
+                                                    <h4 className={styles.paymentFormTitle}>Registrar Abono</h4>
+                                                    
+                                                    <div className={tableStyles.formGroup}>
+                                                        <label className={tableStyles.label}>Monto a pagar</label>
+                                                        <input
+                                                            type="text"
+                                                            className={tableStyles.input}
+                                                            placeholder="Ej. 5.000"
+                                                            value={paymentAmount}
+                                                            onChange={e => {
+                                                                setPaymentError(null)
+                                                                const clean = e.target.value.replace(/\D/g, "")
+                                                                setPaymentAmount(clean ? new Intl.NumberFormat("es-AR").format(parseInt(clean, 10)) : "")
+                                                            }}
+                                                            required
+                                                        />
+                                                    </div>
+
+                                                    <div className={tableStyles.formGroup}>
+                                                        <label className={tableStyles.label}>Fecha Pago</label>
+                                                        <input
+                                                            type="date"
+                                                            className={tableStyles.input}
+                                                            value={paymentDateInput}
+                                                            onChange={e => {
+                                                                setPaymentError(null)
+                                                                setPaymentDateInput(e.target.value)
+                                                            }}
+                                                            required
+                                                        />
+                                                    </div>
+
+                                                    {selectedPurchase.debt.installments.length > 0 && (
+                                                        <div className={tableStyles.formGroup}>
+                                                            <label className={tableStyles.label}>Aplicar a cuota</label>
+                                                            <select
+                                                                className={tableStyles.input}
+                                                                value={targetInstallmentId}
+                                                                onChange={e => {
+                                                                    setPaymentError(null)
+                                                                    setTargetInstallmentId(e.target.value)
+                                                                }}
+                                                            >
+                                                                <option value="">Automático (Orden FIFO)</option>
+                                                                {selectedPurchase.debt.installments.map(inst => (
+                                                                    <option 
+                                                                        key={inst.id} 
+                                                                        value={inst.id}
+                                                                        disabled={inst.status === "PAID"}
+                                                                    >
+                                                                        Cuota {inst.number} - {formatCurrency(inst.amount - inst.paidAmount)} pendiente
+                                                                    </option>
+                                                                ))}
+                                                            </select>
+                                                        </div>
+                                                    )}
+
+                                                    <div className={tableStyles.formGroup}>
+                                                        <label className={tableStyles.label}>Observación / Nota</label>
+                                                        <input
+                                                            type="text"
+                                                            className={tableStyles.input}
+                                                            placeholder="Ej. Transferencia Banco"
+                                                            value={paymentNotes}
+                                                            onChange={e => {
+                                                                setPaymentError(null)
+                                                                setPaymentNotes(e.target.value)
+                                                            }}
+                                                            maxLength={200}
+                                                        />
+                                                    </div>
+
+                                                    {paymentError && (
+                                                        <div className={styles.paymentFormError}>
+                                                            <AlertCircle size={14} />
+                                                            <span>{paymentError}</span>
+                                                        </div>
+                                                    )}
+
+                                                    <button 
+                                                        type="submit" 
+                                                        className={styles.submitPaymentBtn}
+                                                        disabled={registeringPayment}
+                                                    >
+                                                        {registeringPayment ? <Loader2 size={16} className={tableStyles.spinner} /> : null}
+                                                        Registrar Pago
+                                                    </button>
+                                                </form>
+                                            )}
+
+                                            {/* Columna Derecha: Cronograma */}
+                                            <div className={styles.scheduleCol}>
+                                                <h4 className={styles.paymentFormTitle}>Cronograma de Pagos</h4>
+                                                
+                                                {selectedPurchase.debt.scheduleType === "NONE" ? (
+                                                    <div className={styles.singleDueDateMsg}>
+                                                        Pago único sin cuotas. 
+                                                        {selectedPurchase.debt.dueDate ? (
+                                                            <> Fecha límite: <strong>{new Date(selectedPurchase.debt.dueDate).toLocaleDateString()}</strong></>
+                                                        ) : " Sin fecha límite."}
+                                                    </div>
+                                                ) : (
+                                                    <div className={styles.installmentsTableWrapper}>
+                                                        <table className={styles.debtTable}>
+                                                            <thead>
+                                                                <tr>
+                                                                    <th>Cuota</th>
+                                                                    <th>Vencimiento</th>
+                                                                    <th style={{ textAlign: "right" }}>Monto</th>
+                                                                    <th style={{ textAlign: "right" }}>Abonado</th>
+                                                                    <th>Estado</th>
+                                                                </tr>
+                                                            </thead>
+                                                            <tbody>
+                                                                {selectedPurchase.debt.installments.map(inst => (
+                                                                    <tr key={inst.id} className={inst.status === "PAID" ? styles.rowPaid : ""}>
+                                                                        <td>Cuota {inst.number}</td>
+                                                                        <td>{new Date(inst.dueDate).toLocaleDateString()}</td>
+                                                                        <td style={{ textAlign: "right" }}>{formatCurrency(inst.amount)}</td>
+                                                                        <td style={{ textAlign: "right" }}>{formatCurrency(inst.paidAmount)}</td>
+                                                                        <td>
+                                                                            <span className={`${styles.badge} ${
+                                                                                inst.status === "PAID" ? styles.badgePaid :
+                                                                                inst.status === "PARTIAL" ? styles.badgePartial :
+                                                                                styles.badgePending
+                                                                            }`}>
+                                                                                {inst.status === "PAID" ? "Pagada" : inst.status === "PARTIAL" ? "Parcial" : "Pendiente"}
+                                                                            </span>
+                                                                        </td>
+                                                                    </tr>
+                                                                ))}
+                                                            </tbody>
+                                                        </table>
+                                                    </div>
+                                                )}
+
+                                                <h4 className={styles.paymentFormTitle} style={{ marginTop: "1.5rem" }}>Historial de Abonos</h4>
+                                                {selectedPurchase.debt.payments.length === 0 ? (
+                                                    <div className={styles.emptyPayments}>No se han registrado abonos todavía.</div>
+                                                ) : (
+                                                    <div className={styles.paymentsList}>
+                                                        {selectedPurchase.debt.payments.map(pmt => (
+                                                            <div key={pmt.id} className={styles.paymentItem}>
+                                                                <div className={styles.paymentItemHeader}>
+                                                                    <span className={styles.paymentItemDate}>
+                                                                        {new Date(pmt.paymentDate).toLocaleDateString()}
+                                                                    </span>
+                                                                    <span className={styles.paymentItemAmount}>
+                                                                        {formatCurrency(pmt.amount)}
+                                                                    </span>
+                                                                </div>
+                                                                {pmt.notes && <span className={styles.paymentItemNotes}>{pmt.notes}</span>}
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                    </div>
+                                )
+                            )}
 
                             {!loadingDetail && !detailError && (
                                 <>

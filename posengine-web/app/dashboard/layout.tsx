@@ -1,7 +1,7 @@
 "use client"
 
 import type React from "react"
-import { Sidebar } from "@/src/shared/components/Sidebar"
+import { Sidebar, KeyboardShortcutsModal, OfflineSyncProvider } from "@/src/shared/components"
 import { useAuthStore } from "@/src/features/auth/store/auth.store"
 import { getProfileApi } from "@/src/features/auth/api"
 import { isAccessTokenValid } from "@/src/features/auth/utils/auth.utils"
@@ -10,7 +10,6 @@ import { useEffect, useState } from "react"
 import { useHydrated } from "@/src/shared/hooks/useHydrated"
 import styles from "./layout.module.css"
 import { useKeyboardNav } from "@/src/shared/hooks/useKeyboardNav"
-import { KeyboardShortcutsModal } from "@/src/shared/components"
 
 export default function DashboardLayout({
   children,
@@ -35,7 +34,6 @@ export default function DashboardLayout({
 
       try {
         const profile = await getProfileApi()
-        console.log("PROFILE FETCHED IN DASHBOARD:", profile)
         const currentUser = useAuthStore.getState().user
         if (currentUser) {
           useAuthStore.setState({
@@ -67,10 +65,12 @@ export default function DashboardLayout({
   }
 
   return (
-    <div className={styles.layout}>
-      <Sidebar />
-      <main className={styles.main}>{children}</main>
-      {showHelp && <KeyboardShortcutsModal onClose={() => setShowHelp(false)} />}
-    </div>
+    <OfflineSyncProvider>
+      <div className={styles.layout}>
+        <Sidebar />
+        <main className={styles.main}>{children}</main>
+        {showHelp && <KeyboardShortcutsModal onClose={() => setShowHelp(false)} />}
+      </div>
+    </OfflineSyncProvider>
   )
 }

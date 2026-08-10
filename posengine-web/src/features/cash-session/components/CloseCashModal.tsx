@@ -111,11 +111,19 @@ function CloseCashModalContent({
                 </span>
               </div>
             </div>
-            <div className={styles.summaryRow}>
+            <div className={styles.summaryRow} style={{ alignItems: 'flex-start' }}>
               <span className={styles.summaryLabel}>− Compras del día</span>
-              <span className={`${styles.summaryValue} ${styles.negative}`}>
-                {formatGs(session.totalPurchases)}
-              </span>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem', alignItems: 'flex-end' }}>
+                <span className={`${styles.summaryValue} ${styles.negative}`} style={{ fontSize: '0.82rem' }}>
+                  Al contado: {formatGs(session.totalCashPurchases ?? session.totalPurchases)}
+                </span>
+                <span className={`${styles.summaryValue} ${styles.negative}`} style={{ fontSize: '0.82rem' }}>
+                  Pagos deuda: {formatGs(session.totalPurchaseDebtPayments ?? 0)}
+                </span>
+                <span className={`${styles.summaryValue}`} style={{ fontSize: '0.72rem', color: 'var(--color-muted-foreground)', fontWeight: 'normal' }}>
+                  A crédito: {formatGs(session.totalCreditPurchases ?? 0)}
+                </span>
+              </div>
             </div>
             <div className={`${styles.summaryRow} ${styles.summaryTotal}`}>
               <span className={styles.summaryLabel}>Efectivo esperado</span>

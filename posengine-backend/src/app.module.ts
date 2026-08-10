@@ -22,6 +22,7 @@ import { ThrottlerModule } from '@nestjs/throttler';
 import { SubscriptionModule } from './modules/subscription/subscription.module';
 import { CompanyModule } from './modules/company/company.module';
 import { InternalReceiptModule } from './modules/internal-receipts/internal-receipt.module';
+import { DashboardModule } from './modules/dashboard/dashboard.module';
 
 @Module({
   imports: [
@@ -48,6 +49,7 @@ import { InternalReceiptModule } from './modules/internal-receipts/internal-rece
     CustomerPaymentModule,
     CashSessionModule,
     InternalReceiptModule,
+    DashboardModule,
   ],
   controllers: [AppController],
   providers: [AppService],

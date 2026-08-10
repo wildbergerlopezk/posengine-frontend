@@ -21,8 +21,10 @@ import {
   ApiParam,
 } from '@nestjs/swagger';
 import { PurchaseService } from '../services/purchase.service';
-import { CreatePurchaseDto } from '../dto/purchase/create-purchase.dto';
-import { PurchaseFilterDto } from '../dto/purchase/purchase-filter.dto';
+import { CreatePurchaseDto } from '../dto/create-purchase.dto';
+import { PurchaseFilterDto } from '../dto/purchase-filter.dto';
+import { PurchaseDebtService } from '../services/purchase-debt.service';
+import { CreatePurchaseDebtPaymentDto } from '../dto/create-purchase-debt-payment.dto';
 import { CurrentUser, type AuthenticatedUser } from '../../../common/decorators/current-user.decorator';
 import { Roles } from '../../../common/decorators/roles.decorator';
 import { UserRole } from '../../../generated/prisma/enums';
@@ -32,7 +34,10 @@ import { CashSessionGuard } from '../../../common/guards/cash-session.guard';
 @ApiBearerAuth('access-token')
 @Controller('purchases')
 export class PurchaseController {
-  constructor(private readonly purchaseService: PurchaseService) {}
+  constructor(
+    private readonly purchaseService: PurchaseService,
+    private readonly purchaseDebtService: PurchaseDebtService,
+  ) {}
 
   @Get('generate-invoice-number')
   @Roles(UserRole.ADMIN, UserRole.SUPERADMIN)
@@ -101,5 +106,34 @@ export class PurchaseController {
     @CurrentUser('tenantId') tenantId: string,
   ) {
     return this.purchaseService.cancel(id, tenantId);
+  }
+
+  @Get(':id/debt')
+  @Roles(UserRole.ADMIN, UserRole.SUPERADMIN)
+  @ApiOperation({ summary: 'Get purchase debt by purchase ID' })
+  @ApiParam({ name: 'id', description: 'Purchase ID' })
+  @ApiResponse({ status: 200, description: 'Debt found' })
+  @ApiResponse({ status: 404, description: 'Debt not found' })
+  getDebt(
+    @Param('id') id: string,
+    @CurrentUser('tenantId') tenantId: string,
+  ) {
+    return this.purchaseDebtService.findByPurchase(id, tenantId);
+  }
+
+  @Post(':id/debt/payments')
+  @Roles(UserRole.ADMIN, UserRole.SUPERADMIN)
+  @ApiOperation({ summary: 'Register a payment for the purchase debt' })
+  @ApiParam({ name: 'id', description: 'Purchase ID' })
+  @ApiBody({ type: CreatePurchaseDebtPaymentDto })
+  @ApiResponse({ status: 200, description: 'Payment registered and updated debt returned' })
+  @ApiResponse({ status: 400, description: 'Bad request / invalid payment details' })
+  @ApiResponse({ status: 404, description: 'Debt / installment not found' })
+  registerDebtPayment(
+    @Param('id') id: string,
+    @CurrentUser('tenantId') tenantId: string,
+    @Body() dto: CreatePurchaseDebtPaymentDto,
+  ) {
+    return this.purchaseDebtService.registerPayment(tenantId, id, dto);
   }
 }

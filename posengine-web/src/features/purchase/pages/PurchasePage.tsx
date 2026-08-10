@@ -105,6 +105,13 @@ export function PurchasePage() {
     const [notes, setNotes] = useState("")
     const [zeroCostProducts, setZeroCostProducts] = useState<string[]>([])
 
+    // ── Debt state ──────────────────────────────────────────────────────────────
+    const [debtScheduleType, setDebtScheduleType] = useState<"NONE" | "OWNER_REMINDER" | "SUPPLIER_SCHEDULE">("NONE")
+    const [debtDueDate, setDebtDueDate] = useState(() => new Date().toISOString().slice(0, 10))
+    const [debtInstallments, setDebtInstallments] = useState<{ number: number; amount: number; dueDate: string }[]>([
+        { number: 1, amount: 0, dueDate: new Date().toISOString().slice(0, 10) }
+    ])
+
     // ── Items state ────────────────────────────────────────────────────────────
     const [items, setItems] = useState<PurchaseItem[]>([])
     const [editingRowIndex, setEditingRowIndex] = useState<number | null>(null)
@@ -146,6 +153,8 @@ export function PurchasePage() {
     const notesRef = useRef<HTMLInputElement>(null)
     const paymentCashRef = useRef<HTMLButtonElement>(null)
     const paymentCreditRef = useRef<HTMLButtonElement>(null)
+    const debtScheduleTypeRef = useRef<HTMLSelectElement>(null)
+    const debtDueDateRef = useRef<HTMLInputElement>(null)
     const confirmAcceptRef = useRef<HTMLButtonElement>(null)
     const confirmCancelRef = useRef<HTMLButtonElement>(null)
     const editingInputRef = useRef<HTMLInputElement>(null)
@@ -163,9 +172,12 @@ export function PurchasePage() {
                 if (draft.supplierId) setSupplierId(draft.supplierId)
                 if (draft.invoiceNumber) setInvoiceNumber(draft.invoiceNumber)
                 if (draft.purchaseDate) setPurchaseDate(draft.purchaseDate)
-                if (draft.paymentType === "CASH") setPaymentType("CASH")
+                if (draft.paymentType) setPaymentType(draft.paymentType)
                 if (draft.notes) setNotes(draft.notes)
                 if (draft.items) setItems(draft.items)
+                if (draft.debtScheduleType) setDebtScheduleType(draft.debtScheduleType)
+                if (draft.debtDueDate) setDebtDueDate(draft.debtDueDate)
+                if (draft.debtInstallments) setDebtInstallments(draft.debtInstallments)
             } catch (e) {
                 console.error("Error loading purchase draft", e)
             }
@@ -182,10 +194,13 @@ export function PurchasePage() {
             purchaseDate,
             paymentType,
             notes,
-            items
+            items,
+            debtScheduleType,
+            debtDueDate,
+            debtInstallments
         }
         sessionStorage.setItem(PURCHASE_STORAGE_KEY, JSON.stringify(draft))
-    }, [isDraftLoaded, supplierId, invoiceNumber, purchaseDate, paymentType, notes, items])
+    }, [isDraftLoaded, supplierId, invoiceNumber, purchaseDate, paymentType, notes, items, debtScheduleType, debtDueDate, debtInstallments])
 
     // ── Computed totals ────────────────────────────────────────────────────────
     const total = items.reduce((acc, i) => acc + i.total, 0)
@@ -309,6 +324,32 @@ export function PurchasePage() {
             return
         }
 
+        if (paymentType === "CREDIT") {
+            if (debtScheduleType === "NONE") {
+                if (!debtDueDate) {
+                    setSubmitError("Debe indicar una fecha límite de pago para la compra a crédito")
+                    return
+                }
+            } else {
+                if (!debtInstallments.length) {
+                    setSubmitError("Debe indicar al menos una cuota")
+                    return
+                }
+                const sum = debtInstallments.reduce((acc, i) => acc + i.amount, 0)
+                if (Math.abs(sum - total) > 1) {
+                    setSubmitError(`La suma de las cuotas (${sum}) no coincide con el total de la compra (${total})`)
+                    return
+                }
+                const numbers = debtInstallments.map(i => i.number).sort((a, b) => a - b)
+                for (let i = 0; i < numbers.length; i++) {
+                    if (numbers[i] !== i + 1) {
+                        setSubmitError("Las cuotas deben estar numeradas consecutivamente desde 1")
+                        return
+                    }
+                }
+            }
+        }
+
         setSubmitting(true)
         setSubmitError(null)
 
@@ -322,7 +363,7 @@ export function PurchasePage() {
             const [year, month, day] = purchaseDate.split("-").map(Number)
             const dateToSave = new Date(year, month - 1, day, now.getHours(), now.getMinutes(), now.getSeconds())
 
-            const purchasePayload = {
+            const purchasePayload: any = {
                 supplierId,
                 invoiceNumber,
                 purchaseDate: dateToSave.toISOString(),
@@ -334,6 +375,24 @@ export function PurchasePage() {
                     quantity: i.quantity,
                     unitCost: i.unitCost,
                 })),
+            }
+
+            if (paymentType === "CREDIT") {
+                if (debtScheduleType === "NONE") {
+                    purchasePayload.debt = {
+                        scheduleType: debtScheduleType,
+                        dueDate: new Date(debtDueDate).toISOString(),
+                    }
+                } else {
+                    purchasePayload.debt = {
+                        scheduleType: debtScheduleType,
+                        installments: debtInstallments.map(inst => ({
+                            number: inst.number,
+                            amount: inst.amount,
+                            dueDate: new Date(inst.dueDate).toISOString(),
+                        })),
+                    }
+                }
             }
 
             const purchaseRes = await fetch(`${API_BASE}/purchases`, {
@@ -398,6 +457,9 @@ export function PurchasePage() {
                 setNotes("")
                 setPaymentType("CASH")
                 setPurchaseDate(new Date().toISOString().slice(0, 10))
+                setDebtScheduleType("NONE")
+                setDebtDueDate(new Date().toISOString().slice(0, 10))
+                setDebtInstallments([{ number: 1, amount: 0, dueDate: new Date().toISOString().slice(0, 10) }])
                 setSuccess(false)
             }, 1200)
 
@@ -790,15 +852,177 @@ export function PurchasePage() {
                                 <button
                                     ref={paymentCreditRef}
                                     type="button"
-                                    className={`${styles.payToggleBtn} ${styles.payToggleBtnDisabled}`}
-                                    disabled
-                                    aria-disabled="true"
-                                    tabIndex={-1}
+                                    className={`${styles.payToggleBtn} ${paymentType === "CREDIT" ? styles.payToggleBtnActive : ""}`}
+                                    onClick={() => setPaymentType("CREDIT")}
+                                    onKeyDown={e => {
+                                        if (e.key === "Enter") { 
+                                            e.preventDefault()
+                                            setPaymentType("CREDIT")
+                                            setTimeout(() => debtScheduleTypeRef.current?.focus(), 50)
+                                        }
+                                    }}
                                 >
                                     Crédito
                                 </button>
                             </div>
                         </div>
+
+                        {paymentType === "CREDIT" && (
+                            <div className={`${styles.debtSubForm} ${styles.fullWidth}`}>
+                                <h3 className={styles.debtFormTitle}>Detalle de la Deuda</h3>
+                                <div className={styles.debtFormGrid}>
+                                    <div className={tableStyles.formGroup}>
+                                        <label className={tableStyles.label}>Tipo de Cronograma</label>
+                                        <select
+                                            ref={debtScheduleTypeRef}
+                                            className={tableStyles.input}
+                                            value={debtScheduleType}
+                                            onChange={e => {
+                                                const val = e.target.value as any
+                                                setDebtScheduleType(val)
+                                                if (val !== "NONE" && debtInstallments.length === 0) {
+                                                    setDebtInstallments([{ number: 1, amount: total, dueDate: new Date().toISOString().slice(0, 10) }])
+                                                }
+                                            }}
+                                            onKeyDown={e => {
+                                                if (e.key === "Enter") {
+                                                    e.preventDefault()
+                                                    if (debtScheduleType === "NONE") {
+                                                        debtDueDateRef.current?.focus()
+                                                    } else {
+                                                        setTimeout(() => document.getElementById("inst-amount-0")?.focus(), 50)
+                                                    }
+                                                }
+                                            }}
+                                        >
+                                            <option value="NONE">Pago Único (Sin Cuotas)</option>
+                                            <option value="OWNER_REMINDER">Recordatorio de Cuotas (Dueño)</option>
+                                            <option value="SUPPLIER_SCHEDULE">Cuotas Impuestas por Proveedor</option>
+                                        </select>
+                                    </div>
+
+                                    {debtScheduleType === "NONE" ? (
+                                        <div className={tableStyles.formGroup}>
+                                            <label className={tableStyles.label}>Fecha Límite de Pago</label>
+                                            <input
+                                                ref={debtDueDateRef}
+                                                type="date"
+                                                className={tableStyles.input}
+                                                value={debtDueDate}
+                                                onChange={e => setDebtDueDate(e.target.value)}
+                                                onKeyDown={e => {
+                                                    if (e.key === "Enter") {
+                                                        e.preventDefault()
+                                                        notesRef.current?.focus()
+                                                    }
+                                                }}
+                                                required
+                                            />
+                                        </div>
+                                    ) : (
+                                        <div className={`${styles.installmentsWrapper} ${styles.fullWidth}`}>
+                                            <div className={styles.installmentsHeader}>
+                                                <span className={styles.installmentsTitle}>Cuotas ({debtInstallments.length})</span>
+                                                <button
+                                                    type="button"
+                                                    className={styles.addInstallmentBtn}
+                                                    onClick={() => {
+                                                        const nextNum = debtInstallments.length + 1
+                                                        const sumCurrent = debtInstallments.reduce((acc, i) => acc + i.amount, 0)
+                                                        const remaining = Math.max(0, total - sumCurrent)
+                                                        setDebtInstallments([
+                                                            ...debtInstallments,
+                                                            { number: nextNum, amount: remaining, dueDate: new Date().toISOString().slice(0, 10) }
+                                                        ])
+                                                        setTimeout(() => {
+                                                            document.getElementById(`inst-amount-${nextNum - 1}`)?.focus()
+                                                        }, 50)
+                                                    }}
+                                                >
+                                                    + Agregar
+                                                </button>
+                                            </div>
+
+                                            <div className={styles.installmentsList}>
+                                                {debtInstallments.map((inst, index) => (
+                                                    <div key={index} className={styles.installmentRow}>
+                                                        <span className={styles.instNumber}>Cuota {inst.number}</span>
+                                                        <div className={tableStyles.formGroup}>
+                                                            <input
+                                                                id={`inst-amount-${index}`}
+                                                                type="text"
+                                                                placeholder="Monto"
+                                                                className={tableStyles.input}
+                                                                value={inst.amount ? new Intl.NumberFormat("es-AR", { minimumFractionDigits: 0 }).format(inst.amount) : ""}
+                                                                onChange={e => {
+                                                                    const clean = e.target.value.replace(/\D/g, "")
+                                                                    const val = clean ? parseInt(clean, 10) : 0
+                                                                    setDebtInstallments(
+                                                                        debtInstallments.map((itm, idx) => 
+                                                                            idx === index ? { ...itm, amount: val } : itm
+                                                                        )
+                                                                    )
+                                                                }}
+                                                                onKeyDown={e => {
+                                                                    if (e.key === "Enter") {
+                                                                        e.preventDefault()
+                                                                        document.getElementById(`inst-date-${index}`)?.focus()
+                                                                    }
+                                                                }}
+                                                            />
+                                                        </div>
+                                                        <div className={tableStyles.formGroup}>
+                                                            <input
+                                                                id={`inst-date-${index}`}
+                                                                type="date"
+                                                                className={tableStyles.input}
+                                                                value={inst.dueDate}
+                                                                onChange={e => {
+                                                                    setDebtInstallments(
+                                                                        debtInstallments.map((itm, idx) => 
+                                                                            idx === index ? { ...itm, dueDate: e.target.value } : itm
+                                                                        )
+                                                                    )
+                                                                }}
+                                                                onKeyDown={e => {
+                                                                    if (e.key === "Enter") {
+                                                                        e.preventDefault()
+                                                                        const nextAmount = document.getElementById(`inst-amount-${index + 1}`)
+                                                                        if (nextAmount) {
+                                                                            nextAmount.focus()
+                                                                        } else {
+                                                                            notesRef.current?.focus()
+                                                                        }
+                                                                    }
+                                                                }}
+                                                            />
+                                                        </div>
+                                                        <button
+                                                            type="button"
+                                                            className={styles.deleteInstallmentBtn}
+                                                            onClick={() => {
+                                                                const filtered = debtInstallments.filter((_, idx) => idx !== index)
+                                                                setDebtInstallments(
+                                                                    filtered.map((itm, idx) => ({ ...itm, number: idx + 1 }))
+                                                                )
+                                                            }}
+                                                        >
+                                                            X
+                                                        </button>
+                                                    </div>
+                                                ))}
+                                            </div>
+
+                                            <div className={styles.installmentsSummary}>
+                                                <span className={Math.abs(debtInstallments.reduce((acc, i) => acc + i.amount, 0) - total) > 1 ? styles.summaryAlert : styles.summaryOk}>
+                                                    Suma: {formatCurrency(debtInstallments.reduce((acc, i) => acc + i.amount, 0))} / Total: {formatCurrency(total)}
+                                                </span>
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        )}
 
                         {/* Observación — full width */}
                         <div className={`${tableStyles.formGroup} ${styles.fullWidth}`}>

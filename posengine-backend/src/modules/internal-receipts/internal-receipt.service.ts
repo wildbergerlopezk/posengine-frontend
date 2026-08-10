@@ -207,4 +207,13 @@ export class InternalReceiptService {
       },
     })
   }
+
+  // ── Delete (eliminar el comprobante por completo) ─────────────────────────
+  async remove(id: string, tenantId: string) {
+    const receipt = await this.findOne(id, tenantId)
+
+    return this.prisma.internalReceipt.delete({
+      where: { id: receipt.id },
+    })
+  }
 }

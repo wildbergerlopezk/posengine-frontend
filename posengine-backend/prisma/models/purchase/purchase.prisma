@@ -23,7 +23,7 @@ model Purchase {
   cashSession CashSession @relation(fields: [cashSessionId], references: [id])
 
   items   PurchaseItem[]
-  // creditPlan PurchaseCreditPlan?
+  debt    PurchaseDebt?
   returns PurchaseReturn[]
 
   @@unique([invoiceNumber, tenantId])

@@ -1,8 +1,8 @@
 import { IsOptional, IsEnum, IsString, IsDateString } from 'class-validator'; 
 import { ApiPropertyOptional } from '@nestjs/swagger'; 
 import { Type } from 'class-transformer'; 
-import { PaginationQueryDto } from '../../../../common/dto/pagination-query.dto'; 
-import { PurchaseStatus, PurchasePaymentType } from '../../../../generated/prisma/enums'; 
+import { PaginationQueryDto } from '../../../common/dto/pagination-query.dto'; 
+import { PurchaseStatus, PurchasePaymentType } from '../../../generated/prisma/enums'; 
  
 export class PurchaseFilterDto extends PaginationQueryDto { 
   @ApiPropertyOptional({ description: 'Buscar por nro. de factura, nombre o RUC del proveedor' }) 

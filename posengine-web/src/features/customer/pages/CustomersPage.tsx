@@ -97,6 +97,14 @@ export function CustomersPage() {
   const [deleting, setDeleting]         = useState(false)
 
   const firstInputRef = useRef<HTMLInputElement>(null)
+  const documentNumberRef = useRef<HTMLInputElement>(null)
+  const taxIdRef = useRef<HTMLInputElement>(null)
+  const phoneRef = useRef<HTMLInputElement>(null)
+  const emailRef = useRef<HTMLInputElement>(null)
+  const addressRef = useRef<HTMLInputElement>(null)
+  const creditToggleRef = useRef<HTMLInputElement>(null)
+  const creditLimitRef = useRef<HTMLInputElement>(null)
+  const submitBtnRef = useRef<HTMLButtonElement>(null)
 
   // ── Fetch ──────────────────────────────────────────────────────────────────
   const fetchCustomers = useCallback(async () => {
@@ -127,13 +135,15 @@ export function CustomersPage() {
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape" && showModal) {
-        closeModal()
+      if (e.key === "Escape" && showModal) { closeModal(); return }
+      if ((e.ctrlKey || e.metaKey) && e.key === "Enter" && showModal && !isReadOnly && !saving && !saveSuccess) {
+        e.preventDefault()
+        void handleSave()
       }
     }
     window.addEventListener("keydown", handleKeyDown)
     return () => window.removeEventListener("keydown", handleKeyDown)
-  }, [showModal])
+  }, [showModal, isReadOnly, saving, saveSuccess])
 
   // ── Modal helpers ──────────────────────────────────────────────────────────
   const openCreate = () => {
@@ -500,19 +510,31 @@ export function CustomersPage() {
                   <div className={`${tableStyles.formGroup} ${styles.formGridFull}`}>
                     <label className={tableStyles.label} htmlFor="name">Nombre completo *</label>
                     <input ref={firstInputRef} id="name" className={tableStyles.input}
-                      value={form.name} onChange={setField("name")} placeholder="Juan Pérez" disabled={isReadOnly} />
+                      value={form.name} onChange={setField("name")} placeholder="Juan Pérez" disabled={isReadOnly}
+                      onKeyDown={e => {
+                        if (e.key === "Enter") { e.preventDefault(); documentNumberRef.current?.focus() }
+                      }}
+                    />
                   </div>
                   <div className={tableStyles.formGroup}>
                     <label className={tableStyles.label} htmlFor="documentNumber">Número de Cédula (CI)</label>
-                    <input id="documentNumber" className={tableStyles.input}
+                    <input ref={documentNumberRef} id="documentNumber" className={tableStyles.input}
                       value={form.documentNumber} onChange={setField("documentNumber")}
-                      placeholder="5.123.456" disabled={isReadOnly} />
+                      placeholder="5.123.456" disabled={isReadOnly}
+                      onKeyDown={e => {
+                        if (e.key === "Enter") { e.preventDefault(); taxIdRef.current?.focus() }
+                      }}
+                    />
                   </div>
                   <div className={tableStyles.formGroup}>
                     <label className={tableStyles.label} htmlFor="taxId">Número de RUC</label>
-                    <input id="taxId" className={tableStyles.input}
+                    <input ref={taxIdRef} id="taxId" className={tableStyles.input}
                       value={form.taxId} onChange={setField("taxId")}
-                      placeholder="80012345-1" disabled={isReadOnly} />
+                      placeholder="80012345-1" disabled={isReadOnly}
+                      onKeyDown={e => {
+                        if (e.key === "Enter") { e.preventDefault(); phoneRef.current?.focus() }
+                      }}
+                    />
                   </div>
                 </div>
               </div>
@@ -523,13 +545,21 @@ export function CustomersPage() {
                 <div className={styles.formGrid}>
                   <div className={tableStyles.formGroup}>
                     <label className={tableStyles.label} htmlFor="phone">Teléfono / Celular</label>
-                    <input id="phone" className={tableStyles.input} value={form.phone}
-                      onChange={setField("phone")} placeholder="(0981)234567" disabled={isReadOnly} />
+                    <input ref={phoneRef} id="phone" className={tableStyles.input} value={form.phone}
+                      onChange={setField("phone")} placeholder="(0981)234567" disabled={isReadOnly}
+                      onKeyDown={e => {
+                        if (e.key === "Enter") { e.preventDefault(); emailRef.current?.focus() }
+                      }}
+                    />
                   </div>
                   <div className={tableStyles.formGroup}>
                     <label className={tableStyles.label} htmlFor="email">Email</label>
-                    <input id="email" type="email" className={tableStyles.input}
-                      value={form.email} onChange={setField("email")} placeholder="juan@email.com" disabled={isReadOnly} />
+                    <input ref={emailRef} id="email" type="email" className={tableStyles.input}
+                      value={form.email} onChange={setField("email")} placeholder="juan@email.com" disabled={isReadOnly}
+                      onKeyDown={e => {
+                        if (e.key === "Enter") { e.preventDefault(); addressRef.current?.focus() }
+                      }}
+                    />
                   </div>
                 </div>
               </div>
@@ -539,8 +569,15 @@ export function CustomersPage() {
                 <div className={styles.formSectionTitle}>Ubicación</div>
                 <div className={`${tableStyles.formGroup} ${styles.formGridFull}`}>
                   <label className={tableStyles.label} htmlFor="address">Dirección</label>
-                  <input id="address" className={tableStyles.input} value={form.address}
-                    onChange={setField("address")} placeholder="Av. Mariscal López 1234, Asunción" disabled={isReadOnly} />
+                  <input ref={addressRef} id="address" className={tableStyles.input} value={form.address}
+                    onChange={setField("address")} placeholder="Av. Mariscal López 1234, Asunción" disabled={isReadOnly}
+                    onKeyDown={e => {
+                      if (e.key === "Enter") {
+                        e.preventDefault()
+                        creditToggleRef.current?.focus()
+                      }
+                    }}
+                  />
                 </div>
               </div>
 
@@ -552,26 +589,47 @@ export function CustomersPage() {
                     <span className={styles.creditToggleLabelMain}>Habilitar crédito</span>
                     <span className={styles.creditToggleLabelSub}>Permite al cliente comprar a crédito</span>
                   </div>
-                  <input type="checkbox" className={styles.toggle}
+                  <input
+                    ref={creditToggleRef}
+                    type="checkbox" className={styles.toggle}
                     checked={form.creditEnabled}
-                    onChange={e => setForm(p => ({ ...p, creditEnabled: e.target.checked }))} disabled={isReadOnly} />
+                    onChange={e => setForm(p => ({ ...p, creditEnabled: e.target.checked }))}
+                    disabled={isReadOnly}
+                    onKeyDown={e => {
+                      if (e.key === "Enter") {
+                        e.preventDefault()
+                        const next = !form.creditEnabled
+                        setForm(p => ({ ...p, creditEnabled: next }))
+                        setTimeout(() => {
+                          if (next) creditLimitRef.current?.focus()
+                          else submitBtnRef.current?.focus()
+                        }, 30)
+                      }
+                    }}
+                  />
                 </div>
-                 {form.creditEnabled && (
+                {form.creditEnabled && (
                   <div className={styles.formGrid}>
                     <div className={tableStyles.formGroup}>
                       <label className={tableStyles.label} htmlFor="creditLimit">Límite de crédito (Gs.)</label>
-                      <input id="creditLimit" type="text" className={tableStyles.input}
-                        value={form.creditLimit} onChange={setField("creditLimit")} placeholder="0" disabled={isReadOnly} />
+                      <input ref={creditLimitRef} id="creditLimit" type="text" className={tableStyles.input}
+                        value={form.creditLimit} onChange={setField("creditLimit")} placeholder="0" disabled={isReadOnly}
+                        onKeyDown={e => {
+                          if (e.key === "Enter") { e.preventDefault(); submitBtnRef.current?.focus() }
+                        }}
+                      />
                     </div>
                     <div className={tableStyles.formGroup}>
                       <label className={tableStyles.label} htmlFor="currentDebt">Deuda total (Gs.)</label>
                       <input id="currentDebt" type="text" className={tableStyles.input}
-                        value={formatCurrency(form.currentDebt)} disabled={true} style={{ color: form.currentDebt > 0 ? "#ef4444" : "inherit", fontWeight: "bold" }} />
+                        value={formatCurrency(form.currentDebt)} disabled={true}
+                        style={{ color: form.currentDebt > 0 ? "#ef4444" : "inherit", fontWeight: "bold" }} />
                     </div>
                     <div className={tableStyles.formGroup}>
                       <label className={tableStyles.label} htmlFor="availableCredit">Crédito disponible (Gs.)</label>
                       <input id="availableCredit" type="text" className={tableStyles.input}
-                        value={formatCurrency(Math.max(0, (parseFloat(form.creditLimit.replace(/\./g, "")) || 0) - form.currentDebt))} disabled={true} style={{ color: "#22c55e", fontWeight: "bold" }} />
+                        value={formatCurrency(Math.max(0, (parseFloat(form.creditLimit.replace(/\./g, "")) || 0) - form.currentDebt))}
+                        disabled={true} style={{ color: "#22c55e", fontWeight: "bold" }} />
                     </div>
                   </div>
                 )}
@@ -588,7 +646,7 @@ export function CustomersPage() {
                   <button type="button" className={tableStyles.cancelButton} onClick={closeModal} disabled={saving}>
                     Cancelar
                   </button>
-                  <button type="submit" className={tableStyles.submitButton}
+                  <button type="submit" ref={submitBtnRef} className={tableStyles.submitButton}
                     disabled={saving || saveSuccess}>
                     {saveSuccess
                       ? <><Check size={15} /> Guardado</>
