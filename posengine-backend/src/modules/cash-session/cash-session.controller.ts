@@ -20,6 +20,7 @@ import { CashSessionService } from './cash-session.service'
 import { OpenCashSessionDto } from './dto/open-cash-session.dto'
 import { CloseCashSessionDto } from './dto/close-cash-session.dto'
 import { CashSessionFilterDto } from './dto/cash-session-filter.dto'
+import { CreateCashMovementDto } from './dto/create-cash-movement.dto'
 import {
   CurrentUser,
   type AuthenticatedUser,
@@ -32,6 +33,20 @@ import { UserRole } from '../../generated/prisma/enums'
 @Controller('cash-sessions')
 export class CashSessionController {
   constructor(private readonly cashSessionService: CashSessionService) {}
+
+  @Post('active/movements')
+  @Roles(UserRole.ADMIN, UserRole.SUPERADMIN)
+  @HttpCode(HttpStatus.CREATED)
+  @ApiOperation({ summary: 'Registrar un movimiento manual de caja' })
+  @ApiBody({ type: CreateCashMovementDto })
+  @ApiResponse({ status: 201, description: 'Movimiento registrado correctamente' })
+  @ApiResponse({ status: 400, description: 'No hay una sesión de caja activa' })
+  addMovement(
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() dto: CreateCashMovementDto,
+  ) {
+    return this.cashSessionService.addMovement(user.tenantId, dto)
+  }
 
   @Post('open')
   @Roles(UserRole.ADMIN, UserRole.SUPERADMIN)
@@ -98,6 +113,19 @@ export class CashSessionController {
     )
   }
 
+  @Get(':id/report')
+  @Roles(UserRole.ADMIN, UserRole.SUPERADMIN)
+  @ApiOperation({ summary: 'Obtener reporte detallado de arqueo de caja' })
+  @ApiParam({ name: 'id', description: 'Cash Session ID' })
+  @ApiResponse({ status: 200, description: 'Reporte generado' })
+  @ApiResponse({ status: 404, description: 'Sesión no encontrada' })
+  getReport(
+    @Param('id') id: string,
+    @CurrentUser('tenantId') tenantId: string,
+  ) {
+    return this.cashSessionService.getReport(tenantId, id)
+  }
+
   @Get(':id')
   @Roles(UserRole.ADMIN, UserRole.SUPERADMIN)
   @ApiOperation({ summary: 'Obtener sesión de caja por ID' })
@@ -111,3 +139,4 @@ export class CashSessionController {
     return this.cashSessionService.findOne(tenantId, id)
   }
 }
+

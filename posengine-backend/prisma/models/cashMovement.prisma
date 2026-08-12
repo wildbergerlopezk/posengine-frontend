@@ -1,0 +1,19 @@
+enum CashMovementType {
+  IN
+  OUT
+}
+
+model CashMovement {
+  id            String           @id @default(uuid())
+  tenantId      String
+  cashSessionId String
+  amount        Float
+  type          CashMovementType
+  description   String
+  createdAt     DateTime         @default(now())
+
+  tenant      Tenant      @relation(fields: [tenantId], references: [id])
+  cashSession CashSession @relation(fields: [cashSessionId], references: [id])
+
+  @@map("cash_movements")
+}

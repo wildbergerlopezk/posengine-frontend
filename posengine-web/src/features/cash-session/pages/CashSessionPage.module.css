@@ -4,8 +4,8 @@
 }
 
 .container {
-  padding: 2rem;
-  max-width: 1000px;
+  padding: 1.5rem;
+  max-width: 1150px;
   margin: 0 auto;
   min-height: calc(100vh - 4rem);
   display: flex;
@@ -54,6 +54,12 @@
   border-color: var(--color-border);
 }
 
+.historyBtn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
 .content {
   display: flex;
   flex-direction: column;
@@ -62,19 +68,25 @@
 
 /* ── Status Cards ── */
 .statusCard {
+  flex: 1;
+  min-width: 0;
+  min-height: 520px;
   background: var(--color-card);
   border: 1px solid var(--color-border);
   border-radius: 1.25rem;
-  padding: 2rem;
+  padding: 1.25rem 1.5rem;
   box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
   position: relative;
   overflow: hidden;
 }
 
+.iconRow {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
 .statusBadge {
-  position: absolute;
-  top: 1.5rem;
-  right: 1.5rem;
   display: flex;
   align-items: center;
   gap: 0.4rem;
@@ -95,8 +107,8 @@
 .sessionGrid {
   display: grid;
   grid-template-columns: 1fr 1.5fr;
-  gap: 3rem;
-  margin-top: 0.5rem;
+  gap: 1.5rem;
+  margin-top: 0.25rem;
 }
 
 @media (max-width: 768px) {
@@ -109,13 +121,13 @@
 .mainInfo {
   display: flex;
   flex-direction: column;
-  gap: 1.5rem;
+  gap: 1rem;
 }
 
 .iconCircle {
-  width: 4rem;
-  height: 4rem;
-  border-radius: 1.25rem;
+  width: 3rem;
+  height: 3rem;
+  border-radius: 1rem;
   background: color-mix(in srgb, var(--color-primary) 10%, transparent);
   display: flex;
   align-items: center;
@@ -127,9 +139,9 @@
 }
 
 .mainDetails h3 {
-  font-size: 1.25rem;
+  font-size: 1.1rem;
   font-weight: 700;
-  margin-bottom: 0.4rem;
+  margin-bottom: 0.25rem;
 }
 
 .mainDetails p {
@@ -139,8 +151,8 @@
 }
 
 .openingAmountCard {
-  margin-top: 1.5rem;
-  padding: 1rem;
+  margin-top: 0.75rem;
+  padding: 0.75rem;
   background: var(--color-muted);
   border-radius: 0.75rem;
   display: flex;
@@ -149,7 +161,7 @@
 }
 
 .openingAmountValue {
-  font-size: 1.25rem;
+  font-size: 1.1rem;
   font-weight: 800;
   color: var(--color-foreground);
 }
@@ -161,13 +173,13 @@
 .statsGrid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
-  gap: 1rem;
+  gap: 0.625rem;
 }
 
 .statItem {
-  padding: 1.25rem;
+  padding: 0.75rem 0.875rem;
   background: var(--color-muted);
-  border-radius: 1rem;
+  border-radius: 0.75rem;
   display: flex;
   flex-direction: column;
   gap: 0.4rem;
@@ -188,13 +200,13 @@
 }
 
 .statValue {
-  font-size: 1.125rem;
+  font-size: 1rem;
   font-weight: 700;
   color: var(--color-foreground);
 }
 
 .statValueLarge {
-  font-size: 1.75rem;
+  font-size: 1.5rem;
   font-weight: 800;
   color: var(--color-primary);
   letter-spacing: -0.02em;
@@ -219,8 +231,8 @@
 }
 
 .cardFooter {
-  margin-top: 2.5rem;
-  padding-top: 1.5rem;
+  margin-top: 1.25rem;
+  padding-top: 1rem;
   border-top: 1px solid var(--color-border);
   display: flex;
   justify-content: space-between;
@@ -384,3 +396,333 @@
   color: var(--color-foreground);
   border-color: color-mix(in srgb, var(--color-primary) 30%, var(--color-border));
 }
+
+/* ── Layout principal: caja + panel de movimientos ── */
+.mainLayout {
+  display: flex;
+  gap: 1rem;
+  align-items: stretch;
+}
+
+@media (max-width: 1024px) {
+  .mainLayout {
+    flex-direction: column;
+  }
+
+  .movementsPanel {
+    width: 100%;
+  }
+
+  .movementsPanel:not(.movementsPanelOpen) {
+    flex-direction: row;
+    align-items: stretch;
+  }
+
+  .movementsPanel:not(.movementsPanelOpen) .movementsPanelHeader {
+    border-bottom: none;
+    border-right: 1px solid var(--color-border);
+    width: 3.5rem;
+    flex-shrink: 0;
+  }
+
+  .movementsPanel:not(.movementsPanelOpen) .movementsPanelNav {
+    flex-direction: row;
+    flex: 1;
+    align-items: center;
+  }
+
+  .movementsPanel:not(.movementsPanelOpen) .movementsPanelFooter {
+    border-top: none;
+    border-left: 1px solid var(--color-border);
+    width: 3.5rem;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+  }
+}
+
+/* ── Panel colapsable de movimientos (estilo sidebar) ── */
+.movementsPanel {
+  width: 3.5rem;
+  flex-shrink: 0;
+  background: var(--color-card);
+  border: 1px solid var(--color-border);
+  border-radius: 1rem;
+  display: flex;
+  flex-direction: column;
+  transition: width 0.3s ease;
+  overflow: hidden;
+}
+
+.movementsPanelOpen {
+  width: 16rem;
+}
+
+.movementsPanelHeader {
+  height: 48px;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0 0.5rem;
+  border-bottom: 1px solid var(--color-border);
+  flex-shrink: 0;
+}
+
+.menuButton {
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 50%;
+  background: transparent;
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: var(--color-foreground);
+  transition: background 0.2s ease;
+  flex-shrink: 0;
+}
+
+.menuButton:hover {
+  background: var(--color-accent);
+}
+
+.movementsPanelTitle {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--color-foreground);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.movementsPanelBody {
+  display: flex;
+  flex-direction: column;
+  padding: 0.5rem;
+  overflow: hidden;
+  flex: 1;
+  min-height: 0;
+}
+
+.movementsPanelNav {
+  display: flex;
+  flex-direction: column;
+  padding: 0.375rem;
+  gap: 2px;
+}
+
+.panelNavItem {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.5rem;
+  border-radius: 0.625rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  color: var(--color-muted-foreground);
+  border: none;
+  background: transparent;
+  font-family: inherit;
+}
+
+.panelNavItem:hover {
+  background: var(--color-accent);
+  color: var(--color-foreground);
+}
+
+.movementsPanelFooter {
+  padding: 0.5rem;
+  border-top: 1px solid var(--color-border);
+  flex-shrink: 0;
+}
+
+.registerMovementBtnExpanded {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  width: 100%;
+  padding: 0.625rem;
+  border: 1px solid var(--color-primary);
+  background: transparent;
+  border-radius: 0.5rem;
+  color: var(--color-primary);
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.2s, color 0.2s;
+  white-space: nowrap;
+}
+
+.registerMovementBtnExpanded:hover {
+  background: color-mix(in srgb, var(--color-primary) 8%, transparent);
+}
+
+.registerMovementBtnCollapsed {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  padding: 0.625rem 0;
+  border: 1px solid var(--color-border);
+  background: transparent;
+  border-radius: 0.5rem;
+  color: var(--color-muted-foreground);
+  cursor: pointer;
+  transition: background-color 0.2s, color 0.2s, border-color 0.2s;
+}
+
+.registerMovementBtnCollapsed:hover {
+  background: color-mix(in srgb, var(--color-primary) 8%, transparent);
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+}
+
+.registerMovementBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  padding: 0.6rem 1rem;
+  border-radius: 0.5rem;
+  border: 1px solid var(--color-primary);
+  background: transparent;
+  color: var(--color-primary);
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+  width: 100%;
+  flex-shrink: 0;
+}
+
+.registerMovementBtn:hover {
+  background: color-mix(in srgb, var(--color-primary) 8%, transparent);
+}
+
+.movementsList {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  overflow-y: auto;
+  max-height: 300px;
+}
+
+.viewAllBtn {
+  margin-top: 0.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  width: 100%;
+  padding: 0.5rem;
+  border-radius: 0.5rem;
+  border: 1px solid var(--color-border);
+  background: transparent;
+  color: var(--color-muted-foreground);
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.viewAllBtn:hover {
+  background: var(--color-accent);
+  color: var(--color-foreground);
+  border-color: color-mix(in srgb, var(--color-primary) 30%, var(--color-border));
+}
+
+.movementRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  padding: 0.5rem 0.625rem;
+  border-radius: 0.75rem;
+  background: var(--color-muted);
+  border: 1px solid var(--color-border);
+  gap: 0.5rem;
+}
+
+.movementLeft {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.movementIconWrap {
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: 0.375rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.movementIconIn {
+  background: color-mix(in srgb, #22c55e 12%, transparent);
+  color: #16a34a;
+}
+
+.movementIconOut {
+  background: color-mix(in srgb, #ef4444 12%, transparent);
+  color: #dc2626;
+}
+
+.movementDetails {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.movementDesc {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--color-foreground);
+  word-break: break-word;
+}
+
+.movementTime {
+  font-size: 0.72rem;
+  color: var(--color-muted-foreground);
+}
+
+.movementAmount {
+  font-size: 0.85rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.emptyMovements {
+  text-align: center;
+  padding: 1rem 0.5rem;
+  color: var(--color-muted-foreground);
+  font-size: 0.8rem;
+}
+
+/* ── Print Layout ── */
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  .printContainer, .printContainer * {
+    visibility: visible;
+  }
+  .printContainer {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 80mm;
+    font-family: monospace;
+    font-size: 11px;
+    line-height: 1.4;
+    padding: 5mm;
+  }
+}
+
+.printContainer {
+  display: none;
+}
+
+

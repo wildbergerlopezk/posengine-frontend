@@ -18,6 +18,15 @@ export interface CashSession {
   totalCashPurchases?: number
   totalCreditPurchases?: number
   totalPurchaseDebtPayments?: number
+  totalManualInflows?: number
+  totalManualOutflows?: number
+  movements?: Array<{
+    id: string
+    amount: number
+    type: 'IN' | 'OUT'
+    description: string
+    createdAt: string
+  }>
   difference?: number
   status: CashSessionStatus
   openedBy: string
@@ -111,6 +120,29 @@ export function useCashSession() {
     [accessToken],
   )
 
+  const addMovement = useCallback(
+    async (amount: number, type: 'IN' | 'OUT', description: string) => {
+      const result = await apiFetch<any>(
+        `${API_BASE}/active/movements`,
+        accessToken!,
+        {
+          method: 'POST',
+          body: JSON.stringify({ amount, type, description }),
+        },
+      )
+      await fetchCurrent()
+      return result
+    },
+    [accessToken, fetchCurrent],
+  )
+
+  const getReport = useCallback(
+    async (sessionId: string) => {
+      return apiFetch<any>(`${API_BASE}/${sessionId}/report`, accessToken!)
+    },
+    [accessToken],
+  )
+
   return {
     session,
     loading,
@@ -118,5 +150,8 @@ export function useCashSession() {
     refresh: fetchCurrent,
     openCash,
     closeCash,
+    addMovement,
+    getReport,
   }
 }
+

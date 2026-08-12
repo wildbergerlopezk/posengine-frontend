@@ -19,6 +19,7 @@ model Tenant {
   customers        Customer[]
   customerPayments CustomerPayment[]
   cashSessions     CashSession[]
+  cashMovements    CashMovement[]
   subscription    Subscription?
   company         Company[]
   internalReceipts InternalReceipt[]

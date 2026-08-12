@@ -1,8 +1,9 @@
-import { ConflictException, Injectable, NotFoundException } from '@nestjs/common'
+import { ConflictException, Injectable, NotFoundException, BadRequestException } from '@nestjs/common'
 import { PrismaService } from '../../prisma/prisma.service'
 import { OpenCashSessionDto } from './dto/open-cash-session.dto'
 import { CloseCashSessionDto } from './dto/close-cash-session.dto'
 import { CashSessionFilterDto } from './dto/cash-session-filter.dto'
+import { CreateCashMovementDto } from './dto/create-cash-movement.dto'
 import { CashSessionStatus, SaleStatus, PaymentMethod, PurchaseStatus, PurchasePaymentType } from '../../generated/prisma/enums'
 
 @Injectable()
@@ -55,6 +56,51 @@ export class CashSessionService {
   async close(tenantId: string, sessionId: string, dto: CloseCashSessionDto) {
     const session = await this.findOpenSession(tenantId, sessionId)
     return this.executeClose(session, dto.closingAmount)
+  }
+
+  // ── Manual Movements ────────────────────────────────────────────────────────
+  async addMovement(tenantId: string, dto: CreateCashMovementDto) {
+    const activeSession = await this.prisma.cashSession.findFirst({
+      where: { tenantId, status: CashSessionStatus.OPEN },
+    })
+
+    if (!activeSession) {
+      throw new BadRequestException('No hay una sesión de caja activa para registrar movimientos.')
+    }
+
+    return this.prisma.cashMovement.create({
+      data: {
+        tenantId,
+        cashSessionId: activeSession.id,
+        amount: dto.amount,
+        type: dto.type,
+        description: dto.description,
+      },
+    })
+  }
+
+  // ── Arqueo/Closing Report ──────────────────────────────────────────────────
+  async getReport(tenantId: string, id: string) {
+    const session = await this.prisma.cashSession.findFirst({
+      where: { id, tenantId },
+    })
+    if (!session) {
+      throw new NotFoundException(`Sesión de caja "${id}" no encontrada`)
+    }
+    const totals = await this.calculateTotals(tenantId, id)
+    
+    const user = await this.prisma.user.findUnique({
+      where: { id: session.openedBy },
+      select: { name: true },
+    })
+
+    return {
+      session: {
+        ...session,
+        openedByName: user?.name || 'Usuario desconocido',
+      },
+      totals,
+    }
   }
 
   // ── FindAll ─────────────────────────────────────────────────────────────────
@@ -139,6 +185,9 @@ export class CashSessionService {
         totalCashPurchases: 0,
         totalCreditPurchases: 0,
         totalPurchaseDebtPayments: 0,
+        totalManualInflows: 0,
+        totalManualOutflows: 0,
+        movements: [],
       }
     }
 
@@ -148,7 +197,10 @@ export class CashSessionService {
       cashPurchasesResult,
       creditPurchasesResult,
       creditSalesResult,
-      purchasePaymentsResult
+      purchasePaymentsResult,
+      inflowsResult,
+      outflowsResult,
+      movementsList
     ] = await Promise.all([
       // 1. Solo ventas en efectivo/tarjeta/transferencia que pertenezcan a esta sesión
       this.prisma.sale.aggregate({
@@ -213,6 +265,32 @@ export class CashSessionService {
         },
         _sum: { amount: true },
       }),
+      // 7. Movimientos manuales de ingreso (IN) en la sesión
+      this.prisma.cashMovement.aggregate({
+        where: {
+          tenantId,
+          cashSessionId: sessionId,
+          type: 'IN',
+        },
+        _sum: { amount: true },
+      }),
+      // 8. Movimientos manuales de egreso (OUT) en la sesión
+      this.prisma.cashMovement.aggregate({
+        where: {
+          tenantId,
+          cashSessionId: sessionId,
+          type: 'OUT',
+        },
+        _sum: { amount: true },
+      }),
+      // 9. Lista de movimientos manuales de la sesión
+      this.prisma.cashMovement.findMany({
+        where: {
+          tenantId,
+          cashSessionId: sessionId,
+        },
+        orderBy: { createdAt: 'desc' },
+      }),
     ])
 
     const totalCashSales = salesResult._sum.total ?? 0
@@ -224,6 +302,9 @@ export class CashSessionService {
     const totalPurchases = totalCashPurchases + totalPurchaseDebtPayments
     const totalCreditPurchases = creditPurchasesResult._sum.total ?? 0
 
+    const totalManualInflows = inflowsResult._sum.amount ?? 0
+    const totalManualOutflows = outflowsResult._sum.amount ?? 0
+
     return {
       totalSales,
       totalPurchases,
@@ -233,15 +314,18 @@ export class CashSessionService {
       totalCashPurchases,
       totalCreditPurchases,
       totalPurchaseDebtPayments,
+      totalManualInflows,
+      totalManualOutflows,
+      movements: movementsList,
     }
   }
 
   private async executeClose(session: any, closingAmount: number) {
-    const { totalSales, totalPurchases } = await this.calculateTotals(
+    const { totalSales, totalPurchases, totalManualInflows, totalManualOutflows } = await this.calculateTotals(
       session.tenantId,
       session.id,
     )
-    const expectedAmount = session.openingAmount + totalSales - totalPurchases
+    const expectedAmount = session.openingAmount + totalSales + totalManualInflows - totalPurchases - totalManualOutflows
     const difference = closingAmount - expectedAmount
 
     return this.prisma.cashSession.update({
@@ -258,3 +342,4 @@ export class CashSessionService {
     })
   }
 }
+

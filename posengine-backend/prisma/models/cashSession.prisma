@@ -24,6 +24,7 @@ model CashSession {
   tenant    Tenant     @relation(fields: [tenantId], references: [id])
   sales     Sale[]
   purchases Purchase[]
+  movements CashMovement[]
 
   @@map("cash_sessions")
 }
