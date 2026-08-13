@@ -16,5 +16,8 @@ model CustomerPayment {
   customer Customer @relation(fields: [customerId], references: [id])
   sale     Sale?    @relation(fields: [saleId], references: [id])
 
+  @@index([tenantId])
+  @@index([customerId])
+  @@index([saleId])
   @@map("customer_payments")
 }

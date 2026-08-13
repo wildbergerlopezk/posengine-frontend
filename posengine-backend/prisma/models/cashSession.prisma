@@ -26,5 +26,6 @@ model CashSession {
   purchases Purchase[]
   movements CashMovement[]
 
+  @@index([tenantId])
   @@map("cash_sessions")
 }

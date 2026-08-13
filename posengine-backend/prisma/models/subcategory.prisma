@@ -12,5 +12,7 @@ model Subcategory {
   products Product[]
 
   @@unique([name, tenantId])
+  @@index([tenantId])
+  @@index([categoryId])
   @@map("subcategories")
 }

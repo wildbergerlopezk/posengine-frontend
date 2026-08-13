@@ -12,5 +12,8 @@ model PurchaseReturnItem {
   product        Product        @relation(fields: [productId], references: [id])
   purchaseItem   PurchaseItem   @relation(fields: [purchaseItemId], references: [id])
 
+  @@index([purchaseReturnId])
+  @@index([productId])
+  @@index([purchaseItemId])
   @@map("purchase_return_items")
 }

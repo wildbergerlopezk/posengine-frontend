@@ -13,6 +13,8 @@ model SaleItem {
 
   //returns SaleReturnItem[]
 
+  @@index([saleId])
+  @@index([productId])
   @@map("sale_items")
 }
 

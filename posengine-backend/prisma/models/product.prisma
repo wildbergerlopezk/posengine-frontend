@@ -38,6 +38,10 @@ model Product {
   @@unique([name, tenantId])
   @@unique([sku, tenantId])
   @@unique([barcode, tenantId])
+  @@index([tenantId])
+  @@index([categoryId])
+  @@index([subcategoryId])
+  @@index([supplierId])
   @@map("products")
 }
 

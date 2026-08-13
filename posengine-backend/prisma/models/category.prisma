@@ -10,5 +10,6 @@ model Category {
   products      Product[]
 
   @@unique([name, tenantId])
+  @@index([tenantId])
   @@map("categories")
 }

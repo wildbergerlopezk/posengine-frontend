@@ -23,6 +23,9 @@ model Sale {
   customerPayments CustomerPayment[]
   internalReceipt  InternalReceipt?
   
+  @@index([tenantId])
+  @@index([cashSessionId])
+  @@index([customerId])
   @@map("sales")
 }
 

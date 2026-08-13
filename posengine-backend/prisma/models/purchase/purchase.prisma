@@ -27,6 +27,9 @@ model Purchase {
   returns PurchaseReturn[]
 
   @@unique([invoiceNumber, tenantId])
+  @@index([tenantId])
+  @@index([supplierId])
+  @@index([cashSessionId])
   @@map("purchases")
 }
 

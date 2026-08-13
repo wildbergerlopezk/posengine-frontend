@@ -15,5 +15,7 @@ model CashMovement {
   tenant      Tenant      @relation(fields: [tenantId], references: [id])
   cashSession CashSession @relation(fields: [cashSessionId], references: [id])
 
+  @@index([tenantId])
+  @@index([cashSessionId])
   @@map("cash_movements")
 }

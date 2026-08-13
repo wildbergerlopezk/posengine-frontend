@@ -29,5 +29,8 @@ model InternalReceipt {
   customer Customer? @relation(fields: [customerId], references: [id])
 
   @@unique([companyId, docNumber])
+  @@index([tenantId])
+  @@index([companyId])
+  @@index([customerId])
   @@map("internal_receipts")
 }

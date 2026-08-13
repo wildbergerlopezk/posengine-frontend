@@ -25,5 +25,6 @@ model Customer {
 
   @@unique([documentNumber, tenantId])
   @@unique([taxId, tenantId])
+  @@index([tenantId])
   @@map("customers")
 }

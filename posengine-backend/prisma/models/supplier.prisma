@@ -15,5 +15,6 @@ model Supplier {
   products  Product[]
 
   @@unique([name, tenantId])
+  @@index([tenantId])
   @@map("suppliers")
 }
