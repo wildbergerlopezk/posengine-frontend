@@ -2,22 +2,16 @@
 
 import { useState, useEffect, useCallback } from "react"
 import { Header } from "@/src/shared/components/Header"
-import {
-  Search, Eye, Package, AlertCircle, Loader2,
-  X, ChevronLeft, ChevronRight, CheckCircle2,
-  XCircle, Calendar, Receipt, Hash, Ban, User, CreditCard,
-  Printer, Plus,
-
-} from "lucide-react"
+import { AlertCircle, X, ChevronLeft, ChevronRight } from "lucide-react"
 import { useAuthStore } from "@/src/features/auth/store/auth.store"
-import { formatCurrency } from "@/src/shared/hooks/useFormatCurrency"
 import { API_BASE_URL } from "@/src/shared/config/api"
 import tableStyles from "@/src/features/products/pages/ProductsPage.module.css"
 import styles from "./SalesHistoryPage.module.css"
+import { SalesFilterBar } from "../components/SalesFilterBar"
+import { SalesHistoryTable } from "../components/SalesHistoryTable"
+import { SaleDetailModal } from "../components/SaleDetailModal"
 
 const API_BASE = API_BASE_URL
-
-// ─── Types ────────────────────────────────────────────────────────────────────
 
 type SaleStatus = "COMPLETED" | "CANCELLED"
 
@@ -52,6 +46,7 @@ interface Sale {
   createdAt: string
   cashSession?: { id: string; openedAt: string; status: string }
   items?: SaleItem[]
+  customerPayments?: Array<{ id: string; amount: number; paymentMethod: string; paymentDate: string }>
 }
 
 interface PaginatedResponse {
@@ -60,34 +55,6 @@ interface PaginatedResponse {
   page: number
   limit: number
 }
-
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-
-const STATUS_CONFIG: Record<SaleStatus, { label: string; icon: React.ReactNode; className: string }> = {
-  COMPLETED: {
-    label: "Completada",
-    icon: <CheckCircle2 size={12} />,
-    className: styles.statusCompleted,
-  },
-  CANCELLED: {
-    label: "Anulada",
-    icon: <XCircle size={12} />,
-    className: styles.statusCancelled,
-  },
-}
-
-function formatDateTime(iso: string) {
-  return new Date(iso).toLocaleString("es-PY", {
-    day: "2-digit", month: "2-digit", year: "numeric",
-    hour: "2-digit", minute: "2-digit", hour12: false,
-  })
-}
-
-function formatQuantity(qty: number, unitType: string) {
-  return unitType === "UNIT" ? String(qty) : qty % 1 === 0 ? String(qty) : qty.toFixed(3)
-}
-
-// ─── Component ────────────────────────────────────────────────────────────────
 
 export function SalesHistoryPage() {
   const { accessToken } = useAuthStore()
@@ -201,6 +168,7 @@ export function SalesHistoryPage() {
     void checkReceipt()
   }, [selectedSale, accessToken])
 
+  // ── Emit Internal Receipt ──────────────────────────────────────────────────
   const handleEmitReceipt = async () => {
     if (!selectedSale || !selectedCompanyId || !accessToken) return
     setEmittingReceipt(true)
@@ -209,57 +177,47 @@ export function SalesHistoryPage() {
         method: "POST",
         headers: authHeaders,
         body: JSON.stringify({
-          companyId: selectedCompanyId,
           saleId: selectedSale.id,
           customerId: selectedSale.customer?.id || undefined,
-        }),
+          companyId: selectedCompanyId,
+        })
       })
-
       if (!res.ok) {
-        const data = await res.json().catch(() => ({}))
-        throw new Error(data.message || "Error al emitir el comprobante interno")
+        const err = await res.json()
+        throw new Error(err.message || "Error al emitir comprobante de control interno")
       }
-
-      const receipt = await res.json()
-      setInternalReceipt(receipt)
-      
-      // Auto print after emitting
-      await handlePrintReceipt(receipt)
-    } catch (err: any) {
-      alert(err.message || "Error al emitir")
+      const data = await res.json()
+      setInternalReceipt(data)
+    } catch (e: any) {
+      alert(e.message || "Error al generar control interno")
     } finally {
       setEmittingReceipt(false)
     }
   }
 
-  const handlePrintReceipt = async (receiptOverride?: any) => {
-    const targetReceipt = receiptOverride || internalReceipt
-    if (!targetReceipt || !accessToken) return
+  // ── Print Receipt PDF ──────────────────────────────────────────────────────
+  const handlePrintReceipt = async () => {
+    if (!internalReceipt || !accessToken) return
     setPrintingReceipt(true)
     try {
-      const res = await fetch(`${API_BASE_URL}/internal-receipts/${targetReceipt.id}/pdf`, {
+      const res = await fetch(`${API_BASE_URL}/internal-receipts/${internalReceipt.id}/pdf`, {
         headers: { Authorization: `Bearer ${accessToken}` },
       })
-      if (!res.ok) throw new Error("No se pudo obtener el PDF del servidor")
+      if (!res.ok) throw new Error("Error al descargar PDF del comprobante")
       const blob = await res.blob()
-      
-      const { printPdfBlob } = await import("@/src/shared/utils/printService")
-      await printPdfBlob(blob, `comprobante-interno-${targetReceipt.docNumber}.pdf`)
-    } catch (err: any) {
-      alert(err.message || "Error al cargar/imprimir PDF")
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement("a")
+      a.href = url
+      a.download = `comprobante-ci-${internalReceipt.docNumber}.pdf`
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+      window.URL.revokeObjectURL(url)
+    } catch (e: any) {
+      alert(e.message || "Error al descargar PDF")
     } finally {
       setPrintingReceipt(false)
     }
-  }
-
-  // ── Helpers ────────────────────────────────────────────────────────────────
-  const hasActiveFilters = statusFilter !== "ALL" || dateFrom || dateTo || search
-
-  const clearFilters = () => {
-    setSearch("")
-    setStatusFilter("ALL")
-    setDateFrom("")
-    setDateTo("")
   }
 
   // ── Open detail modal ──────────────────────────────────────────────────────
@@ -284,15 +242,10 @@ export function SalesHistoryPage() {
     setSelectedSale(null)
     setDetailError(null)
     setCancelError(null)
+    setInternalReceipt(null)
   }
 
-  useEffect(() => {
-    const handler = (e: KeyboardEvent) => { if (e.key === "Escape") closeDetail() }
-    window.addEventListener("keydown", handler)
-    return () => window.removeEventListener("keydown", handler)
-  }, [])
-
-  // ── Cancel sale ────────────────────────────────────────────────────────────
+  // ── Actions ────────────────────────────────────────────────────────────────
   const handleCancel = async () => {
     if (!selectedSale) return
     setCancelling(true)
@@ -315,7 +268,6 @@ export function SalesHistoryPage() {
     }
   }
 
-  // ── Restore / Uncancel sale ────────────────────────────────────────────────
   const handleRestore = async () => {
     if (!selectedSale) return
     setRestoring(true)
@@ -338,19 +290,27 @@ export function SalesHistoryPage() {
     }
   }
 
-  // ── Filtered sales (client-side search by ID) ──────────────────────────────
   const filteredSales = search.trim()
-    ? sales.filter(s => s.id.toLowerCase().includes(search.toLowerCase()))
+    ? sales.filter(s => 
+        s.id.toLowerCase().includes(search.toLowerCase()) ||
+        s.customer?.name.toLowerCase().includes(search.toLowerCase())
+      )
     : sales
 
   const totalPages = Math.ceil(totalItems / LIMIT)
+  const hasActiveFilters = !!(statusFilter !== "ALL" || dateFrom || dateTo)
+
+  const clearFilters = () => {
+    setStatusFilter("ALL")
+    setDateFrom("")
+    setDateTo("")
+  }
 
   return (
     <div className={styles.page}>
       <Header title="Historial de ventas" />
 
       <div className={styles.container}>
-
         {error && (
           <div className={tableStyles.errorBanner}>
             <AlertCircle size={16} />
@@ -361,502 +321,97 @@ export function SalesHistoryPage() {
           </div>
         )}
 
-        {/* ── Filtros ── */}
-        <div className={styles.filtersBar}>
-          <div className={styles.filtersRow}>
-            <div className={styles.searchWrapper}>
-              <Search size={15} className={styles.searchIcon} />
-              <input
-                className={styles.searchInput}
-                placeholder="Buscar por ID de venta…"
-                value={search}
-                onChange={e => setSearch(e.target.value)}
-              />
-              {search && (
-                <button type="button" className={styles.searchClear} onClick={() => setSearch("")}>
-                  <X size={13} />
-                </button>
-              )}
-            </div>
+        <SalesFilterBar
+          search={search}
+          onSearchChange={setSearch}
+          statusFilter={statusFilter}
+          onStatusChange={setStatusFilter}
+          dateFrom={dateFrom}
+          onDateFromChange={setDateFrom}
+          dateTo={dateTo}
+          onDateToChange={setDateTo}
+          onClearFilters={clearFilters}
+          hasActiveFilters={hasActiveFilters}
+        />
 
-            {hasActiveFilters && (
-              <button type="button" className={styles.clearFiltersBtn} onClick={clearFilters}>
-                <X size={13} /> Limpiar filtros
+        <SalesHistoryTable
+          sales={filteredSales}
+          loading={loading}
+          error={error}
+          totalItems={totalItems}
+          onOpenDetail={openDetail}
+        />
+
+        {/* ── Paginación ── */}
+        {!loading && totalPages > 1 && (
+          <div className={styles.paginationCard}>
+            <div className={styles.paginationInfo}>
+              Mostrando página <strong>{page}</strong> de <strong>{totalPages}</strong> ({totalItems} ventas en total)
+            </div>
+            <div className={styles.paginationControls}>
+              <button
+                type="button"
+                className={styles.pageBtn}
+                onClick={() => setPage(p => Math.max(1, p - 1))}
+                disabled={page === 1}
+              >
+                <ChevronLeft size={15} />
               </button>
-            )}
-          </div>
-
-          <div className={styles.filtersRow}>
-            <div className={styles.statusTabs}>
-              {(["ALL", "COMPLETED", "CANCELLED"] as const).map(s => (
-                <button
-                  key={s}
-                  type="button"
-                  className={`${styles.statusTab} ${statusFilter === s ? styles.statusTabActive : ""}`}
-                  onClick={() => setStatusFilter(s)}
-                >
-                  {s === "ALL" ? "Todos" : STATUS_CONFIG[s].label}
-                </button>
-              ))}
-            </div>
-
-            <div className={styles.dateRange}>
-              <input type="date" className={styles.dateInput} value={dateFrom}
-                onChange={e => setDateFrom(e.target.value)} title="Desde" />
-              <span className={styles.dateSeparator}>→</span>
-              <input type="date" className={styles.dateInput} value={dateTo}
-                onChange={e => setDateTo(e.target.value)} title="Hasta" />
-            </div>
-          </div>
-        </div>
-
-        {/* ── Tabla ── */}
-        <div className={tableStyles.tableCard}>
-          <div className={styles.tableToolbar}>
-            <span className={styles.tableTitle}>
-              Ventas <span className={styles.tableCount}>{totalItems}</span>
-            </span>
-          </div>
-
-          <table className={`${tableStyles.table} ${styles.historyTable}`}>
-            <thead className={tableStyles.tableHeader}>
-              <tr>
-                <th className={`${tableStyles.tableHeaderCell} ${styles.headerCellOverride}`} style={{ width: 170 }}>ID Venta</th>
-                <th className={`${tableStyles.tableHeaderCell} ${styles.headerCellOverride}`} style={{ width: 150 }}>Fecha</th>
-                <th className={`${tableStyles.tableHeaderCell} ${styles.headerCellOverride}`} style={{ width: 120 }}>Tipo de venta</th>
-                <th className={`${tableStyles.tableHeaderCell} ${styles.headerCellOverride}`} style={{ width: 180 }}>Cliente</th>
-                <th className={`${tableStyles.tableHeaderCell} ${styles.headerCellOverride}`} style={{ width: 70 }}>Items</th>
-                <th className={`${tableStyles.tableHeaderCell} ${styles.headerCellOverride}`} style={{ width: 110 }}>Estado</th>
-                <th className={`${tableStyles.tableHeaderCell} ${tableStyles.tableHeaderCellRight} ${styles.headerCellOverride}`} style={{ width: 130 }}>Total</th>
-                <th className={`${tableStyles.tableHeaderCell} ${styles.headerCellOverride}`} style={{ width: 60 }} />
-              </tr>
-            </thead>
-            <tbody>
-              {loading ? (
-                <tr><td colSpan={8}>
-                  <div className={tableStyles.emptyState}>
-                    <Loader2 size={28} className={tableStyles.spinner} />
-                  </div>
-                </td></tr>
-              ) : filteredSales.length === 0 ? (
-                <tr><td colSpan={8}>
-                  <div className={tableStyles.emptyState}>
-                    <Package size={36} className={tableStyles.emptyStateIcon} />
-                    <p className={tableStyles.emptyStateTitle}>Sin ventas registradas</p>
-                    <p>No se encontraron ventas con los filtros seleccionados</p>
-                  </div>
-                </td></tr>
-              ) : (
-                filteredSales.map(sale => {
-                  const sc = STATUS_CONFIG[sale.status] ?? STATUS_CONFIG.COMPLETED
-                  return (
-                    <tr key={sale.id} className={tableStyles.tableRow}>
-                      <td className={tableStyles.tableCell}>
-                        <span className={styles.saleIdChip}>#{sale.id.slice(0, 8)}</span>
-                      </td>
-                      <td className={tableStyles.tableCell}>
-                        <span className={styles.dateText}>{formatDateTime(sale.saleDate)}</span>
-                      </td>
-                      <td className={tableStyles.tableCell}>
-                        <span style={{
-                          display: "inline-flex",
-                          alignItems: "center",
-                          padding: "0.25rem 0.6rem",
-                          borderRadius: "9999px",
-                          fontSize: "0.725rem",
-                          fontWeight: 600,
-                          backgroundColor: sale.paymentMethod === "CREDIT" ? "rgba(59, 130, 246, 0.12)" : "rgba(34, 197, 94, 0.12)",
-                          color: sale.paymentMethod === "CREDIT" ? "#3b82f6" : "#22c55e",
-                        }}>
-                          {sale.paymentMethod === "CREDIT" ? "Crédito" : "Contado"}
-                        </span>
-                      </td>
-                      <td className={tableStyles.tableCell}>
-                        <span style={{ fontSize: "0.825rem" }}>
-                          {sale.customer?.name || "Consumidor Final"}
-                        </span>
-                      </td>
-                      <td className={tableStyles.tableCell}>
-                        <span className={styles.itemsCount}>{sale.items?.length ?? "—"}</span>
-                      </td>
-                      <td className={tableStyles.tableCell}>
-                        <span className={`${styles.statusBadge} ${sc.className}`}>
-                          {sc.icon}{sc.label}
-                        </span>
-                      </td>
-                      <td className={`${tableStyles.tableCell} ${tableStyles.tableCellRight}`}>
-                        <strong className={styles.totalAmount}>{formatCurrency(sale.total)}</strong>
-                      </td>
-                      <td className={tableStyles.tableCell}>
-                        <button
-                          type="button"
-                          className={styles.viewBtn}
-                          onClick={() => openDetail(sale)}
-                          title="Ver detalle"
-                        >
-                          <Eye size={14} />
-                        </button>
-                      </td>
-                    </tr>
+              {Array.from({ length: totalPages }, (_, i) => i + 1)
+                .filter(p => p === 1 || p === totalPages || Math.abs(p - page) <= 1)
+                .reduce((acc: (number | string)[], p, i, arr) => {
+                  if (i > 0 && p - (arr[i - 1] as number) > 1) acc.push("...")
+                  acc.push(p)
+                  return acc
+                }, [])
+                .map((p, i) =>
+                  p === "..." ? (
+                    <span key={`dots-${i}`} className={styles.pageDots}>…</span>
+                  ) : (
+                    <button
+                      key={p}
+                      type="button"
+                      className={`${styles.pageBtn} ${page === p ? styles.pageBtnActive : ""}`}
+                      onClick={() => setPage(p as number)}
+                    >
+                      {p}
+                    </button>
                   )
-                })
-              )}
-            </tbody>
-          </table>
-
-          {totalPages > 1 && (
-            <div className={styles.pagination}>
-              <span className={styles.paginationInfo}>
-                Mostrando {(page - 1) * LIMIT + 1}–{Math.min(page * LIMIT, totalItems)} de {totalItems}
-              </span>
-              <div className={styles.paginationControls}>
-                <button type="button" className={styles.pageBtn}
-                  onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}>
-                  <ChevronLeft size={15} />
-                </button>
-                {Array.from({ length: totalPages }, (_, i) => i + 1)
-                  .filter(p => p === 1 || p === totalPages || Math.abs(p - page) <= 1)
-                  .reduce<(number | "...")[]>((acc, p, i, arr) => {
-                    if (i > 0 && p - (arr[i - 1] as number) > 1) acc.push("...")
-                    acc.push(p)
-                    return acc
-                  }, [])
-                  .map((p, i) =>
-                    p === "..." ? (
-                      <span key={`dots-${i}`} className={styles.pageDots}>…</span>
-                    ) : (
-                      <button key={p} type="button"
-                        className={`${styles.pageBtn} ${page === p ? styles.pageBtnActive : ""}`}
-                        onClick={() => setPage(p as number)}
-                      >{p}</button>
-                    )
-                  )}
-                <button type="button" className={styles.pageBtn}
-                  onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages}>
-                  <ChevronRight size={15} />
-                </button>
-              </div>
+                )}
+              <button
+                type="button"
+                className={styles.pageBtn}
+                onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                disabled={page === totalPages}
+              >
+                <ChevronRight size={15} />
+              </button>
             </div>
-          )}
-        </div>
+          </div>
+        )}
       </div>
 
       {/* ── Detail modal ── */}
       {selectedSale && (
-        <div className={tableStyles.modalOverlay} onClick={closeDetail}>
-          <div className={styles.detailModal} onClick={e => e.stopPropagation()}>
-
-            <div className={styles.detailModalHeader}>
-              <div className={styles.detailModalHeaderLeft}>
-                <Receipt size={18} className={styles.detailModalIcon} />
-                <div>
-                  <h2 className={styles.detailModalTitle}>Detalle de venta</h2>
-                  <p className={styles.detailModalSubtitle}>#{selectedSale.id.slice(0, 8)}</p>
-                </div>
-              </div>
-              <button type="button" className={styles.modalCloseBtn} onClick={closeDetail}>
-                <X size={18} />
-              </button>
-            </div>
-
-            <div className={styles.detailModalBody}>
-
-              {/* Info header */}
-              <div className={styles.receiptHeader}>
-                <div className={styles.receiptHeaderGrid}>
-                  <div className={styles.receiptInfoBlock}>
-                    <div className={styles.receiptInfoRow}>
-                      <Hash size={14} className={styles.receiptInfoIcon} />
-                      <div>
-                        <span className={styles.receiptInfoLabel}>ID de venta</span>
-                        <span className={`${styles.receiptInfoValue} ${styles.receiptIdValue}`}>{selectedSale.id}</span>
-                      </div>
-                    </div>
-                  </div>
-                  <div className={styles.receiptInfoBlock}>
-                    <div className={styles.receiptInfoRow}>
-                      <Calendar size={14} className={styles.receiptInfoIcon} />
-                      <div>
-                        <span className={styles.receiptInfoLabel}>Fecha</span>
-                        <span className={styles.receiptInfoValue}>{formatDateTime(selectedSale.saleDate)}</span>
-                      </div>
-                    </div>
-                  </div>
-                  <div className={styles.receiptInfoBlock}>
-                    <div className={styles.receiptInfoRow}>
-                      <CheckCircle2 size={14} className={styles.receiptInfoIcon} />
-                      <div>
-                        <span className={styles.receiptInfoLabel}>Estado</span>
-                        <span className={`${styles.statusBadge} ${STATUS_CONFIG[selectedSale.status]?.className ?? styles.statusCompleted}`}>
-                          {STATUS_CONFIG[selectedSale.status]?.icon}
-                          {STATUS_CONFIG[selectedSale.status]?.label ?? selectedSale.status}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                  <div className={styles.receiptInfoBlock}>
-                    <div className={styles.receiptInfoRow}>
-                      <CreditCard size={14} className={styles.receiptInfoIcon} />
-                      <div>
-                        <span className={styles.receiptInfoLabel}>Método de pago</span>
-                        <span className={styles.receiptInfoValue} style={{ fontWeight: 600, color: selectedSale.paymentMethod === "CREDIT" ? "var(--color-primary)" : "inherit" }}>
-                          {selectedSale.paymentMethod === "CREDIT" ? "Crédito" : selectedSale.paymentMethod === "CASH" ? "Contado (Efectivo)" : selectedSale.paymentMethod === "CARD" ? "Tarjeta" : selectedSale.paymentMethod === "TRANSFER" ? "Transferencia" : selectedSale.paymentMethod}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                  <div className={`${styles.receiptInfoBlock} ${styles.receiptInfoBlockFull}`}>
-                    <div className={styles.receiptInfoRow}>
-                      <User size={14} className={styles.receiptInfoIcon} />
-                      <div>
-                        <span className={styles.receiptInfoLabel}>Cliente asociado</span>
-                        <span className={styles.receiptInfoValue} style={{ fontWeight: 600 }}>
-                          {selectedSale.customer ? (
-                            <>
-                              {selectedSale.customer.name} {selectedSale.customer.documentNumber ? `(CI: ${selectedSale.customer.documentNumber})` : selectedSale.customer.taxId ? `(RUC: ${selectedSale.customer.taxId})` : ""}
-                            </>
-                          ) : (
-                            "Consumidor Final"
-                          )}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                  {selectedSale.paymentMethod === "CREDIT" && (
-                    <div className={`${styles.receiptInfoBlock} ${styles.receiptInfoBlockFull}`}>
-                      <div className={styles.receiptInfoRow}>
-                        <AlertCircle size={14} className={styles.receiptInfoIcon} />
-                        <div>
-                          <span className={styles.receiptInfoLabel}>Saldo pendiente de pago</span>
-                          <span className={styles.receiptInfoValue} style={{ color: selectedSale.remainingBalance > 0 ? "#ef4444" : "#22c55e", fontWeight: 600 }}>
-                            {formatCurrency(selectedSale.remainingBalance)} (Estado: {selectedSale.paymentStatus === "PAID" ? "Pagado" : selectedSale.paymentStatus === "PARTIAL" ? "Parcial" : "Pendiente"})
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                  {selectedSale.notes && (
-                    <div className={`${styles.receiptInfoBlock} ${styles.receiptInfoBlockFull}`}>
-                      <div className={styles.receiptInfoRow}>
-                        <Receipt size={14} className={styles.receiptInfoIcon} />
-                        <div>
-                          <span className={styles.receiptInfoLabel}>Observaciones</span>
-                          <span className={styles.receiptInfoValue}>{selectedSale.notes}</span>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Items */}
-              <div className={styles.receiptItemsSection}>
-                <div className={styles.receiptItemsTitle}>
-                  <Package size={14} />
-                  Productos
-                  {selectedSale.items && (
-                    <span className={styles.receiptItemsCount}>{selectedSale.items.length}</span>
-                  )}
-                </div>
-
-                {loadingDetail ? (
-                  <div className={styles.detailLoading}>
-                    <Loader2 size={22} className={tableStyles.spinner} />
-                    <span>Cargando productos…</span>
-                  </div>
-                ) : detailError ? (
-                  <div className={styles.detailError}>
-                    <AlertCircle size={16} />{detailError}
-                  </div>
-                ) : (
-                  <table className={styles.receiptTable}>
-                    <thead>
-                      <tr>
-                        <th style={{ width: 40 }}>#</th>
-                        <th style={{ width: 120 }}>Código</th>
-                        <th>Descripción</th>
-                        <th style={{ width: 90, textAlign: "right" }}>Cant.</th>
-                        <th style={{ width: 130, textAlign: "right" }}>Precio unit.</th>
-                        <th style={{ width: 130, textAlign: "right" }}>Subtotal</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {(selectedSale.items ?? []).map((item, idx) => (
-                        <tr key={item.id}>
-                          <td className={styles.receiptTableNum}>{idx + 1}</td>
-                          <td>
-                            <span className={styles.codeChip}>
-                              {item.product.barcode || item.product.sku || "—"}
-                            </span>
-                          </td>
-                          <td className={styles.receiptTableName}>
-                            <div>{item.product.name}</div>
-                            {item.priceType && (
-                              <span style={{ fontSize: "0.7rem", color: "var(--color-muted-foreground)", background: "rgba(100, 116, 139, 0.1)", padding: "2px 6px", borderRadius: "4px", display: "inline-block", marginTop: "2px" }}>
-                                {item.priceType === "WHOLESALE" ? "Mayorista" : "Minorista"}
-                              </span>
-                            )}
-                          </td>
-                          <td className={styles.receiptTableRight}>
-                            {formatQuantity(item.quantity, item.product.unitType)}
-                            {item.product.unitType !== "UNIT" && (
-                              <span className={styles.unitLabel}> {item.product.unitType}</span>
-                            )}
-                          </td>
-                          <td className={styles.receiptTableRight}>{formatCurrency(item.unitPrice)}</td>
-                          <td className={`${styles.receiptTableRight} ${styles.receiptTableSubtotal}`}>
-                            {formatCurrency(item.total)}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                )}
-              </div>
-
-              {!loadingDetail && !detailError && (
-                <>
-                  <div className={styles.receiptTotalFooter}>
-                    <div className={styles.receiptTotalDivider} />
-                    <div className={styles.receiptTotalRow}>
-                      <span className={styles.receiptTotalLabel}>TOTAL</span>
-                      <span className={styles.receiptTotalValue}>{formatCurrency(selectedSale.total)}</span>
-                    </div>
-                  </div>
-
-                  {/* Comprobante de Control Interno Section */}
-                  {selectedSale.status === "COMPLETED" && (
-                    <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem", padding: "1rem 1.5rem", borderTop: "1px dashed var(--color-border)", marginTop: "1rem" }}>
-                      <span style={{ fontSize: "0.825rem", color: "var(--color-muted-foreground)", fontWeight: 700, textTransform: "uppercase" }}>
-                        Comprobante de Control Interno
-                      </span>
-                      {checkingReceipt ? (
-                        <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", fontSize: "0.875rem", color: "var(--color-muted-foreground)" }}>
-                          <Loader2 size={14} className={tableStyles.spinner} />
-                          <span>Verificando comprobantes asociados...</span>
-                        </div>
-                      ) : internalReceipt ? (
-                        <div style={{ display: "flex", gap: "0.75rem", alignItems: "center" }}>
-                          <span style={{ fontSize: "0.875rem", color: "var(--color-foreground)" }}>
-                            Nro: <strong>CI-{String(internalReceipt.docNumber).padStart(7, "0")}</strong>
-                          </span>
-                          <button
-                            type="button"
-                            onClick={() => handlePrintReceipt()}
-                            disabled={printingReceipt}
-                            style={{
-                              display: "flex",
-                              alignItems: "center",
-                              gap: "0.375rem",
-                              background: "var(--color-primary)",
-                              color: "var(--color-primary-foreground)",
-                              padding: "0.375rem 0.75rem",
-                              borderRadius: "0.375rem",
-                              fontSize: "0.75rem",
-                              fontWeight: 600,
-                              cursor: "pointer",
-                              border: "none"
-                            }}
-                          >
-                            {printingReceipt ? <Loader2 size={12} className={tableStyles.spinner} /> : <Printer size={12} />}
-                            Imprimir PDF
-                          </button>
-                        </div>
-                      ) : (
-                        <div style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
-                          {companies.length > 0 ? (
-                            <>
-                              <select
-                                value={selectedCompanyId}
-                                onChange={e => setSelectedCompanyId(e.target.value)}
-                                style={{
-                                  height: "2rem",
-                                  borderRadius: "0.375rem",
-                                  border: "1px solid var(--color-border)",
-                                  background: "var(--color-background)",
-                                  color: "var(--color-foreground)",
-                                  padding: "0 0.5rem",
-                                  fontSize: "0.75rem"
-                                }}
-                              >
-                                {companies.map((c: any) => (
-                                  <option key={c.id} value={c.id}>{c.legalName}</option>
-                                ))}
-                              </select>
-                              <button
-                                type="button"
-                                onClick={handleEmitReceipt}
-                                disabled={emittingReceipt}
-                                style={{
-                                  display: "flex",
-                                  alignItems: "center",
-                                  gap: "0.375rem",
-                                  background: "none",
-                                  border: "1px solid var(--color-border)",
-                                  color: "var(--color-foreground)",
-                                  padding: "0.375rem 0.75rem",
-                                  borderRadius: "0.375rem",
-                                  fontSize: "0.75rem",
-                                  fontWeight: 600,
-                                  cursor: "pointer"
-                                }}
-                              >
-                                {emittingReceipt ? <Loader2 size={12} className={tableStyles.spinner} /> : <Plus size={12} />}
-                                Emitir Control Interno
-                              </button>
-                            </>
-                          ) : (
-                            <span style={{ fontSize: "0.75rem", color: "var(--color-muted-foreground)", fontStyle: "italic" }}>
-                              Crea una empresa en la configuración para emitir comprobantes.
-                            </span>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  )}
-
-                  {cancelError && (
-                    <div className={styles.cancelError}>
-                      <AlertCircle size={14} />{cancelError}
-                    </div>
-                  )}
-
-                  {selectedSale.status === "COMPLETED" && (
-                    <div className={styles.modalActions}>
-                      <button
-                        type="button"
-                        className={styles.cancelBtn}
-                        onClick={handleCancel}
-                        disabled={cancelling}
-                      >
-                        {cancelling
-                          ? <><Loader2 size={15} className={tableStyles.spinner} /> Anulando…</>
-                          : <><Ban size={15} /> Anular venta</>
-                        }
-                      </button>
-                    </div>
-                  )}
-
-                  {selectedSale.status === "CANCELLED" && (
-                    <div className={styles.modalActions}>
-                      <button
-                        type="button"
-                        className={styles.restoreBtn}
-                        onClick={handleRestore}
-                        disabled={restoring}
-                      >
-                        {restoring
-                          ? <><Loader2 size={15} className={tableStyles.spinner} /> Restaurando…</>
-                          : <><CheckCircle2 size={15} /> Desanular venta</>
-                        }
-                      </button>
-                    </div>
-                  )}
-                </>
-              )}
-            </div>
-          </div>
-        </div>
+        <SaleDetailModal
+          selectedSale={selectedSale}
+          onClose={closeDetail}
+          loadingDetail={loadingDetail}
+          detailError={detailError}
+          cancelError={cancelError}
+          cancelling={cancelling}
+          restoring={restoring}
+          onCancel={handleCancel}
+          onRestore={handleRestore}
+          internalReceipt={internalReceipt}
+          checkingReceipt={checkingReceipt}
+          companies={companies}
+          selectedCompanyId={selectedCompanyId}
+          emittingReceipt={emittingReceipt}
+          printingReceipt={printingReceipt}
+          onEmitReceipt={handleEmitReceipt}
+          onPrintReceipt={handlePrintReceipt}
+        />
       )}
     </div>
   )

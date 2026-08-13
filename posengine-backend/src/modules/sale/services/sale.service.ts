@@ -182,6 +182,7 @@ export class SaleService {
       where: { id, tenantId },
       include: {
         customer: true,
+        customerPayments: true,
         cashSession: {
           select: { id: true, openedAt: true, closedAt: true, status: true },
         },

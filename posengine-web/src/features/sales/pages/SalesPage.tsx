@@ -3,20 +3,10 @@
 import type React from "react"
 import { useState, useRef, useEffect, useCallback } from "react"
 import { useHydrated } from "@/src/shared/hooks/useHydrated"
-import {
-  Trash2,
-  ShoppingCart,
-  Check,
-  X,
-  AlertCircle,
-  Plus,
-  Loader2,
-  User,
-} from "lucide-react"
+import { AlertCircle, X } from "lucide-react"
 import { Header } from "@/src/shared/components/Header"
 import { ProductSearchModal } from "@/src/shared/components/ProductSearchModal"
 import { CustomerSearchModal } from "@/src/shared/components/CustomerSearchModal"
-import { formatCurrency } from "@/src/shared/hooks/useFormatCurrency"
 import { useRouter } from "next/navigation"
 import { useCashSession } from "@/src/features/cash-session/hooks/useCashSession"
 import { useAuthStore } from "@/src/features/auth/store/auth.store"
@@ -24,19 +14,11 @@ import { API_BASE_URL } from "@/src/shared/config/api"
 import styles from "./SalesPage.module.css"
 import tableStyles from "@/src/features/products/pages/ProductsPage.module.css"
 import { PriceTypeSelectorModal } from "../components/PriceTypeSelectorModal"
-import {
-  Autocomplete,
-  AutocompleteEmpty,
-  AutocompleteInput,
-  AutocompleteItem,
-  AutocompleteList,
-  AutocompletePopup,
-} from "@/components/ui/autocomplete"
+import { SaleItemsTable } from "../components/SaleItemsTable"
+import { SaleConfirmModal } from "../components/SaleConfirmModal"
 
 const API_BASE = API_BASE_URL
 const SALE_STORAGE_KEY = "posengine_sale_draft"
-
-// ─── Tipos ────────────────────────────────────────────────────────────────────
 
 interface Product {
   id: string
@@ -75,17 +57,6 @@ function readApiError(body: unknown): string {
   return "Error en la solicitud"
 }
 
-function isUnitType(unitType: string) {
-  return unitType === "UNIT"
-}
-
-function formatQuantity(qty: number, unitType: string) {
-  if (isUnitType(unitType)) return String(qty)
-  return qty % 1 === 0 ? String(qty) : qty.toFixed(3)
-}
-
-// ─── Componente ───────────────────────────────────────────────────────────────
-
 export function SalesPage() {
   const { accessToken } = useAuthStore()
   const router = useRouter()
@@ -100,11 +71,6 @@ export function SalesPage() {
 
   // ── Items ──────────────────────────────────────────────────────────────────
   const [items, setItems] = useState<SaleItem[]>([])
-
-  // ── Edición inline ─────────────────────────────────────────────────────────
-  const [editingRowIndex, setEditingRowIndex] = useState<number | null>(null)
-  const [editingField, setEditingField] = useState<"quantity" | "unitPrice" | null>(null)
-  const [editingValue, setEditingValue] = useState("")
 
   // ── Modal de productos ─────────────────────────────────────────────────────
   const [showProductModal, setShowProductModal] = useState(false)
@@ -134,7 +100,6 @@ export function SalesPage() {
   const barcodeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   // ── Refs ───────────────────────────────────────────────────────────────────
-  const editingInputRef = useRef<HTMLInputElement>(null)
   const confirmAcceptRef = useRef<HTMLButtonElement>(null)
   const confirmCancelRef = useRef<HTMLButtonElement>(null)
   const amountPaidInputRef = useRef<HTMLInputElement>(null)
@@ -197,8 +162,6 @@ export function SalesPage() {
     }
   }, [showProductModal, fetchProducts])
 
-
-
   // ── Fetch clientes para el punto de venta ───────────────────────────────────
   useEffect(() => {
     if (accessToken) {
@@ -209,67 +172,6 @@ export function SalesPage() {
     }
   }, [accessToken])
 
-  // ── Edición inline ─────────────────────────────────────────────────────────
-  const cancelEdit = useCallback(() => {
-    setEditingRowIndex(null)
-    setEditingField(null)
-    setEditingValue("")
-  }, [])
-
-  const startEdit = useCallback((index: number, field: "quantity" | "unitPrice", current: number) => {
-    setEditingRowIndex(index)
-    setEditingField(field)
-    setEditingValue(String(current))
-  }, [])
-
-  useEffect(() => {
-    if (editingRowIndex !== null && editingField !== null) {
-      const t = setTimeout(() => {
-        editingInputRef.current?.focus()
-        editingInputRef.current?.select()
-      }, 30)
-      return () => clearTimeout(t)
-    }
-  }, [editingRowIndex, editingField])
-
-  const commitEdit = useCallback(() => {
-    if (editingRowIndex === null || editingField === null) return
-    const val = parseFloat(editingValue)
-    if (isNaN(val) || val <= 0) { cancelEdit(); return }
-
-    setItems(prev => prev.map((item, idx) => {
-      if (idx !== editingRowIndex) return item
-
-      if (editingField === "quantity") {
-        const product = item.product
-        // Si es UNIT, forzar entero
-        const qty = isUnitType(product.unitType) ? Math.round(val) : val
-        return { ...item, quantity: qty }
-      }
-
-      if (editingField === "unitPrice") {
-        // No se puede bajar del precio base
-        const safePrice = Math.max(val, item.product.price)
-        return { ...item, unitPrice: safePrice }
-      }
-
-      return item
-    }))
-
-    const targetIndex = editingRowIndex
-    const wasQuantityEdit = editingField === "quantity"
-    cancelEdit()
-
-    if (wasQuantityEdit && targetIndex !== null) {
-      setPriceSelectorIndex(targetIndex)
-    }
-  }, [editingRowIndex, editingField, editingValue, cancelEdit])
-
-  const removeItem = (index: number) => {
-    setItems(prev => prev.filter((_, i) => i !== index))
-    cancelEdit()
-  }
-
   // ── Agregar producto ───────────────────────────────────────────────────────
   const addProduct = useCallback((product: Product) => {
     setShowProductModal(false)
@@ -278,19 +180,13 @@ export function SalesPage() {
     setItems(prev => {
       const existing = prev.findIndex(i => i.product.id === product.id)
       if (existing >= 0) {
-        const newQty = isUnitType(product.unitType)
-          ? prev[existing].quantity + 1
-          : prev[existing].quantity + 1
-        setTimeout(() => startEdit(existing, "quantity", newQty), 50)
         return prev.map((item, idx) =>
-          idx === existing ? { ...item, quantity: newQty } : item
+          idx === existing ? { ...item, quantity: item.quantity + 1 } : item
         )
       }
-      const newIndex = prev.length
-      setTimeout(() => startEdit(newIndex, "quantity", 1), 50)
       return [...prev, { product, quantity: 1, unitPrice: product.price, priceType: "PUBLIC" }]
     })
-  }, [startEdit])
+  }, [])
 
   // ── Barcode scanner ────────────────────────────────────────────────────────
   const handleBarcodeAdd = useCallback(async (code: string) => {
@@ -368,10 +264,8 @@ export function SalesPage() {
       const activeTag = document.activeElement?.tagName
       const isTyping = activeTag === "INPUT" || activeTag === "TEXTAREA"
 
-      // Evitar atajos si el selector de precio está abierto
       if (priceSelectorIndex !== null) return
 
-      // Barcode scanner — solo cuando no hay modal ni edición activa
       if (!showProductModal && !showConfirmModal && !isTyping) {
         if (e.key === "Enter" && barcodeBuffer.trim()) {
           e.preventDefault()
@@ -421,7 +315,7 @@ export function SalesPage() {
     }
     window.addEventListener("keydown", handler)
     return () => window.removeEventListener("keydown", handler)
-  }, [showProductModal, showConfirmModal, barcodeBuffer, barcodeError, items, handleBarcodeAdd, paymentMethod, selectedCustomerId])
+  }, [showProductModal, showConfirmModal, barcodeBuffer, barcodeError, items, handleBarcodeAdd, paymentMethod, selectedCustomerId, priceSelectorIndex])
 
   // ── Confirm modal teclado ──────────────────────────────────────────────────
   useEffect(() => {
@@ -500,8 +394,6 @@ export function SalesPage() {
     }
   }, [showConfirmModal, confirmSelectedBtn])
 
-  // ─────────────────────────────────────────────────────────────────────────────
-
   return (
     <div className={styles.page}>
       <Header title="Nueva venta" />
@@ -521,7 +413,6 @@ export function SalesPage() {
       )}
 
       <div className={styles.container}>
-
         {/* Bloqueo sin caja */}
         {salesDisabled && (
           <div className={styles.blockNotice}>
@@ -547,235 +438,21 @@ export function SalesPage() {
           </div>
         )}
 
-        {/* ══ TABLA DE ITEMS ═══════════════════════════════════════════════════ */}
-        <div className={`${tableStyles.tableCard} ${salesDisabled ? styles.disabledArea : ""}`}>
-
-          {/* Toolbar */}
-          <div className={styles.itemsToolbar}>
-            <span className={styles.itemsTitle}>
-              Productos <span className={styles.itemsCount}>{items.length}</span>
-            </span>
-            <div className={styles.itemsActions}>
-              <span className={styles.shortcutHint}><kbd>F12</kbd> Cobrar</span>
-              <button
-                type="button"
-                className={`${tableStyles.newButton} ${selectedCustomer ? styles.creditModeBtn : styles.cashModeBtn}`}
-                onClick={() => setShowCustomerModal(true)}
-                style={{ marginLeft: 8 }}
-              >
-                Cliente: {selectedCustomer ? selectedCustomer.name : "Consumidor Final"} <kbd className={styles.kbdInline} style={{ marginLeft: 6 }}>F8</kbd>
-              </button>
-              <button
-                type="button"
-                className={`${tableStyles.newButton} ${paymentMethod === "CREDIT" ? styles.creditModeBtn : styles.cashModeBtn}`}
-                onClick={() => setPaymentMethod(prev => prev === "CASH" ? "CREDIT" : "CASH")}
-                style={{ marginLeft: 8 }}
-              >
-                Tipo de venta: {paymentMethod === "CASH" ? "Contado" : "Crédito"} <kbd className={styles.kbdInline} style={{ marginLeft: 6 }}>F9</kbd>
-              </button>
-              <button
-                type="button"
-                className={tableStyles.newButton}
-                onClick={() => setShowProductModal(true)}
-                style={{ marginLeft: 8 }}
-              >
-                <Plus size={15} /> Agregar producto <span className={styles.shortcutHint}><kbd>F2</kbd></span>
-              </button>
-            </div>
-          </div>
-          {paymentMethod === "CREDIT" && selectedCustomer && (selectedCustomer.currentDebt + Math.max(0, total - amountPaid) > selectedCustomer.creditLimit) && (
-            <div className={tableStyles.errorBanner} style={{ marginTop: 8, marginBottom: 8 }}>
-              <AlertCircle size={16} />
-              Límite de crédito superado para {selectedCustomer.name}. Disponible: {formatCurrency(Math.max(0, selectedCustomer.creditLimit - selectedCustomer.currentDebt))}, Requerido: {formatCurrency(Math.max(0, total - amountPaid))}
-            </div>
-          )}
-
-          <table className={tableStyles.table}>
-            <thead className={tableStyles.tableHeader}>
-              <tr>
-                <th className={tableStyles.tableHeaderCell} style={{ width: 40 }}>#</th>
-                <th className={tableStyles.tableHeaderCell} style={{ width: 130 }}>Código</th>
-                <th className={tableStyles.tableHeaderCell}>Descripción</th>
-                <th className={`${tableStyles.tableHeaderCell} ${tableStyles.tableHeaderCellRight}`} style={{ width: 110 }}>Cant.</th>
-                <th className={tableStyles.tableHeaderCell} style={{ width: 100 }}>Venta</th>
-                <th className={tableStyles.tableHeaderCell} style={{ width: 100 }}>Tipo</th>
-                <th className={`${tableStyles.tableHeaderCell} ${tableStyles.tableHeaderCellRight}`} style={{ width: 140 }}>Precio unit.</th>
-                <th className={`${tableStyles.tableHeaderCell} ${tableStyles.tableHeaderCellRight}`} style={{ width: 140 }}>SubTotal</th>
-                <th className={tableStyles.tableHeaderCell} style={{ width: 44 }} />
-              </tr>
-            </thead>
-            <tbody>
-              {items.length === 0 ? (
-                <tr>
-                  <td colSpan={8}>
-                    <div className={tableStyles.emptyState}>
-                      <ShoppingCart size={36} className={tableStyles.emptyStateIcon} />
-                      <p className={tableStyles.emptyStateTitle}>Sin productos</p>
-                      <p>Escaneá un código de barras o presioná <kbd className={styles.kbdInline}>F2</kbd> para buscar</p>
-                    </div>
-                  </td>
-                </tr>
-              ) : (
-                items.map((item, idx) => (
-                  <tr key={item.product.id} className={tableStyles.tableRow}>
-
-                    <td className={tableStyles.tableCell}>
-                      <span className={styles.rowNum}>{idx + 1}</span>
-                    </td>
-
-                    <td className={tableStyles.tableCell}>
-                      <span className={styles.codeChip}>{item.product.barcode || item.product.sku || "—"}</span>
-                    </td>
-
-                    <td className={tableStyles.tableCell}>
-                      <span style={{ fontWeight: 500 }}>{item.product.name}</span>
-                      {item.product.unitType !== "UNIT" && (
-                        <span className={styles.unitBadge}>{item.product.unitType}</span>
-                      )}
-                    </td>
-
-                    {/* Cantidad — editable inline */}
-                    <td className={`${tableStyles.tableCell} ${tableStyles.tableCellRight}`}>
-                      {editingRowIndex === idx && editingField === "quantity" ? (
-                        <input
-                          ref={editingInputRef}
-                          className={styles.inlineInput}
-                          type="number"
-                          value={editingValue}
-                          onChange={e => setEditingValue(e.target.value)}
-                          onKeyDown={e => {
-                            if (e.key === "Enter" || e.key === "Tab") { 
-                              e.preventDefault(); 
-                              e.stopPropagation();
-                              commitEdit();
-                            }
-                            if (e.key === "Escape") cancelEdit()
-                          }}
-                          onBlur={commitEdit}
-                          min={isUnitType(item.product.unitType) ? "1" : "0.001"}
-                          step={isUnitType(item.product.unitType) ? "1" : "0.001"}
-                        />
-                      ) : (
-                        <button
-                          type="button"
-                          className={styles.editableCell}
-                          onClick={() => startEdit(idx, "quantity", item.quantity)}
-                          title="Clic para editar"
-                        >
-                          {formatQuantity(item.quantity, item.product.unitType)}
-                        </button>
-                      )}
-                    </td>
-
-                    {/* Modo de venta (Contado / Crédito) */}
-                    <td className={tableStyles.tableCell}>
-                      <span className={paymentMethod === "CREDIT" ? styles.creditBadgeInline : styles.cashBadgeInline}>
-                        {paymentMethod === "CREDIT" ? "Crédito" : "Contado"}
-                      </span>
-                    </td>
-
-                    <td className={tableStyles.tableCell}>
-                      <button
-                        type="button"
-                        className={`${styles.priceTypeBtn} ${item.priceType === "WHOLESALE" ? styles.priceTypeBtnWholesale : ""}`}
-                        onClick={() => setItems(prev => prev.map((it, i) => {
-                          if (i !== idx) return it
-                          const newType = it.priceType === "PUBLIC" ? "WHOLESALE" : "PUBLIC"
-                          const newPrice = newType === "WHOLESALE" ? it.product.wholesalePrice : it.product.price
-                          return { ...it, priceType: newType, unitPrice: newPrice }
-                        }))}
-                        title="Cambiar tipo de precio (Público/Mayorista)"
-                      >
-                        {item.priceType === "WHOLESALE" ? "Mayorista" : "Público"}
-                      </button>
-                    </td>
-
-                    {/* Precio unitario — editable inline */}
-                    <td className={`${tableStyles.tableCell} ${tableStyles.tableCellRight}`}>
-                      {editingRowIndex === idx && editingField === "unitPrice" ? (
-                        <input
-                          ref={editingInputRef}
-                          className={styles.inlineInput}
-                          type="number"
-                          value={editingValue}
-                          onChange={e => setEditingValue(e.target.value)}
-                          onKeyDown={e => {
-                            if (e.key === "Enter" || e.key === "Tab") { e.preventDefault(); commitEdit() }
-                            if (e.key === "Escape") cancelEdit()
-                          }}
-                          onBlur={commitEdit}
-                          min={item.product.price}
-                          step="any"
-                        />
-                      ) : (
-                        <button
-                          type="button"
-                          className={`${styles.editableCell} ${item.unitPrice > item.product.price ? styles.editableCellModified : ""}`}
-                          onClick={() => startEdit(idx, "unitPrice", item.unitPrice)}
-                          title={`Precio base: ${formatCurrency(item.product.price)}. Clic para modificar (solo se puede subir)`}
-                        >
-                          {formatCurrency(item.unitPrice)}
-                        </button>
-                      )}
-                    </td>
-
-                    <td className={`${tableStyles.tableCell} ${tableStyles.tableCellRight}`}>
-                      <strong>{formatCurrency(item.quantity * item.unitPrice)}</strong>
-                    </td>
-
-                    <td className={tableStyles.tableCell}>
-                      <button
-                        type="button"
-                        className={styles.removeBtn}
-                        onClick={() => removeItem(idx)}
-                        title="Eliminar"
-                      >
-                        <Trash2 size={14} />
-                      </button>
-                    </td>
-
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-
-          {/* Footer totales */}
-          {items.length > 0 && (
-            <div className={styles.tableFooter}>
-              <div className={styles.totalsBlock}>
-                <div className={`${styles.totalRow} ${styles.totalRowFinal}`}>
-                  <span className={styles.totalLabel}>Total</span>
-                  <span className={styles.totalValueFinal}>{formatCurrency(total)}</span>
-                </div>
-              </div>
-              <div className={styles.footerActions}>
-                <button
-                  type="button"
-                  className={tableStyles.cancelButton}
-                  onClick={() => { setItems([]); cancelEdit() }}
-                  disabled={submitting}
-                >
-                  Limpiar
-                </button>
-                <button
-                  type="button"
-                  className={tableStyles.submitButton}
-                  onClick={() => { setShowConfirmModal(true); setConfirmSelectedBtn("accept") }}
-                  disabled={submitting || success}
-                >
-                  {success
-                    ? <><Check size={15} /> Guardado</>
-                    : submitting
-                      ? <><Loader2 size={15} className={tableStyles.spinner} /> Guardando…</>
-                      : <><Check size={15} /> Cobrar <kbd className={styles.kbdWhite}>F12</kbd></>
-                  }
-                </button>
-              </div>
-            </div>
-          )}
-
-        </div>
+        <SaleItemsTable
+          items={items}
+          setItems={setItems}
+          paymentMethod={paymentMethod}
+          onPaymentMethodChange={setPaymentMethod}
+          selectedCustomer={selectedCustomer}
+          onOpenCustomerModal={() => setShowCustomerModal(true)}
+          onOpenProductModal={() => setShowProductModal(true)}
+          total={total}
+          submitting={submitting}
+          success={success}
+          salesDisabled={salesDisabled}
+          onOpenConfirmModal={() => setShowConfirmModal(true)}
+          onTriggerPriceSelector={setPriceSelectorIndex}
+        />
       </div>
 
       {/* ══ MODAL BÚSQUEDA DE PRODUCTOS (F2) ═════════════════════════════════ */}
@@ -784,7 +461,7 @@ export function SalesPage() {
         products={products as any}
         loading={loadingProducts}
         searchValue={productSearch}
-        onSearchChange={(v) => setProductSearch(v)}
+        onSearchChange={setProductSearch}
         onSelect={(p) => addProduct(p as Product)}
         onClose={() => { setShowProductModal(false); setProductSearch("") }}
         priceColumn="price"
@@ -795,7 +472,7 @@ export function SalesPage() {
         open={showCustomerModal}
         customers={customers}
         searchValue={customerSearch}
-        onSearchChange={(v) => setCustomerSearch(v)}
+        onSearchChange={setCustomerSearch}
         onSelect={(c) => {
           setSelectedCustomer(c)
           setSelectedCustomerId(c?.id || "")
@@ -810,85 +487,22 @@ export function SalesPage() {
 
       {/* ══ MODAL CONFIRMAR VENTA ════════════════════════════════════════════ */}
       {showConfirmModal && (
-        <div className={styles.modalOverlay}>
-          <div className={styles.confirmModal}>
-            <div className={styles.confirmIcon}>
-              <AlertCircle size={40} />
-            </div>
-            <h2 className={styles.confirmTitle}>¿Confirmar venta?</h2>
-            <p className={styles.confirmDescription}>
-              Total: <strong>{formatCurrency(total)}</strong>
-            </p>
-            {paymentMethod === "CREDIT" && (
-              <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem", width: "100%", marginBottom: "1rem", textAlign: "left" }}>
-                <div>
-                  <span style={{ fontSize: "0.825rem", color: "var(--color-muted-foreground)", fontWeight: 600, display: "block" }}>
-                    Cliente seleccionado
-                  </span>
-                  <div style={{ fontSize: "1rem", fontWeight: 700, padding: "0.5rem", borderRadius: "0.25rem", background: "var(--color-muted, #f3f4f6)", color: "var(--color-foreground)" }}>
-                    {selectedCustomer ? selectedCustomer.name : "Consumidor Final"}
-                  </div>
-                </div>
-                <div>
-                  <label style={{ fontSize: "0.825rem", color: "var(--color-muted-foreground)", fontWeight: 600, display: "block", marginBottom: "0.25rem" }}>
-                    Monto abonado / Seña (Gs.)
-                  </label>
-                  <input
-                    id="amount-paid-input"
-                    ref={amountPaidInputRef}
-                    type="number"
-                    min="0"
-                    max={total}
-                    value={amountPaid || ""}
-                    onChange={e => setAmountPaid(Number(e.target.value) || 0)}
-                    placeholder="0"
-                    style={{
-                      width: "100%",
-                      height: "2.5rem",
-                      borderRadius: "0.375rem",
-                      border: "1px solid var(--color-border)",
-                      background: "var(--color-background)",
-                      color: "var(--color-foreground)",
-                      padding: "0 0.5rem",
-                      fontSize: "0.875rem"
-                    }}
-                  />
-                </div>
-              </div>
-            )}
-            <div className={styles.confirmButtons}>
-              <button
-                ref={confirmCancelRef}
-                className={`${styles.confirmCancel} ${confirmSelectedBtn === "cancel" ? styles.buttonFocused : ""}`}
-                onClick={() => setShowConfirmModal(false)}
-              >
-                Cancelar
-              </button>
-              <button
-                ref={confirmAcceptRef}
-                className={`${styles.confirmAccept} ${confirmSelectedBtn === "accept" ? styles.buttonFocused : ""}`}
-                disabled={paymentMethod === "CREDIT" && selectedCustomer !== null && (selectedCustomer.currentDebt + Math.max(0, total - amountPaid) > selectedCustomer.creditLimit)}
-                style={{
-                  opacity: (paymentMethod === "CREDIT" && selectedCustomer !== null && (selectedCustomer.currentDebt + Math.max(0, total - amountPaid) > selectedCustomer.creditLimit)) ? 0.5 : 1,
-                  cursor: (paymentMethod === "CREDIT" && selectedCustomer !== null && (selectedCustomer.currentDebt + Math.max(0, total - amountPaid) > selectedCustomer.creditLimit)) ? "not-allowed" : "pointer"
-                }}
-                onClick={() => {
-                  if (paymentMethod === "CREDIT" && !selectedCustomerId) {
-                    alert("Debes seleccionar un cliente para ventas a crédito.")
-                    return
-                  }
-                  setShowConfirmModal(false)
-                  void handleSubmit()
-                }}
-              >
-                Confirmar
-              </button>
-            </div>
-            <div className={styles.confirmHint}>
-              <kbd>←→</kbd> Navegar <kbd>Enter</kbd> Confirmar <kbd>Esc</kbd> Cancelar
-            </div>
-          </div>
-        </div>
+        <SaleConfirmModal
+          total={total}
+          paymentMethod={paymentMethod}
+          selectedCustomer={selectedCustomer}
+          amountPaid={amountPaid}
+          onAmountPaidChange={setAmountPaid}
+          confirmSelectedBtn={confirmSelectedBtn}
+          amountPaidInputRef={amountPaidInputRef}
+          confirmAcceptRef={confirmAcceptRef}
+          confirmCancelRef={confirmCancelRef}
+          onClose={() => setShowConfirmModal(false)}
+          onConfirm={() => {
+            setShowConfirmModal(false)
+            void handleSubmit()
+          }}
+        />
       )}
 
       {/* ══ MODAL BARCODE ERROR ══════════════════════════════════════════════ */}
