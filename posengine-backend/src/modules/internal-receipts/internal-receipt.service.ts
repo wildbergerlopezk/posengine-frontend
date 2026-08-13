@@ -114,15 +114,15 @@ export class InternalReceiptService {
         id: sale.id,
         saleDate: sale.saleDate.toString(),
         status: sale.status,
-        total: sale.total,
+        total: Number(sale.total),
       },
       items: sale.items.map((item: any) => ({
         productName: item.product.name,
         sku: item.product.sku ?? null,
         quantity: item.quantity,
-        unitPrice: item.unitPrice,
+        unitPrice: Number(item.unitPrice),
         priceType: item.priceType,
-        total: item.total,
+        total: Number(item.total),
       })),
     }
 

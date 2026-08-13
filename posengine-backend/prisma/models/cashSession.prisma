@@ -10,12 +10,12 @@ model CashSession {
   openedAt DateTime  @default(now())
   closedAt DateTime?
 
-  openingAmount  Float
-  closingAmount Float?
-  expectedAmount Float?
-  totalSales     Float  @default(0)
-  totalPurchases Float  @default(0)
-  difference     Float?
+  openingAmount  Decimal  @db.Decimal(12, 2)
+  closingAmount  Decimal? @db.Decimal(12, 2)
+  expectedAmount Decimal? @db.Decimal(12, 2)
+  totalSales     Decimal  @db.Decimal(12, 2) @default(0)
+  totalPurchases Decimal  @db.Decimal(12, 2) @default(0)
+  difference     Decimal? @db.Decimal(12, 2)
 
   status      CashSessionStatus @default(OPEN)
 

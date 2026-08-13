@@ -20,13 +20,13 @@ export class CustomerPaymentService {
       throw new NotFoundException(`Cliente con id "${dto.customerId}" no encontrado`)
     }
 
-    if (customer.currentDebt <= 0) {
+    if (Number(customer.currentDebt) <= 0) {
       throw new BadRequestException('Este cliente no tiene deuda pendiente.')
     }
 
-    if (dto.amount > customer.currentDebt) {
+    if (dto.amount > Number(customer.currentDebt)) {
       throw new BadRequestException(
-        `El pago (Gs. ${dto.amount.toLocaleString('es-PY')}) supera la deuda actual del cliente (Gs. ${customer.currentDebt.toLocaleString('es-PY')}).`,
+        `El pago (Gs. ${dto.amount.toLocaleString('es-PY')}) supera la deuda actual del cliente (Gs. ${Number(customer.currentDebt).toLocaleString('es-PY')}).`,
       )
     }
 
@@ -40,12 +40,12 @@ export class CustomerPaymentService {
           `Venta "${dto.saleId}" no encontrada o no pertenece a este cliente`,
         )
       }
-      if (sale.remainingBalance <= 0) {
+      if (Number(sale.remainingBalance) <= 0) {
         throw new BadRequestException('Esta venta ya está totalmente paga.')
       }
-      if (dto.amount > sale.remainingBalance) {
+      if (dto.amount > Number(sale.remainingBalance)) {
         throw new BadRequestException(
-          `El pago (Gs. ${dto.amount.toLocaleString('es-PY')}) supera el saldo pendiente de esta venta (Gs. ${sale.remainingBalance.toLocaleString('es-PY')}).`,
+          `El pago (Gs. ${dto.amount.toLocaleString('es-PY')}) supera el saldo pendiente de esta venta (Gs. ${Number(sale.remainingBalance).toLocaleString('es-PY')}).`,
         )
       }
     }
@@ -68,7 +68,7 @@ export class CustomerPaymentService {
       })
 
       if (sale) {
-        const newRemaining = sale.remainingBalance - dto.amount
+        const newRemaining = Number(sale.remainingBalance) - dto.amount
         await tx.sale.update({
           where: { id: sale.id },
           data: {
@@ -164,7 +164,7 @@ export class CustomerPaymentService {
         name: customer.name,
         creditLimit: customer.creditLimit,
         currentDebt: customer.currentDebt,
-        creditAvailable: Math.max(0, customer.creditLimit - customer.currentDebt),
+        creditAvailable: Math.max(0, Number(customer.creditLimit) - Number(customer.currentDebt)),
       },
       pendingSales,
       payments,
@@ -179,12 +179,12 @@ export class CustomerPaymentService {
     if (!customer) {
       throw new NotFoundException(`Cliente con id "${dto.customerId}" no encontrado`)
     }
-    if (customer.currentDebt <= 0) {
+    if (Number(customer.currentDebt) <= 0) {
       throw new BadRequestException('Este cliente no tiene deuda pendiente.')
     }
-    if (dto.amount > customer.currentDebt) {
+    if (dto.amount > Number(customer.currentDebt)) {
       throw new BadRequestException(
-        `El pago (Gs. ${dto.amount.toLocaleString('es-PY')}) supera la deuda actual del cliente (Gs. ${customer.currentDebt.toLocaleString('es-PY')}).`,
+        `El pago (Gs. ${dto.amount.toLocaleString('es-PY')}) supera la deuda actual del cliente (Gs. ${Number(customer.currentDebt).toLocaleString('es-PY')}).`,
       )
     }
 
@@ -201,7 +201,7 @@ export class CustomerPaymentService {
       for (const sale of pendingSales) {
         if (remainingToDistribute <= 0) break
 
-        const appliedAmount = Math.min(sale.remainingBalance, remainingToDistribute)
+        const appliedAmount = Math.min(Number(sale.remainingBalance), remainingToDistribute)
 
         const payment = await tx.customerPayment.create({
           data: {
@@ -215,7 +215,7 @@ export class CustomerPaymentService {
         })
         paymentsCreated.push(payment)
 
-        const newRemaining = sale.remainingBalance - appliedAmount
+        const newRemaining = Number(sale.remainingBalance) - appliedAmount
         await tx.sale.update({
           where: { id: sale.id },
           data: {
@@ -278,13 +278,13 @@ export class CustomerPaymentService {
       if (payment.saleId) {
         const sale = await tx.sale.findUnique({ where: { id: payment.saleId } })
         if (sale) {
-          const newRemaining = sale.remainingBalance + payment.amount
+          const newRemaining = Number(sale.remainingBalance) + Number(payment.amount)
           await tx.sale.update({
             where: { id: sale.id },
             data: {
               remainingBalance: newRemaining,
               paymentStatus:
-                newRemaining >= sale.total
+                newRemaining >= Number(sale.total)
                   ? PaymentStatus.PENDING
                   : PaymentStatus.PARTIAL,
             },

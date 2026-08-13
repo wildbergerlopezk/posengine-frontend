@@ -22,9 +22,9 @@ model PurchaseDebt {
   tenantId   String
   purchaseId String @unique
 
-  totalAmount Float
-  paidAmount  Float @default(0)
-  balance     Float
+  totalAmount Decimal @db.Decimal(12, 2)
+  paidAmount  Decimal @db.Decimal(12, 2) @default(0)
+  balance     Decimal @db.Decimal(12, 2)
 
   scheduleType PurchaseDebtScheduleType @default(NONE)
   dueDate      DateTime? // solo se usa cuando scheduleType es NONE
@@ -49,8 +49,8 @@ model PurchaseDebtInstallment {
   purchaseDebtId String
 
   number     Int
-  amount     Float
-  paidAmount Float @default(0)
+  amount     Decimal @db.Decimal(12, 2)
+  paidAmount Decimal @db.Decimal(12, 2) @default(0)
   dueDate    DateTime
 
   status PurchaseDebtInstallmentStatus @default(PENDING)
@@ -69,7 +69,7 @@ model PurchaseDebtPayment {
   installmentId  String?
   cashSessionId  String?
 
-  amount      Float
+  amount      Decimal @db.Decimal(12, 2)
   paymentDate DateTime @default(now())
   notes       String?
 

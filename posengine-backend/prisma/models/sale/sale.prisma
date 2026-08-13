@@ -5,13 +5,13 @@ model Sale {
   customerId    String?
 
   saleDate DateTime @default(now())
-  total    Float
+  total    Decimal @db.Decimal(12, 2)
 
   status        SaleStatus    @default(COMPLETED)
   paymentStatus PaymentStatus @default(PAID)
   paymentMethod PaymentMethod @default(CASH)
 
-  remainingBalance Float @default(0)
+  remainingBalance Decimal @db.Decimal(12, 2) @default(0)
 
   createdAt DateTime   @default(now())
   updatedAt DateTime   @updatedAt

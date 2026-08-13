@@ -293,17 +293,17 @@ export class CashSessionService {
       }),
     ])
 
-    const totalCashSales = salesResult._sum.total ?? 0
-    const totalDebtPayments = paymentsResult._sum.amount ?? 0
+    const totalCashSales = Number(salesResult._sum.total ?? 0)
+    const totalDebtPayments = Number(paymentsResult._sum.amount ?? 0)
     const totalSales = totalCashSales + totalDebtPayments
 
-    const totalCashPurchases = cashPurchasesResult._sum.total ?? 0
-    const totalPurchaseDebtPayments = purchasePaymentsResult._sum.amount ?? 0
+    const totalCashPurchases = Number(cashPurchasesResult._sum.total ?? 0)
+    const totalPurchaseDebtPayments = Number(purchasePaymentsResult._sum.amount ?? 0)
     const totalPurchases = totalCashPurchases + totalPurchaseDebtPayments
-    const totalCreditPurchases = creditPurchasesResult._sum.total ?? 0
+    const totalCreditPurchases = Number(creditPurchasesResult._sum.total ?? 0)
 
-    const totalManualInflows = inflowsResult._sum.amount ?? 0
-    const totalManualOutflows = outflowsResult._sum.amount ?? 0
+    const totalManualInflows = Number(inflowsResult._sum.amount ?? 0)
+    const totalManualOutflows = Number(outflowsResult._sum.amount ?? 0)
 
     return {
       totalSales,

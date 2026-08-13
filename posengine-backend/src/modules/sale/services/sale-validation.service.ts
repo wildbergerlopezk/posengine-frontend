@@ -48,11 +48,11 @@ export class SaleValidationService {
         ? product.wholesalePrice
         : product.price
 
-      if (item.unitPrice < basePrice) {
+      if (item.unitPrice < Number(basePrice)) {
         throw new BadRequestException(
           `El precio de "${product.name}" no puede ser menor al precio ${
             item.priceType === PriceType.WHOLESALE ? 'mayorista' : 'público'
-          } (Gs. ${basePrice.toLocaleString('es-PY')}). Recibido: Gs. ${item.unitPrice.toLocaleString('es-PY')}.`,
+          } (Gs. ${Number(basePrice).toLocaleString('es-PY')}). Recibido: Gs. ${item.unitPrice.toLocaleString('es-PY')}.`,
         )
       }
     }

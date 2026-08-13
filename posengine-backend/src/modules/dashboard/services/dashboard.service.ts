@@ -114,7 +114,9 @@ export class DashboardService {
       },
     })
 
-    const weeklySalesData = this.calculateWeeklySales(weeklySalesList)
+    const weeklySalesData = this.calculateWeeklySales(
+      weeklySalesList.map((s) => ({ ...s, total: Number(s.total) })),
+    )
 
     // 6. Category sales data
     const categorySales = await this.prisma.saleItem.findMany({

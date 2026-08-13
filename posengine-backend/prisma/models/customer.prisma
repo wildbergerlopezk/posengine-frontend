@@ -11,8 +11,8 @@ model Customer {
   address String?
 
   creditEnabled Boolean @default(false)
-  creditLimit   Float   @default(0)
-  currentDebt   Float   @default(0)
+  creditLimit   Decimal  @db.Decimal(12, 2) @default(0)
+  currentDebt   Decimal  @db.Decimal(12, 2) @default(0)
 
   isActive  Boolean  @default(true)
   createdAt DateTime @default(now())

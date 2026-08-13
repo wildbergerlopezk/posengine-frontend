@@ -63,7 +63,7 @@ export class PurchaseDebtService {
       if (!debt) throw new NotFoundException('Esta compra no tiene deuda asociada')
       if (debt.status === 'PAID') throw new ConflictException('La deuda ya está totalmente pagada')
       if (debt.status === 'CANCELLED') throw new ConflictException('La deuda está cancelada')
-      if (dto.amount > debt.balance + 0.01) {
+      if (dto.amount > Number(debt.balance) + 0.01) {
         throw new BadRequestException(
           `El pago (${dto.amount}) supera el saldo pendiente (${debt.balance})`,
         )
@@ -81,8 +81,8 @@ export class PurchaseDebtService {
         },
       })
 
-      const newPaid = debt.paidAmount + dto.amount
-      const newBalance = debt.totalAmount - newPaid
+      const newPaid = Number(debt.paidAmount) + dto.amount
+      const newBalance = Number(debt.totalAmount) - newPaid
 
       await tx.purchaseDebt.update({
         where: { id: debt.id },
@@ -97,15 +97,15 @@ export class PurchaseDebtService {
         // pago dirigido a una cuota puntual
         const installment = debt.installments.find((i) => i.id === dto.installmentId)
         if (!installment) throw new NotFoundException('Cuota no encontrada')
-        const instPaid = installment.paidAmount + dto.amount
-        if (instPaid > installment.amount + 0.01) {
+        const instPaid = Number(installment.paidAmount) + dto.amount
+        if (instPaid > Number(installment.amount) + 0.01) {
           throw new BadRequestException('El pago supera el monto de la cuota seleccionada')
         }
         await tx.purchaseDebtInstallment.update({
           where: { id: installment.id },
           data: {
             paidAmount: instPaid,
-            status: instPaid >= installment.amount - 0.01 ? 'PAID' : 'PARTIAL',
+            status: instPaid >= Number(installment.amount) - 0.01 ? 'PAID' : 'PARTIAL',
           },
         })
       } else if (debt.installments.length) {
@@ -113,14 +113,14 @@ export class PurchaseDebtService {
         let remaining = dto.amount
         for (const inst of debt.installments) {
           if (remaining <= 0) break
-          const pending = inst.amount - inst.paidAmount
+          const pending = Number(inst.amount) - Number(inst.paidAmount)
           if (pending <= 0) continue
           const applied = Math.min(pending, remaining)
           await tx.purchaseDebtInstallment.update({
             where: { id: inst.id },
             data: {
-              paidAmount: inst.paidAmount + applied,
-              status: inst.paidAmount + applied >= inst.amount - 0.01 ? 'PAID' : 'PARTIAL',
+              paidAmount: Number(inst.paidAmount) + applied,
+              status: Number(inst.paidAmount) + applied >= Number(inst.amount) - 0.01 ? 'PAID' : 'PARTIAL',
             },
           })
           remaining -= applied

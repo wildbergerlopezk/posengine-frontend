@@ -251,21 +251,21 @@ export class SaleService {
       // Revertir deuda de cliente y anular pagos
       await this.saleCreditService.revertCreditDebtAndPayments(tx, tenantId, sale)
 
-      const collectedAmount = sale.total - sale.remainingBalance
-      const adjustedTotalSales = Math.max(0, sale.cashSession.totalSales - collectedAmount)
+      const collectedAmount = Number(sale.total) - Number(sale.remainingBalance)
+      const adjustedTotalSales = Math.max(0, Number(sale.cashSession.totalSales) - collectedAmount)
       const cashSessionUpdate: Prisma.CashSessionUpdateInput = {
         totalSales: adjustedTotalSales,
       }
 
       if (sale.cashSession.closingAmount !== null) {
         const expectedAmount =
-          sale.cashSession.openingAmount +
+          Number(sale.cashSession.openingAmount) +
           adjustedTotalSales -
-          sale.cashSession.totalPurchases
+          Number(sale.cashSession.totalPurchases)
 
         cashSessionUpdate.expectedAmount = expectedAmount
         cashSessionUpdate.difference =
-          sale.cashSession.closingAmount - expectedAmount
+          Number(sale.cashSession.closingAmount) - expectedAmount
       }
 
       await tx.cashSession.update({
@@ -350,21 +350,21 @@ export class SaleService {
       }
 
       // 5. Ajustar ventas de la sesión de caja
-      const collectedAmount = sale.total - sale.remainingBalance
-      const adjustedTotalSales = sale.cashSession.totalSales + collectedAmount
+      const collectedAmount = Number(sale.total) - Number(sale.remainingBalance)
+      const adjustedTotalSales = Number(sale.cashSession.totalSales) + collectedAmount
       const cashSessionUpdate: Prisma.CashSessionUpdateInput = {
         totalSales: adjustedTotalSales,
       }
 
       if (sale.cashSession.closingAmount !== null) {
         const expectedAmount =
-          sale.cashSession.openingAmount +
+          Number(sale.cashSession.openingAmount) +
           adjustedTotalSales -
-          sale.cashSession.totalPurchases
+          Number(sale.cashSession.totalPurchases)
 
         cashSessionUpdate.expectedAmount = expectedAmount
         cashSessionUpdate.difference =
-          sale.cashSession.closingAmount - expectedAmount
+          Number(sale.cashSession.closingAmount) - expectedAmount
       }
 
       await tx.cashSession.update({

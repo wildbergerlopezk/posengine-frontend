@@ -5,8 +5,8 @@ model PurchaseReturnItem {
   purchaseItemId   String
 
   quantity Float
-  unitCost Float
-  total    Float
+  unitCost Decimal @db.Decimal(12, 2)
+  total    Decimal @db.Decimal(12, 2)
 
   purchaseReturn PurchaseReturn @relation(fields: [purchaseReturnId], references: [id])
   product        Product        @relation(fields: [productId], references: [id])

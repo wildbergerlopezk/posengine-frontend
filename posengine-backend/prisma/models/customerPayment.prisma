@@ -3,7 +3,7 @@ model CustomerPayment {
   tenantId      String
   customerId    String
   saleId        String?
-  amount        Float
+  amount        Decimal       @db.Decimal(12, 2)
   paymentDate   DateTime      @default(now())
   paymentMethod PaymentMethod
   notes         String?

@@ -4,9 +4,9 @@ model SaleItem {
 
   productId String
   quantity  Float
-  unitPrice Float
+  unitPrice Decimal   @db.Decimal(12, 2)
   priceType PriceType @default(PUBLIC)
-  total     Float
+  total     Decimal   @db.Decimal(12, 2)
 
   sale    Sale    @relation(fields: [saleId], references: [id])
   product Product @relation(fields: [productId], references: [id])

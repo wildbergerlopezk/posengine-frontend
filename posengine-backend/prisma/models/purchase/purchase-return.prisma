@@ -9,7 +9,7 @@ model PurchaseReturn {
   reason           String?
   creditNoteNumber String?
 
-  total Float
+  total Decimal @db.Decimal(12, 2)
 
   items PurchaseReturnItem[]
 

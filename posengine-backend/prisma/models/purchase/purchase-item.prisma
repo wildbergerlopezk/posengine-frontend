@@ -4,8 +4,8 @@ model PurchaseItem {
   productId  String
 
   quantity Float
-  unitCost Float
-  total    Float
+  unitCost Decimal @db.Decimal(12, 2)
+  total    Decimal @db.Decimal(12, 2)
 
   purchase    Purchase             @relation(fields: [purchaseId], references: [id])
   product     Product              @relation(fields: [productId], references: [id])

@@ -84,14 +84,14 @@ export class PurchaseReturnService {
         )
       }
 
-      const itemTotal = dtoItem.quantity * purchaseItem.unitCost
+      const itemTotal = dtoItem.quantity * Number(purchaseItem.unitCost)
       returnTotal += itemTotal
 
       returnItemsData.push({
         purchaseItemId: dtoItem.purchaseItemId,
         productId: purchaseItem.productId,
         quantity: dtoItem.quantity,
-        unitCost: purchaseItem.unitCost,
+        unitCost: Number(purchaseItem.unitCost),
         total: itemTotal,
       })
     }

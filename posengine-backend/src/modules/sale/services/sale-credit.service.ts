@@ -36,9 +36,9 @@ export class SaleCreditService {
         throw new BadRequestException('El monto abonado no puede superar el total de la venta.')
       }
 
-      const projectedDebt = customer.currentDebt + remainingBalance
-      if (remainingBalance > 0 && projectedDebt > customer.creditLimit) {
-        const available = Math.max(0, customer.creditLimit - customer.currentDebt)
+      const projectedDebt = Number(customer.currentDebt) + remainingBalance
+      if (remainingBalance > 0 && projectedDebt > Number(customer.creditLimit)) {
+        const available = Math.max(0, Number(customer.creditLimit) - Number(customer.currentDebt))
         throw new BadRequestException(
           `El cliente "${customer.name}" no tiene crédito suficiente. Disponible: Gs. ${available.toLocaleString('es-PY')}, requerido: Gs. ${remainingBalance.toLocaleString('es-PY')}.`,
         )
@@ -124,11 +124,11 @@ export class SaleCreditService {
         if (!customer.isActive) {
           throw new BadRequestException('El cliente asociado está inactivo.')
         }
-        const projectedDebt = customer.currentDebt + sale.remainingBalance
-        if (projectedDebt > customer.creditLimit) {
-          const available = Math.max(0, customer.creditLimit - customer.currentDebt)
+        const projectedDebt = Number(customer.currentDebt) + Number(sale.remainingBalance)
+        if (projectedDebt > Number(customer.creditLimit)) {
+          const available = Math.max(0, Number(customer.creditLimit) - Number(customer.currentDebt))
           throw new BadRequestException(
-            `El cliente "${customer.name}" no tiene crédito suficiente para restaurar la venta. Disponible: Gs. ${available.toLocaleString('es-PY')}, requerido: Gs. ${sale.remainingBalance.toLocaleString('es-PY')}.`,
+            `El cliente "${customer.name}" no tiene crédito suficiente para restaurar la venta. Disponible: Gs. ${available.toLocaleString('es-PY')}, requerido: Gs. ${Number(sale.remainingBalance).toLocaleString('es-PY')}.`,
           )
         }
       }

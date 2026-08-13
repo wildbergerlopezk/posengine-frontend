@@ -11,9 +11,9 @@ model Product {
   barcode     String?
   imageUrl    String?
 
-  price Float
-  wholesalePrice Float @default(0)
-  cost  Float
+  price Decimal @db.Decimal(12, 2)
+  wholesalePrice Decimal @db.Decimal(12, 2) @default(0)
+  cost  Decimal @db.Decimal(12, 2)
 
   stock        Float    @default(0)
   unitType     UnitType @default(UNIT)

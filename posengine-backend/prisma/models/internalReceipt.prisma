@@ -10,7 +10,7 @@ model InternalReceipt {
   // para poder ordenar/buscar "Comprobante Interno Nro X")
   docNumber Int
 
-  total Float
+  total Decimal @db.Decimal(12, 2)
 
   // Foto congelada de company + customer + sale + items al momento
   // de la emisión. Es lo que el frontend usa para pintar el PDF.

@@ -235,7 +235,7 @@ export class PurchaseService {
       )
     }
 
-    if (purchase.debt && purchase.debt.paidAmount > 0) {
+    if (purchase.debt && Number(purchase.debt.paidAmount) > 0) {
       throw new BadRequestException(
         'No se puede cancelar una compra a crédito que ya tiene pagos registrados',
       )
