@@ -151,3 +151,45 @@ export const apiClient = {
   delete: <T>(path: string, options?: RequestOptions) =>
     request<T>(path, { ...options, method: "DELETE" }),
 }
+
+if (typeof window !== "undefined") {
+  const originalFetch = window.fetch
+  window.fetch = async (input, init) => {
+    const url = typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url
+
+    const isApiRequest = url.includes(API_BASE_URL)
+    const isRefreshRequest = url.includes("/auth/refresh")
+    const hasClientHeader =
+      init?.headers &&
+      ((init.headers instanceof Headers && init.headers.has("X-Client-Request")) ||
+        (Array.isArray(init.headers) && init.headers.some(([k]) => k.toLowerCase() === "x-client-request")) ||
+        (typeof init.headers === "object" && (init.headers as Record<string, string>)["X-Client-Request"]))
+
+    if (!isApiRequest || isRefreshRequest || hasClientHeader) {
+      return originalFetch(input, init)
+    }
+
+    const path = url.replace(API_BASE_URL, "")
+    const method = init?.method || "GET"
+    const requestOptions: RequestOptions = {
+      ...init,
+      method,
+    }
+
+    try {
+      const data = await request<any>(path, requestOptions)
+      return new Response(JSON.stringify(data), {
+        status: 200,
+        headers: new Headers({ "Content-Type": "application/json" }),
+      })
+    } catch (error: any) {
+      return new Response(
+        JSON.stringify({ message: error.message || "Error de red" }),
+        {
+          status: 400,
+          headers: new Headers({ "Content-Type": "application/json" }),
+        },
+      )
+    }
+  }
+}
