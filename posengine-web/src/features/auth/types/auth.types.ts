@@ -1,15 +1,8 @@
-export interface LoginCredentials {
-  email: string
-  password: string
-  isRemember?: boolean
-}
+import { components } from "@/src/shared/api/schema"
 
-export interface RegisterCredentials {
-  name: string
-  email: string
-  password: string
-  tenantName: string
-}
+export type LoginCredentials = components["schemas"]["LoginDto"]
+
+export type RegisterCredentials = components["schemas"]["RegisterDto"]
 
 export interface AuthResponse {
   accessToken: string

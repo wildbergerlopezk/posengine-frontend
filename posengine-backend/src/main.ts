@@ -4,7 +4,9 @@ import { ValidationPipe } from '@nestjs/common'
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger'
 import { NestExpressApplication } from '@nestjs/platform-express'
 import { join } from 'path'
+import { writeFileSync } from 'fs'
 import { AllExceptionsFilter } from './common/filters/http-exception.filter'
+import { MailService } from './common/mail/mail.service'
 import { Prisma } from './generated/prisma/client'
 
 // Forzar a que los Decimal de Prisma se serialicen como números en JSON
@@ -43,7 +45,8 @@ async function bootstrap() {
     }),
   )
 
-  app.useGlobalFilters(new AllExceptionsFilter())
+  const mailService = app.get(MailService)
+  app.useGlobalFilters(new AllExceptionsFilter(mailService))
 
   const config = new DocumentBuilder()
     .setTitle('PosEngine API')
@@ -63,6 +66,16 @@ async function bootstrap() {
 
   const document = SwaggerModule.createDocument(app, config)
   SwaggerModule.setup('api', app, document)
+
+  if (process.env.EXPORT_SWAGGER === 'true') {
+    writeFileSync(
+      join(process.cwd(), 'swagger-spec.json'),
+      JSON.stringify(document, null, 2),
+    )
+    console.log('Swagger spec exported successfully to swagger-spec.json')
+    await app.close()
+    process.exit(0)
+  }
 
   const port = Number(process.env.PORT) || 3006
   await app.listen(port, '0.0.0.0')

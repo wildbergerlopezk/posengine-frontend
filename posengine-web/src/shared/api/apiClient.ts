@@ -121,6 +121,14 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
     }
   }
 
+  const contentType = response.headers.get("Content-Type") || ""
+  if (!contentType.includes("application/json")) {
+    if (!response.ok) {
+      throw new Error("Error en la solicitud")
+    }
+    return response as unknown as T
+  }
+
   const data = await response.json().catch(() => null)
 
   if (!response.ok) {
@@ -178,6 +186,9 @@ if (typeof window !== "undefined") {
 
     try {
       const data = await request<any>(path, requestOptions)
+      if (data instanceof Response) {
+        return data
+      }
       return new Response(JSON.stringify(data), {
         status: 200,
         headers: new Headers({ "Content-Type": "application/json" }),

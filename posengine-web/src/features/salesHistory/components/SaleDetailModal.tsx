@@ -294,8 +294,8 @@ export function SaleDetailModal({
                 </div>
               </div>
 
-              {/* Comprobante de Control Interno Section */}
-              {selectedSale.status === "COMPLETED" && (
+              {/* Comprobante de Control Interno Section comentada por desuso */}
+              {/* {selectedSale.status === "COMPLETED" && (
                 <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem", padding: "1rem 1.5rem", borderTop: "1px dashed var(--color-border)", marginTop: "1rem" }}>
                   <span style={{ fontSize: "0.825rem", color: "var(--color-muted-foreground)", fontWeight: 700, textTransform: "uppercase" }}>
                     Comprobante de Control Interno
@@ -369,7 +369,7 @@ export function SaleDetailModal({
                     </div>
                   )}
                 </div>
-              )}
+              )} */}
 
               {cancelError && (
                 <div className={styles.cancelError}>

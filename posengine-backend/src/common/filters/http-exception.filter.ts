@@ -1,9 +1,12 @@
 import { ExceptionFilter, Catch, ArgumentsHost, HttpException, HttpStatus } from '@nestjs/common'
 import { Prisma } from '../../generated/prisma/client'
 import { Response } from 'express'
+import { MailService } from '../mail/mail.service'
 
 @Catch()
 export class AllExceptionsFilter implements ExceptionFilter {
+  constructor(private readonly mailService?: MailService) {}
+
   catch(exception: any, host: ArgumentsHost) {
     const ctx = host.switchToHttp()
     const res = ctx.getResponse<Response>()
@@ -73,6 +76,40 @@ export class AllExceptionsFilter implements ExceptionFilter {
       details ?? (exception?.stack ? exception.stack : String(exception)),
     )
 
+    // Enviar alerta de correo si es un error 500 y MailService está disponible
+    if (status === HttpStatus.INTERNAL_SERVER_ERROR && this.mailService) {
+      try {
+        const request = ctx.getRequest<any>()
+        const url = request.url
+        const method = request.method
+        const body = request.body ? JSON.stringify(sanitizeObject(request.body), null, 2) : 'No body'
+        const headers = request.headers ? JSON.stringify(sanitizeObject(request.headers), null, 2) : 'No headers'
+        const tenantId = request.user?.tenantId || 'No tenant'
+        const userEmail = request.user?.email || 'Invitado'
+        const stack = exception?.stack ? exception.stack : String(exception)
+
+        const html = `
+          <h3>🚨 Error 500 Interno en el Servidor</h3>
+          <p><strong>Ruta:</strong> ${method} ${url}</p>
+          <p><strong>Usuario:</strong> ${userEmail} (Tenant: ${tenantId})</p>
+          <p><strong>Timestamp:</strong> ${new Date().toISOString()}</p>
+          <h4>Mensaje del error:</h4>
+          <pre style="background: #f4f4f4; padding: 10px; border: 1px solid #ddd; font-family: monospace;">${message}</pre>
+          <h4>Stack Trace:</h4>
+          <pre style="background: #f4f4f4; padding: 10px; border: 1px solid #ddd; overflow: auto; max-height: 400px; font-family: monospace;">${stack}</pre>
+          <h4>Request Headers:</h4>
+          <pre style="background: #f4f4f4; padding: 10px; border: 1px solid #ddd; font-family: monospace;">${headers}</pre>
+          <h4>Request Body:</h4>
+          <pre style="background: #f4f4f4; padding: 10px; border: 1px solid #ddd; font-family: monospace;">${body}</pre>
+        `
+
+        this.mailService.sendErrorAlert(`Error 500 en ${method} ${url}`, html)
+          .catch(err => console.error('Error al enviar alerta por correo:', err))
+      } catch (err) {
+        console.error('Error en el filtro al procesar alerta por correo:', err)
+      }
+    }
+
     res.status(status).json({
       success: false,
       code,
@@ -86,4 +123,30 @@ export class AllExceptionsFilter implements ExceptionFilter {
     const entry = Object.entries(HttpStatus).find(([, v]) => v === s)
     return entry ? entry[0] : 'UNKNOWN'
   }
+}
+
+function sanitizeObject(obj: any): any {
+  if (!obj || typeof obj !== 'object') {
+    return obj
+  }
+
+  if (Array.isArray(obj)) {
+    return obj.map(sanitizeObject)
+  }
+
+  const sanitized: any = {}
+  const sensitiveKeys = ['password', 'authorization', 'cookie', 'token', 'refreshtoken', 'accesstoken', 'jwt', 'secret']
+
+  for (const key of Object.keys(obj)) {
+    const lowerKey = key.toLowerCase()
+    if (sensitiveKeys.some(sk => lowerKey.includes(sk))) {
+      sanitized[key] = '[FILTRADO]'
+    } else if (typeof obj[key] === 'object') {
+      sanitized[key] = sanitizeObject(obj[key])
+    } else {
+      sanitized[key] = obj[key]
+    }
+  }
+
+  return sanitized
 }

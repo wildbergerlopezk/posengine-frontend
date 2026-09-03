@@ -65,16 +65,16 @@ const navItems = [
     icon: Wallet,
   },
 
-  {
-    href: "/dashboard/printing",
-    label: "Impresión",
-    icon: Printer,
-    subItems: [
-      { href: "/dashboard/printing/invoices", label: "Facturas", icon: List },
-      { href: "/dashboard/printing/internal-receipts", label: "Control interno", icon: Layers },
-      { href: "/dashboard/printing/labels", label: "Etiquetas", icon: Tag },
-    ],
-  },
+  // {
+  //   href: "/dashboard/printing",
+  //   label: "Impresión",
+  //   icon: Printer,
+  //   subItems: [
+  //     { href: "/dashboard/printing/invoices", label: "Facturas", icon: List },
+  //     { href: "/dashboard/printing/internal-receipts", label: "Control interno", icon: Layers },
+  //     { href: "/dashboard/printing/labels", label: "Etiquetas", icon: Tag },
+  //   ],
+  // },
   { href: "/dashboard/help", label: "Ayuda", icon: HelpCircle },
 ]
 

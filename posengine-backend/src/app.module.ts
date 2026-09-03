@@ -23,6 +23,7 @@ import { SubscriptionModule } from './modules/subscription/subscription.module';
 import { CompanyModule } from './modules/company/company.module';
 import { InternalReceiptModule } from './modules/internal-receipts/internal-receipt.module';
 import { DashboardModule } from './modules/dashboard/dashboard.module';
+import { MailModule } from './common/mail/mail.module';
 
 @Module({
   imports: [
@@ -31,6 +32,7 @@ import { DashboardModule } from './modules/dashboard/dashboard.module';
     PrismaModule,
     UserModule,
     AuthModule,
+    MailModule,
     SubscriptionModule,
     CompanyModule,
     CategoryModule,

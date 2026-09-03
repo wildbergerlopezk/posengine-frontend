@@ -9,11 +9,15 @@ import { Public } from '../../common/decorators/public.decorator';
 import { CurrentUser, type AuthenticatedUser } from '../../common/decorators/current-user.decorator';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
+import { MailService } from '../../common/mail/mail.service';
 
 @ApiTags('Auth')
 @Controller('auth')
 export class AuthController {
-  constructor(private readonly authService: AuthService) { }
+  constructor(
+    private readonly authService: AuthService,
+    private readonly mailService: MailService,
+  ) { }
 
   @Post('login')
   @Public()
@@ -124,5 +128,27 @@ export class AuthController {
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   getProfile(@CurrentUser() user: AuthenticatedUser) {
     return user;
+  }
+
+  @Post('report-frontend-error')
+  @Public()
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Report error from frontend' })
+  async reportFrontendError(
+    @Body() body: { errorMsg: string; stack?: string; url?: string; user?: string; userAgent?: string }
+  ) {
+    const { errorMsg, stack, url, user, userAgent } = body;
+    const html = `
+      <h3>🚨 Error no controlado en el Frontend (Next.js)</h3>
+      <p><strong>Mensaje:</strong> ${errorMsg}</p>
+      <p><strong>URL de pantalla:</strong> ${url || 'Desconocida'}</p>
+      <p><strong>Usuario Activo:</strong> ${user || 'Invitado/No logueado'}</p>
+      <p><strong>Navegador (User-Agent):</strong> ${userAgent || 'Desconocido'}</p>
+      <p><strong>Timestamp:</strong> ${new Date().toISOString()}</p>
+      <h4>Stack Trace (Detalle técnico):</h4>
+      <pre style="background: #f4f4f4; padding: 10px; border: 1px solid #ddd; overflow: auto; max-height: 400px; font-family: monospace;">${stack || 'Sin stack trace disponible'}</pre>
+    `;
+    await this.mailService.sendErrorAlert(`Error en pantalla: ${errorMsg}`, html);
+    return { success: true };
   }
 }

@@ -1,0 +1,4614 @@
+{
+  "openapi": "3.0.0",
+  "paths": {
+    "/": {
+      "get": {
+        "operationId": "AppController_getHello",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "App"
+        ]
+      }
+    },
+    "/health": {
+      "get": {
+        "operationId": "AppController_health",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "App"
+        ]
+      }
+    },
+    "/users/{id}": {
+      "get": {
+        "operationId": "UserController_findOne",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "User ID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Get a user by ID",
+        "tags": [
+          "Users"
+        ]
+      },
+      "put": {
+        "operationId": "UserController_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateUserDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Update a user by ID",
+        "tags": [
+          "Users"
+        ]
+      },
+      "delete": {
+        "operationId": "UserController_deactivate",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Deactivate a user by ID",
+        "tags": [
+          "Users"
+        ]
+      }
+    },
+    "/users/{id}/assign-tenant/{tenantId}": {
+      "patch": {
+        "operationId": "UserController_assignTenant",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "tenantId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Assign a tenant to a user",
+        "tags": [
+          "Users"
+        ]
+      }
+    },
+    "/auth/login": {
+      "post": {
+        "operationId": "AuthController_login",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Returns accessToken and user data"
+          },
+          "401": {
+            "description": "Invalid credentials"
+          }
+        },
+        "summary": "Login with email and password",
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
+    "/auth/register": {
+      "post": {
+        "operationId": "AuthController_register",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegisterDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "User and tenant created successfully, returns accessToken and user data"
+          },
+          "409": {
+            "description": "Email or tenant slug already in use"
+          }
+        },
+        "summary": "Register new user with tenant creation",
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
+    "/auth/verify-email": {
+      "get": {
+        "operationId": "AuthController_verifyEmail",
+        "parameters": [
+          {
+            "name": "token",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Verify user email",
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
+    "/auth/resend-verification-email": {
+      "post": {
+        "operationId": "AuthController_resendVerificationEmail",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Verification email sent"
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Resend verification email",
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
+    "/auth/refresh": {
+      "post": {
+        "operationId": "AuthController_refresh",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RefreshTokenDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Returns new accessToken and refreshToken"
+          },
+          "401": {
+            "description": "Invalid or expired refresh token"
+          }
+        },
+        "summary": "Refresh access token using a refresh token",
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
+    "/auth/logout": {
+      "post": {
+        "operationId": "AuthController_logout",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RefreshTokenDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Session closed"
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Logout and revoke refresh token",
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
+    "/auth/logout-all": {
+      "post": {
+        "operationId": "AuthController_logoutAll",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "All sessions closed"
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Logout from all devices by revoking every active refresh token for the current user",
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
+    "/auth/forgot-password": {
+      "post": {
+        "operationId": "AuthController_forgotPassword",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ForgotPasswordDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "If the email exists, reset instructions are sent"
+          }
+        },
+        "summary": "Request password reset email",
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
+    "/auth/reset-password": {
+      "post": {
+        "operationId": "AuthController_resetPassword",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResetPasswordDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Password updated successfully"
+          },
+          "401": {
+            "description": "Invalid or expired token"
+          }
+        },
+        "summary": "Reset password using recovery token",
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
+    "/auth/profile": {
+      "get": {
+        "operationId": "AuthController_getProfile",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Returns current user data"
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Get current user profile",
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
+    "/subscription/me": {
+      "get": {
+        "operationId": "SubscriptionController_getMySubscription",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Devuelve los detalles de la suscripción y el plan"
+          },
+          "401": {
+            "description": "No autorizado"
+          },
+          "404": {
+            "description": "Suscripción no encontrada"
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Obtener la suscripción activa del tenant actual",
+        "tags": [
+          "Subscription"
+        ]
+      }
+    },
+    "/companies": {
+      "post": {
+        "operationId": "CompanyController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateCompanyDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Empresa creada correctamente"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "409": {
+            "description": "Slug o RUC ya existe"
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Crear una nueva empresa",
+        "tags": [
+          "Companies"
+        ]
+      },
+      "get": {
+        "operationId": "CompanyController_findAll",
+        "parameters": [
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 50,
+              "type": "number"
+            }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Lista de empresas"
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Listar empresas del tenant con paginación",
+        "tags": [
+          "Companies"
+        ]
+      }
+    },
+    "/companies/{id}": {
+      "get": {
+        "operationId": "CompanyController_findOne",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Company ID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Empresa encontrada"
+          },
+          "404": {
+            "description": "Empresa no encontrada"
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Obtener empresa por ID",
+        "tags": [
+          "Companies"
+        ]
+      },
+      "patch": {
+        "operationId": "CompanyController_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Company ID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateCompanyDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Empresa actualizada correctamente"
+          },
+          "404": {
+            "description": "Empresa no encontrada"
+          },
+          "409": {
+            "description": "Slug o RUC ya en uso"
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Actualizar empresa por ID",
+        "tags": [
+          "Companies"
+        ]
+      },
+      "delete": {
+        "operationId": "CompanyController_remove",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Company ID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Empresa eliminada/desasociada correctamente"
+          },
+          "404": {
+            "description": "Empresa no encontrada"
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Eliminar/Desasociar empresa por ID",
+        "tags": [
+          "Companies"
+        ]
+      }
+    },
+    "/categories": {
+      "post": {
+        "operationId": "CategoryController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateCategoryDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Category created successfully"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Create a new category",
+        "tags": [
+          "Categories"
+        ]
+      },
+      "get": {
+        "operationId": "CategoryController_findAll",
+        "parameters": [
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 50,
+              "type": "number"
+            }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of categories"
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Get all categories for tenant with pagination",
+        "tags": [
+          "Categories"
+        ]
+      }
+    },
+    "/categories/{id}": {
+      "get": {
+        "operationId": "CategoryController_findOne",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Category ID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Category found"
+          },
+          "404": {
+            "description": "Category not found"
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Get category by ID",
+        "tags": [
+          "Categories"
+        ]
+      },
+      "patch": {
+        "operationId": "CategoryController_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Category ID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateCategoryDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Category updated successfully"
+          },
+          "404": {
+            "description": "Category not found"
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Update category by ID",
+        "tags": [
+          "Categories"
+        ]
+      },
+      "delete": {
+        "operationId": "CategoryController_remove",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Category ID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Category deleted successfully"
+          },
+          "404": {
+            "description": "Category not found"
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Delete category by ID",
+        "tags": [
+          "Categories"
+        ]
+      }
+    },
+    "/subcategories": {
+      "post": {
+        "operationId": "SubcategoryController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateSubcategoryDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Subcategory created successfully"
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Create a new subcategory",
+        "tags": [
+          "Subcategories"
+        ]
+      },
+      "get": {
+        "operationId": "SubcategoryController_findAll",
+        "parameters": [
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 50,
+              "type": "number"
+            }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of subcategories"
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Get all subcategories for tenant with pagination",
+        "tags": [
+          "Subcategories"
+        ]
+      }
+    },
+    "/subcategories/{id}": {
+      "get": {
+        "operationId": "SubcategoryController_findOne",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Subcategory ID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Get subcategory by ID",
+        "tags": [
+          "Subcategories"
+        ]
+      },
+      "patch": {
+        "operationId": "SubcategoryController_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Subcategory ID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateSubcategoryDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Update subcategory by ID",
+        "tags": [
+          "Subcategories"
+        ]
+      },
+      "delete": {
+        "operationId": "SubcategoryController_remove",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Subcategory ID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Delete subcategory by ID",
+        "tags": [
+          "Subcategories"
+        ]
+      }
+    },
+    "/product": {
+      "post": {
+        "operationId": "ProductController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateProductDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Producto creado correctamente"
+          },
+          "404": {
+            "description": "Categoría o subcategoría no encontrada"
+          },
+          "409": {
+            "description": "Nombre, SKU o código de barras ya existe"
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Crear un nuevo producto",
+        "tags": [
+          "Product"
+        ]
+      },
+      "get": {
+        "operationId": "ProductController_findAll",
+        "parameters": [
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 50,
+              "type": "number"
+            }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "description": "Busca en nombre, SKU, código de barras y descripción",
+            "schema": {
+              "example": "cadena",
+              "type": "string"
+            }
+          },
+          {
+            "name": "categoryId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "example": "e0000101",
+              "type": "string"
+            }
+          },
+          {
+            "name": "subcategoryId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "example": "e0000201",
+              "type": "string"
+            }
+          },
+          {
+            "name": "isActive",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "example": true,
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "lowStock",
+            "required": false,
+            "in": "query",
+            "description": "Filtra productos con stock <= stockMinimum",
+            "schema": {
+              "example": true,
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Lista de productos"
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Listar productos con filtros y paginación",
+        "tags": [
+          "Product"
+        ]
+      }
+    },
+    "/product/barcode/{barcode}": {
+      "get": {
+        "operationId": "ProductController_findByBarcode",
+        "parameters": [
+          {
+            "name": "barcode",
+            "required": true,
+            "in": "path",
+            "description": "Código de barras del producto",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Producto encontrado"
+          },
+          "404": {
+            "description": "Producto no encontrado"
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Buscar producto por código de barras (para escáner en caja)",
+        "tags": [
+          "Product"
+        ]
+      }
+    },
+    "/product/{id}": {
+      "get": {
+        "operationId": "ProductController_findOne",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "ID del producto",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Producto encontrado"
+          },
+          "404": {
+            "description": "Producto no encontrado"
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Obtener producto por ID",
+        "tags": [
+          "Product"
+        ]
+      },
+      "patch": {
+        "operationId": "ProductController_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "ID del producto",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateProductDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Producto actualizado correctamente"
+          },
+          "404": {
+            "description": "Producto no encontrado"
+          },
+          "409": {
+            "description": "Nombre, SKU o código de barras ya existe"
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Actualizar producto por ID",
+        "tags": [
+          "Product"
+        ]
+      },
+      "delete": {
+        "operationId": "ProductController_remove",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "ID del producto",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Producto eliminado correctamente"
+          },
+          "404": {
+            "description": "Producto no encontrado"
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Eliminar producto permanentemente",
+        "tags": [
+          "Product"
+        ]
+      }
+    },
+    "/product/{id}/price-history": {
+      "get": {
+        "operationId": "ProductController_findPriceHistory",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Product ID",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "description": "Página actual",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "description": "Cantidad de registros a obtener",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Historial de precios de compra de un producto",
+        "tags": [
+          "Product"
+        ]
+      }
+    },
+    "/product/{id}/deactivate": {
+      "patch": {
+        "operationId": "ProductController_deactivate",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "ID del producto",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Producto desactivado correctamente"
+          },
+          "404": {
+            "description": "Producto no encontrado"
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Desactivar producto (soft delete)",
+        "tags": [
+          "Product"
+        ]
+      }
+    },
+    "/product/{id}/activate": {
+      "patch": {
+        "operationId": "ProductController_activate",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "ID del producto",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Producto activado correctamente"
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Activar producto",
+        "tags": [
+          "Product"
+        ]
+      }
+    },
+    "/stock-movements/manual": {
+      "post": {
+        "description": "Adds or subtracts stock from a product manually. Use positive quantity to add, negative to subtract.",
+        "operationId": "StockMovementController_registerManual",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateManualStockMovementDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Movement registered and stock updated"
+          },
+          "400": {
+            "description": "Invalid type or resulting stock would be negative"
+          },
+          "404": {
+            "description": "Product not found"
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Register a manual stock adjustment",
+        "tags": [
+          "Stock Movements"
+        ]
+      }
+    },
+    "/stock-movements": {
+      "get": {
+        "operationId": "StockMovementController_findAll",
+        "parameters": [
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 50,
+              "type": "number"
+            }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "description": "Buscar por nombre de producto, SKU o notas",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "type",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "INITIAL",
+                "PURCHASE",
+                "SALE",
+                "MANUAL"
+              ]
+            }
+          },
+          {
+            "name": "dateFrom",
+            "required": false,
+            "in": "query",
+            "description": "Fecha desde (ISO 8601)",
+            "schema": {
+              "example": "2025-01-01",
+              "type": "string"
+            }
+          },
+          {
+            "name": "dateTo",
+            "required": false,
+            "in": "query",
+            "description": "Fecha hasta (ISO 8601)",
+            "schema": {
+              "example": "2025-12-31",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Paginated list of stock movements"
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Get all stock movements for tenant with filters",
+        "tags": [
+          "Stock Movements"
+        ]
+      }
+    },
+    "/stock-movements/product/{productId}": {
+      "get": {
+        "operationId": "StockMovementController_findByProduct",
+        "parameters": [
+          {
+            "name": "productId",
+            "required": true,
+            "in": "path",
+            "description": "Product ID",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 50,
+              "type": "number"
+            }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Paginated list of movements for the product"
+          },
+          "404": {
+            "description": "Product not found"
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Get stock movements for a specific product",
+        "tags": [
+          "Stock Movements"
+        ]
+      }
+    },
+    "/upload": {
+      "post": {
+        "description": "Accepts JPEG, PNG or WebP. The image is resized to 800×800 and converted to WebP before being stored in Supabase Storage.",
+        "operationId": "UploadController_upload",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "file"
+                ],
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "format": "binary",
+                    "description": "Image file (JPEG, PNG or WebP, max 5 MB)"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Image uploaded and optimized successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "example": {
+                    "url": "https://xyz.supabase.co/storage/v1/object/public/product-images/1234567890.webp"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "No file provided or invalid format"
+          },
+          "500": {
+            "description": "Supabase storage error"
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Upload a product image",
+        "tags": [
+          "Upload"
+        ]
+      }
+    },
+    "/upload/{filename}": {
+      "delete": {
+        "description": "Removes the file from Supabase Storage by filename (e.g. 1234567890.webp).",
+        "operationId": "UploadController_remove",
+        "parameters": [
+          {
+            "name": "filename",
+            "required": true,
+            "in": "path",
+            "description": "Filename returned by the upload endpoint",
+            "schema": {
+              "example": "1714500000000-123456789.webp",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Image deleted successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "example": {
+                    "deleted": true
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Supabase storage error"
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Delete a product image",
+        "tags": [
+          "Upload"
+        ]
+      }
+    },
+    "/purchases/generate-invoice-number": {
+      "get": {
+        "description": "Called by the frontend with Alt+Q to auto-fill the invoice number field.",
+        "operationId": "PurchaseController_generateInvoiceNumber",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Invoice number generated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "example": {
+                    "invoiceNumber": "001-001-0058689"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Generate a unique invoice number (format: 001-001-XXXXXXX)",
+        "tags": [
+          "Purchases"
+        ]
+      }
+    },
+    "/purchases": {
+      "post": {
+        "operationId": "PurchaseController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreatePurchaseDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Purchase created successfully"
+          },
+          "400": {
+            "description": "Bad request / invalid invoice format"
+          },
+          "409": {
+            "description": "Invoice number already exists"
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Create a new purchase",
+        "tags": [
+          "Purchases"
+        ]
+      },
+      "get": {
+        "operationId": "PurchaseController_findAll",
+        "parameters": [
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 50,
+              "type": "number"
+            }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "description": "Buscar por nro. de factura, nombre o RUC del proveedor",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "supplierId",
+            "required": false,
+            "in": "query",
+            "description": "Filtrar por ID de proveedor",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "RECEIVED",
+                "FULLY_RETURNED",
+                "CANCELLED"
+              ]
+            }
+          },
+          {
+            "name": "paymentType",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "CASH",
+                "CREDIT"
+              ]
+            }
+          },
+          {
+            "name": "dateFrom",
+            "required": false,
+            "in": "query",
+            "description": "Fecha exacta o desde (ISO 8601)",
+            "schema": {
+              "example": "2025-01-01",
+              "type": "string"
+            }
+          },
+          {
+            "name": "dateTo",
+            "required": false,
+            "in": "query",
+            "description": "Fecha hasta (ISO 8601)",
+            "schema": {
+              "example": "2025-12-31",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of purchases"
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Get all purchases for tenant with pagination and filters",
+        "tags": [
+          "Purchases"
+        ]
+      }
+    },
+    "/purchases/{id}": {
+      "get": {
+        "operationId": "PurchaseController_findOne",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Purchase ID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Purchase found"
+          },
+          "404": {
+            "description": "Purchase not found"
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Get purchase by ID",
+        "tags": [
+          "Purchases"
+        ]
+      }
+    },
+    "/purchases/{id}/cancel": {
+      "patch": {
+        "operationId": "PurchaseController_cancel",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Purchase ID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Purchase cancelled successfully"
+          },
+          "409": {
+            "description": "Purchase is already cancelled"
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Cancel a purchase",
+        "tags": [
+          "Purchases"
+        ]
+      }
+    },
+    "/purchases/{id}/debt": {
+      "get": {
+        "operationId": "PurchaseController_getDebt",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Purchase ID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Debt found"
+          },
+          "404": {
+            "description": "Debt not found"
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Get purchase debt by purchase ID",
+        "tags": [
+          "Purchases"
+        ]
+      }
+    },
+    "/purchases/{id}/debt/payments": {
+      "post": {
+        "operationId": "PurchaseController_registerDebtPayment",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Purchase ID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreatePurchaseDebtPaymentDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Payment registered and updated debt returned"
+          },
+          "400": {
+            "description": "Bad request / invalid payment details"
+          },
+          "404": {
+            "description": "Debt / installment not found"
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Register a payment for the purchase debt",
+        "tags": [
+          "Purchases"
+        ]
+      }
+    },
+    "/purchase-returns": {
+      "post": {
+        "operationId": "PurchaseReturnController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreatePurchaseReturnDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Devolución creada, pendiente de confirmación"
+          },
+          "400": {
+            "description": "Unidades ya vendidas o cantidad inválida"
+          },
+          "404": {
+            "description": "Compra o ítem no encontrado"
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Crear una devolución de compra (en estado PENDING)",
+        "tags": [
+          "Purchase Returns"
+        ]
+      },
+      "get": {
+        "operationId": "PurchaseReturnController_findAll",
+        "parameters": [
+          {
+            "name": "purchaseId",
+            "required": false,
+            "in": "query",
+            "description": "Filtrar por compra",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Listar devoluciones del tenant",
+        "tags": [
+          "Purchase Returns"
+        ]
+      }
+    },
+    "/purchase-returns/{id}/confirm": {
+      "patch": {
+        "operationId": "PurchaseReturnController_confirm",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "ID de la devolución",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Devolución confirmada, stock actualizado"
+          },
+          "400": {
+            "description": "Unidades ya vendidas al momento de confirmar"
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Confirmar devolución — descuenta stock y actualiza estado de compra",
+        "tags": [
+          "Purchase Returns"
+        ]
+      }
+    },
+    "/purchase-returns/{id}/cancel": {
+      "patch": {
+        "operationId": "PurchaseReturnController_cancel",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "ID de la devolución",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Devolución cancelada"
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Cancelar una devolución PENDING — sin efecto en stock",
+        "tags": [
+          "Purchase Returns"
+        ]
+      }
+    },
+    "/purchase-returns/{id}": {
+      "get": {
+        "operationId": "PurchaseReturnController_findOne",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "ID de la devolución",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Obtener detalle de una devolución",
+        "tags": [
+          "Purchase Returns"
+        ]
+      }
+    },
+    "/suppliers": {
+      "post": {
+        "operationId": "SupplierController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateSupplierDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Supplier created successfully"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Create a new supplier",
+        "tags": [
+          "Suppliers"
+        ]
+      },
+      "get": {
+        "operationId": "SupplierController_findAll",
+        "parameters": [
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 50,
+              "type": "number"
+            }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "description": "Busca por nombre, RUC, teléfono o dirección",
+            "schema": {
+              "example": "Comercial",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of suppliers"
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Get all suppliers for tenant with pagination and search",
+        "tags": [
+          "Suppliers"
+        ]
+      }
+    },
+    "/suppliers/{id}": {
+      "get": {
+        "operationId": "SupplierController_findOne",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Supplier ID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Supplier found"
+          },
+          "404": {
+            "description": "Supplier not found"
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Get supplier by ID",
+        "tags": [
+          "Suppliers"
+        ]
+      },
+      "patch": {
+        "operationId": "SupplierController_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Supplier ID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateSupplierDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Supplier updated successfully"
+          },
+          "404": {
+            "description": "Supplier not found"
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Update supplier by ID",
+        "tags": [
+          "Suppliers"
+        ]
+      },
+      "delete": {
+        "operationId": "SupplierController_remove",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Supplier ID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Supplier deleted successfully"
+          },
+          "404": {
+            "description": "Supplier not found"
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Delete supplier by ID",
+        "tags": [
+          "Suppliers"
+        ]
+      }
+    },
+    "/sales": {
+      "post": {
+        "operationId": "SaleController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateSaleDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Venta registrada correctamente"
+          },
+          "400": {
+            "description": "Sin caja abierta, stock insuficiente o precio inválido"
+          },
+          "404": {
+            "description": "Producto no encontrado"
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Registrar una nueva venta",
+        "tags": [
+          "Sales"
+        ]
+      },
+      "get": {
+        "operationId": "SaleController_findAll",
+        "parameters": [
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "COMPLETED",
+                "CANCELLED"
+              ]
+            }
+          },
+          {
+            "name": "dateFrom",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "example": "2026-04-01",
+              "type": "string"
+            }
+          },
+          {
+            "name": "dateTo",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "example": "2026-04-30",
+              "type": "string"
+            }
+          },
+          {
+            "name": "cashSessionId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "example": "uuid-cash-session",
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": 20,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Lista de ventas"
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Listar ventas con filtros y paginación",
+        "tags": [
+          "Sales"
+        ]
+      }
+    },
+    "/sales/by-session/{cashSessionId}": {
+      "get": {
+        "operationId": "SaleController_findByCashSession",
+        "parameters": [
+          {
+            "name": "cashSessionId",
+            "required": true,
+            "in": "path",
+            "description": "ID de la sesión de caja",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Ventas de la sesión"
+          },
+          "404": {
+            "description": "Sesión no encontrada"
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Obtener todas las ventas de una sesión de caja",
+        "tags": [
+          "Sales"
+        ]
+      }
+    },
+    "/sales/{id}": {
+      "get": {
+        "operationId": "SaleController_findOne",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "ID de la venta",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Venta encontrada"
+          },
+          "404": {
+            "description": "Venta no encontrada"
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Obtener venta por ID",
+        "tags": [
+          "Sales"
+        ]
+      }
+    },
+    "/sales/{id}/cancel": {
+      "patch": {
+        "operationId": "SaleController_cancel",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "ID de la venta",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Venta anulada correctamente"
+          },
+          "404": {
+            "description": "Venta no encontrada"
+          },
+          "409": {
+            "description": "La venta ya fue anulada"
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Anular una venta",
+        "tags": [
+          "Sales"
+        ]
+      }
+    },
+    "/sales/{id}/uncancel": {
+      "patch": {
+        "operationId": "SaleController_uncancel",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "ID de la venta",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Venta restaurada correctamente"
+          },
+          "404": {
+            "description": "Venta no encontrada"
+          },
+          "409": {
+            "description": "La venta no está anulada"
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Desanular/Restaurar una venta anulada",
+        "tags": [
+          "Sales"
+        ]
+      }
+    },
+    "/customers": {
+      "post": {
+        "operationId": "CustomerController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateCustomerDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Cliente creado correctamente"
+          },
+          "409": {
+            "description": "Número de documento ya existe"
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Crear un nuevo cliente",
+        "tags": [
+          "Customers"
+        ]
+      },
+      "get": {
+        "operationId": "CustomerController_findAll",
+        "parameters": [
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "description": "Busca en nombre, apellido, documento, teléfono, email",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "creditEnabled",
+            "required": false,
+            "in": "query",
+            "description": "Filtrar por clientes con crédito habilitado",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": 20,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Lista de clientes"
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Listar clientes del tenant con paginación y filtros",
+        "tags": [
+          "Customers"
+        ]
+      }
+    },
+    "/customers/{id}": {
+      "get": {
+        "operationId": "CustomerController_findOne",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Customer ID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Cliente encontrado"
+          },
+          "404": {
+            "description": "Cliente no encontrado"
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Obtener cliente por ID",
+        "tags": [
+          "Customers"
+        ]
+      },
+      "patch": {
+        "operationId": "CustomerController_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Customer ID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateCustomerDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Cliente actualizado"
+          },
+          "404": {
+            "description": "Cliente no encontrado"
+          },
+          "409": {
+            "description": "Documento ya en uso"
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Actualizar cliente",
+        "tags": [
+          "Customers"
+        ]
+      },
+      "delete": {
+        "operationId": "CustomerController_remove",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Customer ID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Cliente desactivado"
+          },
+          "404": {
+            "description": "Cliente no encontrado"
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Eliminar cliente (soft delete)",
+        "tags": [
+          "Customers"
+        ]
+      }
+    },
+    "/customer-payments": {
+      "post": {
+        "operationId": "CustomerPaymentController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateCustomerPaymentDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Pago registrado correctamente"
+          },
+          "400": {
+            "description": "Monto inválido o supera la deuda/saldo pendiente"
+          },
+          "404": {
+            "description": "Cliente o venta no encontrada"
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Registrar un pago de un cliente (a cuenta o a una venta puntual)",
+        "tags": [
+          "Customer Payments"
+        ]
+      },
+      "get": {
+        "operationId": "CustomerPaymentController_findAll",
+        "parameters": [
+          {
+            "name": "customerId",
+            "required": false,
+            "in": "query",
+            "description": "Filtrar pagos de un cliente puntual",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "saleId",
+            "required": false,
+            "in": "query",
+            "description": "Filtrar pagos aplicados a una venta puntual",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "dateFrom",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "example": "2026-08-01",
+              "type": "string"
+            }
+          },
+          {
+            "name": "dateTo",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "example": "2026-08-31",
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": 20,
+              "type": "number"
+            }
+          },
+          {
+            "name": "isVoided",
+            "required": false,
+            "in": "query",
+            "description": "Filtrar por pagos anulados o activos",
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Lista de pagos"
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Listar pagos de clientes con filtros y paginación",
+        "tags": [
+          "Customer Payments"
+        ]
+      }
+    },
+    "/customer-payments/by-customer/{customerId}": {
+      "get": {
+        "operationId": "CustomerPaymentController_findByCustomer",
+        "parameters": [
+          {
+            "name": "customerId",
+            "required": true,
+            "in": "path",
+            "description": "Customer ID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Estado de cuenta del cliente"
+          },
+          "404": {
+            "description": "Cliente no encontrado"
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Estado de cuenta de un cliente: deuda, ventas pendientes e historial de pagos",
+        "tags": [
+          "Customer Payments"
+        ]
+      }
+    },
+    "/customer-payments/{id}": {
+      "get": {
+        "operationId": "CustomerPaymentController_findOne",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Payment ID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Pago encontrado"
+          },
+          "404": {
+            "description": "Pago no encontrado"
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Obtener pago por ID",
+        "tags": [
+          "Customer Payments"
+        ]
+      }
+    },
+    "/customer-payments/pay-to-account": {
+      "post": {
+        "operationId": "CustomerPaymentController_payToAccount",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PayToAccountDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Pago aplicado y distribuido correctamente"
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Registrar un pago a cuenta, distribuido automáticamente entre las ventas pendientes más antiguas (FIFO)",
+        "tags": [
+          "Customer Payments"
+        ]
+      }
+    },
+    "/customer-payments/{id}/void": {
+      "post": {
+        "operationId": "CustomerPaymentController_voidPayment",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Payment ID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VoidPaymentDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Pago anulado correctamente"
+          },
+          "400": {
+            "description": "El pago ya estaba anulado"
+          },
+          "404": {
+            "description": "Pago no encontrado"
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Anular un pago (revierte deuda del cliente y saldo de la venta asociada)",
+        "tags": [
+          "Customer Payments"
+        ]
+      }
+    },
+    "/cash-sessions/active/movements": {
+      "post": {
+        "operationId": "CashSessionController_addMovement",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateCashMovementDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Movimiento registrado correctamente"
+          },
+          "400": {
+            "description": "No hay una sesión de caja activa"
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Registrar un movimiento manual de caja",
+        "tags": [
+          "Cash Sessions"
+        ]
+      }
+    },
+    "/cash-sessions/open": {
+      "post": {
+        "operationId": "CashSessionController_open",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OpenCashSessionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Sesión de caja abierta correctamente"
+          },
+          "409": {
+            "description": "Ya existe una sesión abierta"
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Abrir una nueva sesión de caja",
+        "tags": [
+          "Cash Sessions"
+        ]
+      }
+    },
+    "/cash-sessions/current": {
+      "get": {
+        "operationId": "CashSessionController_getCurrent",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Sesión actual (o null si no hay)"
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Obtener la sesión de caja actualmente abierta",
+        "tags": [
+          "Cash Sessions"
+        ]
+      }
+    },
+    "/cash-sessions/{id}/close": {
+      "post": {
+        "operationId": "CashSessionController_close",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Cash Session ID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CloseCashSessionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Sesión cerrada correctamente"
+          },
+          "404": {
+            "description": "Sesión no encontrada"
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Cerrar una sesión de caja",
+        "tags": [
+          "Cash Sessions"
+        ]
+      }
+    },
+    "/cash-sessions": {
+      "get": {
+        "operationId": "CashSessionController_findAll",
+        "parameters": [
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "OPEN",
+                "CLOSED"
+              ]
+            }
+          },
+          {
+            "name": "dateFrom",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "example": "2026-04-01",
+              "type": "string"
+            }
+          },
+          {
+            "name": "dateTo",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "example": "2026-04-30",
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": 20,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Lista de sesiones de caja"
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Listar sesiones de caja con paginación y filtros",
+        "tags": [
+          "Cash Sessions"
+        ]
+      }
+    },
+    "/cash-sessions/history": {
+      "get": {
+        "operationId": "CashSessionController_getHistory",
+        "parameters": [
+          {
+            "name": "year",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "month",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Historial mensual de sesiones"
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Obtener historial mensual de sesiones de caja",
+        "tags": [
+          "Cash Sessions"
+        ]
+      }
+    },
+    "/cash-sessions/{id}/report": {
+      "get": {
+        "operationId": "CashSessionController_getReport",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Cash Session ID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Reporte generado"
+          },
+          "404": {
+            "description": "Sesión no encontrada"
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Obtener reporte detallado de arqueo de caja",
+        "tags": [
+          "Cash Sessions"
+        ]
+      }
+    },
+    "/cash-sessions/{id}": {
+      "get": {
+        "operationId": "CashSessionController_findOne",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Cash Session ID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Sesión encontrada"
+          },
+          "404": {
+            "description": "Sesión no encontrada"
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Obtener sesión de caja por ID",
+        "tags": [
+          "Cash Sessions"
+        ]
+      }
+    },
+    "/internal-receipts": {
+      "post": {
+        "operationId": "InternalReceiptController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateInternalReceiptDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Comprobante emitido correctamente"
+          },
+          "400": {
+            "description": "Venta anulada"
+          },
+          "404": {
+            "description": "Venta, empresa o cliente no encontrado"
+          },
+          "409": {
+            "description": "La venta ya tiene un comprobante emitido"
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Emitir un comprobante de control interno para una venta",
+        "tags": [
+          "Internal Receipts"
+        ]
+      },
+      "get": {
+        "operationId": "InternalReceiptController_findAll",
+        "parameters": [
+          {
+            "name": "companyId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "saleId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "voided",
+            "required": false,
+            "in": "query",
+            "description": "Filtra por comprobantes anulados o no",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "dateFrom",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "example": "2026-07-01",
+              "type": "string"
+            }
+          },
+          {
+            "name": "dateTo",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "example": "2026-07-31",
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": 20,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Lista de comprobantes"
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Listar comprobantes internos con filtros y paginación",
+        "tags": [
+          "Internal Receipts"
+        ]
+      }
+    },
+    "/internal-receipts/{id}": {
+      "get": {
+        "operationId": "InternalReceiptController_findOne",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Internal Receipt ID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Comprobante encontrado"
+          },
+          "404": {
+            "description": "Comprobante no encontrado"
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Obtener un comprobante interno por ID (incluye el snapshot para el PDF)",
+        "tags": [
+          "Internal Receipts"
+        ]
+      },
+      "delete": {
+        "operationId": "InternalReceiptController_remove",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Internal Receipt ID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Comprobante eliminado"
+          },
+          "404": {
+            "description": "Comprobante no encontrado"
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Eliminar completamente un comprobante interno",
+        "tags": [
+          "Internal Receipts"
+        ]
+      }
+    },
+    "/internal-receipts/{id}/pdf": {
+      "get": {
+        "operationId": "InternalReceiptController_downloadPdf",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Internal Receipt ID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Archivo PDF"
+          },
+          "404": {
+            "description": "Comprobante no encontrado"
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Descargar el PDF del comprobante interno",
+        "tags": [
+          "Internal Receipts"
+        ]
+      }
+    },
+    "/internal-receipts/{id}/void": {
+      "patch": {
+        "operationId": "InternalReceiptController_void",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Internal Receipt ID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "reason": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Comprobante anulado"
+          },
+          "404": {
+            "description": "Comprobante no encontrado"
+          },
+          "409": {
+            "description": "El comprobante ya está anulado"
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Anular un comprobante interno (no anula la venta)",
+        "tags": [
+          "Internal Receipts"
+        ]
+      }
+    },
+    "/dashboard/stats": {
+      "get": {
+        "operationId": "DashboardController_getStats",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Estadísticas del dashboard"
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Obtener métricas y estadísticas del dashboard",
+        "tags": [
+          "Dashboard"
+        ]
+      }
+    }
+  },
+  "info": {
+    "title": "PosEngine API",
+    "description": "Documentación de la API",
+    "version": "1.0",
+    "contact": {}
+  },
+  "tags": [],
+  "servers": [],
+  "components": {
+    "securitySchemes": {
+      "access-token": {
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "type": "http",
+        "in": "header",
+        "name": "Authorization"
+      }
+    },
+    "schemas": {
+      "UpdateUserDto": {
+        "type": "object",
+        "properties": {}
+      },
+      "LoginDto": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "description": "Correo electrónico del usuario",
+            "example": "juan.perez@example.com"
+          },
+          "password": {
+            "type": "string",
+            "description": "Contraseña del usuario",
+            "example": "JuanPerez123_"
+          },
+          "isRemember": {
+            "type": "boolean",
+            "description": "Mantener sesión iniciada",
+            "example": true
+          }
+        },
+        "required": [
+          "email",
+          "password"
+        ]
+      },
+      "RegisterDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "example": "Juan Pérez"
+          },
+          "email": {
+            "type": "string",
+            "example": "juan@example.com"
+          },
+          "password": {
+            "type": "string",
+            "example": "Password123!",
+            "minLength": 8
+          },
+          "tenantName": {
+            "type": "string",
+            "example": "Aqua Gestión"
+          }
+        },
+        "required": [
+          "name",
+          "email",
+          "password",
+          "tenantName"
+        ]
+      },
+      "RefreshTokenDto": {
+        "type": "object",
+        "properties": {
+          "refreshToken": {
+            "type": "string",
+            "description": "Refresh token entregado en el login"
+          }
+        },
+        "required": [
+          "refreshToken"
+        ]
+      },
+      "ForgotPasswordDto": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "description": "Correo electrónico del usuario",
+            "example": "usuario@example.com"
+          }
+        },
+        "required": [
+          "email"
+        ]
+      },
+      "ResetPasswordDto": {
+        "type": "object",
+        "properties": {
+          "token": {
+            "type": "string",
+            "description": "Token recibido por correo"
+          },
+          "password": {
+            "type": "string",
+            "description": "Nueva contraseña",
+            "example": "NuevaPassword123!"
+          }
+        },
+        "required": [
+          "token",
+          "password"
+        ]
+      },
+      "CreateCompanyDto": {
+        "type": "object",
+        "properties": {
+          "slug": {
+            "type": "string",
+            "example": "mi-empresa"
+          },
+          "active": {
+            "type": "boolean",
+            "default": true
+          },
+          "legalName": {
+            "type": "string",
+            "example": "Mi Empresa Sociedad Anónima"
+          },
+          "tradeName": {
+            "type": "string",
+            "example": "Mi Empresa"
+          },
+          "taxId": {
+            "type": "string",
+            "example": "80012345-6"
+          },
+          "address": {
+            "type": "string",
+            "example": "Av. España 123"
+          },
+          "city": {
+            "type": "string",
+            "example": "Asunción"
+          },
+          "state": {
+            "type": "string",
+            "example": "Central"
+          },
+          "phone": {
+            "type": "string",
+            "example": "021234567"
+          },
+          "email": {
+            "type": "string",
+            "example": "contacto@miempresa.com"
+          },
+          "economicActivity": {
+            "type": "string",
+            "example": "Venta de productos y servicios"
+          },
+          "emissionPoint": {
+            "type": "string",
+            "example": "001-001",
+            "default": "001-001"
+          },
+          "logoUrl": {
+            "type": "string",
+            "example": "https://miempresa.com/logo.png"
+          },
+          "stampNumber": {
+            "type": "string",
+            "example": "12345678"
+          },
+          "stampStartDate": {
+            "type": "string",
+            "example": "2026-01-01T00:00:00.000Z"
+          }
+        },
+        "required": [
+          "slug",
+          "legalName",
+          "taxId",
+          "address",
+          "city"
+        ]
+      },
+      "UpdateCompanyDto": {
+        "type": "object",
+        "properties": {
+          "slug": {
+            "type": "string",
+            "example": "mi-empresa"
+          },
+          "active": {
+            "type": "boolean",
+            "default": true
+          },
+          "legalName": {
+            "type": "string",
+            "example": "Mi Empresa Sociedad Anónima"
+          },
+          "tradeName": {
+            "type": "string",
+            "example": "Mi Empresa"
+          },
+          "taxId": {
+            "type": "string",
+            "example": "80012345-6"
+          },
+          "address": {
+            "type": "string",
+            "example": "Av. España 123"
+          },
+          "city": {
+            "type": "string",
+            "example": "Asunción"
+          },
+          "state": {
+            "type": "string",
+            "example": "Central"
+          },
+          "phone": {
+            "type": "string",
+            "example": "021234567"
+          },
+          "email": {
+            "type": "string",
+            "example": "contacto@miempresa.com"
+          },
+          "economicActivity": {
+            "type": "string",
+            "example": "Venta de productos y servicios"
+          },
+          "emissionPoint": {
+            "type": "string",
+            "example": "001-001",
+            "default": "001-001"
+          },
+          "logoUrl": {
+            "type": "string",
+            "example": "https://miempresa.com/logo.png"
+          },
+          "stampNumber": {
+            "type": "string",
+            "example": "12345678"
+          },
+          "stampStartDate": {
+            "type": "string",
+            "example": "2026-01-01T00:00:00.000Z"
+          }
+        }
+      },
+      "CreateCategoryDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "example": "Repuestos"
+          }
+        },
+        "required": [
+          "name"
+        ]
+      },
+      "UpdateCategoryDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "example": "Repuestos"
+          }
+        }
+      },
+      "CreateSubcategoryDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "example": "Motocicleta"
+          },
+          "categoryId": {
+            "type": "string",
+            "example": "cat-uuid-here"
+          }
+        },
+        "required": [
+          "name",
+          "categoryId"
+        ]
+      },
+      "UpdateSubcategoryDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "example": "Motocicleta"
+          },
+          "categoryId": {
+            "type": "string",
+            "example": "cat-uuid-here"
+          }
+        }
+      },
+      "CreateProductDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "example": "Cadena 428H x 120 eslabones"
+          },
+          "description": {
+            "type": "string",
+            "example": "Cadena de transmisión para motos 125cc"
+          },
+          "categoryId": {
+            "type": "string",
+            "example": "e0000101"
+          },
+          "subcategoryId": {
+            "type": "string",
+            "example": "e0000201"
+          },
+          "sku": {
+            "type": "string",
+            "example": "REP-00001",
+            "description": "Si no se provee, se genera automáticamente"
+          },
+          "barcode": {
+            "type": "string",
+            "example": "7891234567890"
+          },
+          "imageUrl": {
+            "type": "string",
+            "example": "https://cdn.example.com/products/cadena.jpg"
+          },
+          "price": {
+            "type": "number",
+            "example": 85000
+          },
+          "wholesalePrice": {
+            "type": "number",
+            "example": 80000
+          },
+          "cost": {
+            "type": "number",
+            "example": 60000
+          },
+          "unitType": {
+            "type": "string",
+            "enum": [
+              "UNIT",
+              "KG",
+              "G",
+              "L",
+              "ML",
+              "MG"
+            ],
+            "default": "UNIT",
+            "description": "Unidad de medida del producto. UNIT = enteros, resto = decimales permitidos"
+          },
+          "stock": {
+            "type": "number",
+            "example": 50,
+            "description": "Para UNIT debe ser entero, para KG/L/etc acepta decimales"
+          },
+          "stockMinimum": {
+            "type": "number",
+            "example": 5
+          },
+          "isActive": {
+            "type": "boolean",
+            "example": true,
+            "default": true
+          },
+          "supplierId": {
+            "type": "string",
+            "example": "supplier-uuid"
+          }
+        },
+        "required": [
+          "name",
+          "categoryId",
+          "price"
+        ]
+      },
+      "UpdateProductDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "example": "Cadena 428H x 120 eslabones"
+          },
+          "description": {
+            "type": "string",
+            "example": "Cadena de transmisión para motos 125cc"
+          },
+          "categoryId": {
+            "type": "string",
+            "example": "e0000101"
+          },
+          "subcategoryId": {
+            "type": "string",
+            "example": "e0000201"
+          },
+          "sku": {
+            "type": "string",
+            "example": "REP-00001",
+            "description": "Si no se provee, se genera automáticamente"
+          },
+          "barcode": {
+            "type": "string",
+            "example": "7891234567890"
+          },
+          "imageUrl": {
+            "type": "string",
+            "example": "https://cdn.example.com/products/cadena.jpg"
+          },
+          "price": {
+            "type": "number",
+            "example": 85000
+          },
+          "wholesalePrice": {
+            "type": "number",
+            "example": 80000
+          },
+          "cost": {
+            "type": "number",
+            "example": 60000
+          },
+          "unitType": {
+            "type": "string",
+            "enum": [
+              "UNIT",
+              "KG",
+              "G",
+              "L",
+              "ML",
+              "MG"
+            ],
+            "default": "UNIT",
+            "description": "Unidad de medida del producto. UNIT = enteros, resto = decimales permitidos"
+          },
+          "stock": {
+            "type": "number",
+            "example": 50,
+            "description": "Para UNIT debe ser entero, para KG/L/etc acepta decimales"
+          },
+          "stockMinimum": {
+            "type": "number",
+            "example": 5
+          },
+          "isActive": {
+            "type": "boolean",
+            "example": true,
+            "default": true
+          },
+          "supplierId": {
+            "type": "string",
+            "example": "supplier-uuid"
+          },
+          "stockNotes": {
+            "type": "string",
+            "description": "Motivo del ajuste de stock (solo si stock cambia)"
+          }
+        }
+      },
+      "CreateManualStockMovementDto": {
+        "type": "object",
+        "properties": {
+          "productId": {
+            "type": "string",
+            "description": "Product ID"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "INITIAL",
+              "PURCHASE",
+              "SALE",
+              "MANUAL"
+            ],
+            "description": "Movement type. Only MANUAL is accepted here.",
+            "example": "MANUAL"
+          },
+          "quantity": {
+            "type": "number",
+            "description": "Quantity to add (positive) or subtract (negative)",
+            "example": 10
+          },
+          "notes": {
+            "type": "string",
+            "description": "Reason or note for this movement"
+          }
+        },
+        "required": [
+          "productId",
+          "type",
+          "quantity"
+        ]
+      },
+      "CreatePurchaseItemDto": {
+        "type": "object",
+        "properties": {
+          "productId": {
+            "type": "string",
+            "example": "uuid-producto"
+          },
+          "quantity": {
+            "type": "number",
+            "example": 5
+          },
+          "unitCost": {
+            "type": "number",
+            "example": 15000
+          }
+        },
+        "required": [
+          "productId",
+          "quantity",
+          "unitCost"
+        ]
+      },
+      "CreatePurchaseDebtInstallmentDto": {
+        "type": "object",
+        "properties": {
+          "number": {
+            "type": "number",
+            "example": 1
+          },
+          "amount": {
+            "type": "number",
+            "example": 100000
+          },
+          "dueDate": {
+            "type": "string",
+            "example": "2026-05-01T00:00:00.000Z"
+          }
+        },
+        "required": [
+          "number",
+          "amount",
+          "dueDate"
+        ]
+      },
+      "CreatePurchaseDebtDto": {
+        "type": "object",
+        "properties": {
+          "scheduleType": {
+            "type": "string",
+            "enum": [
+              "NONE",
+              "OWNER_REMINDER",
+              "SUPPLIER_SCHEDULE"
+            ],
+            "example": "NONE"
+          },
+          "dueDate": {
+            "type": "string",
+            "example": "2026-05-01T00:00:00.000Z"
+          },
+          "installments": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CreatePurchaseDebtInstallmentDto"
+            }
+          }
+        },
+        "required": [
+          "scheduleType"
+        ]
+      },
+      "CreatePurchaseDto": {
+        "type": "object",
+        "properties": {
+          "supplierId": {
+            "type": "string",
+            "example": "uuid-del-proveedor"
+          },
+          "invoiceNumber": {
+            "type": "string",
+            "example": "001-001-0058689",
+            "description": "Número de factura en formato 001-001-XXXXXXX"
+          },
+          "purchaseDate": {
+            "type": "string",
+            "example": "2026-04-11T00:00:00.000Z"
+          },
+          "paymentType": {
+            "type": "string",
+            "enum": [
+              "CASH",
+              "CREDIT"
+            ],
+            "example": "CASH"
+          },
+          "total": {
+            "type": "number",
+            "example": 298899
+          },
+          "notes": {
+            "type": "string",
+            "example": "Compra de repuestos para motos"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CreatePurchaseItemDto"
+            }
+          },
+          "debt": {
+            "$ref": "#/components/schemas/CreatePurchaseDebtDto"
+          }
+        },
+        "required": [
+          "supplierId",
+          "invoiceNumber",
+          "purchaseDate",
+          "paymentType",
+          "total",
+          "items"
+        ]
+      },
+      "CreatePurchaseDebtPaymentDto": {
+        "type": "object",
+        "properties": {
+          "amount": {
+            "type": "number",
+            "example": 50000
+          },
+          "paymentDate": {
+            "type": "string",
+            "example": "2026-04-20T00:00:00.000Z"
+          },
+          "cashSessionId": {
+            "type": "string",
+            "description": "Si el pago sale de una sesión de caja abierta"
+          },
+          "installmentId": {
+            "type": "string",
+            "description": "Cuota específica a la que se aplica el pago. Si no se manda, se va completando cuota por cuota en orden (FIFO)"
+          },
+          "notes": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "amount"
+        ]
+      },
+      "CreatePurchaseReturnItemDto": {
+        "type": "object",
+        "properties": {
+          "purchaseItemId": {
+            "type": "string",
+            "description": "ID del ítem original de la compra"
+          },
+          "quantity": {
+            "type": "number",
+            "description": "Cantidad a devolver"
+          }
+        },
+        "required": [
+          "purchaseItemId",
+          "quantity"
+        ]
+      },
+      "CreatePurchaseReturnDto": {
+        "type": "object",
+        "properties": {
+          "purchaseId": {
+            "type": "string",
+            "description": "ID de la compra a devolver"
+          },
+          "returnDate": {
+            "type": "string",
+            "example": "2026-04-24T00:00:00.000Z"
+          },
+          "reason": {
+            "type": "string",
+            "example": "Producto defectuoso"
+          },
+          "creditNoteNumber": {
+            "type": "string",
+            "example": "NC-001-001-0000001"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CreatePurchaseReturnItemDto"
+            }
+          }
+        },
+        "required": [
+          "purchaseId",
+          "returnDate",
+          "items"
+        ]
+      },
+      "CreateSupplierDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "example": "Comercial JK"
+          },
+          "address": {
+            "type": "string",
+            "example": "123 Main St"
+          },
+          "phone": {
+            "type": "string",
+            "example": "+595971123456"
+          },
+          "RUC": {
+            "type": "string",
+            "example": "80012345-6"
+          }
+        },
+        "required": [
+          "name"
+        ]
+      },
+      "UpdateSupplierDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "example": "Comercial JK"
+          },
+          "address": {
+            "type": "string",
+            "example": "123 Main St"
+          },
+          "phone": {
+            "type": "string",
+            "example": "+595971123456"
+          },
+          "RUC": {
+            "type": "string",
+            "example": "80012345-6"
+          }
+        }
+      },
+      "CreateSaleItemDto": {
+        "type": "object",
+        "properties": {
+          "productId": {
+            "type": "string",
+            "example": "uuid-del-producto"
+          },
+          "quantity": {
+            "type": "number",
+            "example": 3,
+            "description": "Cantidad vendida. Para productos por UNIT debe ser entero."
+          },
+          "unitPrice": {
+            "type": "number",
+            "example": 5000,
+            "description": "Precio unitario de venta. No puede ser menor al precio base del producto."
+          },
+          "priceType": {
+            "type": "string",
+            "enum": [
+              "PUBLIC",
+              "WHOLESALE"
+            ],
+            "default": "PUBLIC"
+          }
+        },
+        "required": [
+          "productId",
+          "quantity",
+          "unitPrice"
+        ]
+      },
+      "CreateSaleDto": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CreateSaleItemDto"
+            }
+          },
+          "paymentMethod": {
+            "type": "string",
+            "enum": [
+              "CASH",
+              "CARD",
+              "TRANSFER",
+              "CREDIT"
+            ],
+            "default": "CASH"
+          },
+          "customerId": {
+            "type": "string",
+            "description": "Requerido si paymentMethod es CREDIT"
+          },
+          "amountPaid": {
+            "type": "number",
+            "example": 50000,
+            "description": "Monto abonado al momento de la venta (seña). Si no se envía, se asume 0 en ventas a crédito."
+          }
+        },
+        "required": [
+          "items"
+        ]
+      },
+      "CreateCustomerDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "example": "Juan"
+          },
+          "taxId": {
+            "type": "string",
+            "example": "12345678-9"
+          },
+          "documentNumber": {
+            "type": "string",
+            "example": "5.123.456"
+          },
+          "phone": {
+            "type": "string",
+            "example": "(0981)234567"
+          },
+          "email": {
+            "type": "string",
+            "example": "juan@email.com"
+          },
+          "address": {
+            "type": "string",
+            "example": "Av. Mariscal López 1234"
+          },
+          "creditEnabled": {
+            "type": "boolean",
+            "default": false
+          },
+          "creditLimit": {
+            "type": "number",
+            "default": 0,
+            "description": "Límite de crédito en Gs."
+          }
+        },
+        "required": [
+          "name"
+        ]
+      },
+      "UpdateCustomerDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "example": "Juan"
+          },
+          "taxId": {
+            "type": "string",
+            "example": "12345678-9"
+          },
+          "documentNumber": {
+            "type": "string",
+            "example": "5.123.456"
+          },
+          "phone": {
+            "type": "string",
+            "example": "(0981)234567"
+          },
+          "email": {
+            "type": "string",
+            "example": "juan@email.com"
+          },
+          "address": {
+            "type": "string",
+            "example": "Av. Mariscal López 1234"
+          },
+          "creditEnabled": {
+            "type": "boolean",
+            "default": false
+          },
+          "creditLimit": {
+            "type": "number",
+            "default": 0,
+            "description": "Límite de crédito en Gs."
+          }
+        }
+      },
+      "CreateCustomerPaymentDto": {
+        "type": "object",
+        "properties": {
+          "customerId": {
+            "type": "string",
+            "example": "uuid-del-cliente"
+          },
+          "saleId": {
+            "type": "string",
+            "description": "Si se especifica, el pago se aplica al saldo pendiente de esta venta puntual. Si se omite, es un pago general a cuenta del cliente."
+          },
+          "amount": {
+            "type": "number",
+            "example": 100000,
+            "description": "Monto abonado (Gs.)"
+          },
+          "paymentMethod": {
+            "type": "string",
+            "enum": [
+              "CASH",
+              "CARD",
+              "TRANSFER",
+              "CREDIT"
+            ],
+            "example": "CASH"
+          },
+          "notes": {
+            "type": "string",
+            "example": "Pago de cuota mensual"
+          }
+        },
+        "required": [
+          "customerId",
+          "amount",
+          "paymentMethod"
+        ]
+      },
+      "PayToAccountDto": {
+        "type": "object",
+        "properties": {
+          "customerId": {
+            "type": "string",
+            "example": "uuid-del-cliente"
+          },
+          "amount": {
+            "type": "number",
+            "example": 4500000,
+            "description": "Monto total a cuenta, se distribuye automáticamente entre las ventas pendientes más antiguas"
+          },
+          "paymentMethod": {
+            "type": "string",
+            "enum": [
+              "CASH",
+              "CARD",
+              "TRANSFER",
+              "CREDIT"
+            ],
+            "example": "CASH"
+          },
+          "notes": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "customerId",
+          "amount",
+          "paymentMethod"
+        ]
+      },
+      "VoidPaymentDto": {
+        "type": "object",
+        "properties": {
+          "reason": {
+            "type": "string",
+            "example": "Monto cargado por error"
+          }
+        }
+      },
+      "CreateCashMovementDto": {
+        "type": "object",
+        "properties": {
+          "amount": {
+            "type": "number",
+            "example": 100000,
+            "description": "Monto del movimiento manual en Gs."
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "IN",
+              "OUT"
+            ],
+            "example": "OUT",
+            "description": "Tipo de movimiento: IN (Ingreso) o OUT (Egreso)"
+          },
+          "description": {
+            "type": "string",
+            "example": "Retiro para compra de insumos de limpieza",
+            "description": "Descripción/Motivo del movimiento manual"
+          }
+        },
+        "required": [
+          "amount",
+          "type",
+          "description"
+        ]
+      },
+      "OpenCashSessionDto": {
+        "type": "object",
+        "properties": {
+          "openingAmount": {
+            "type": "number",
+            "example": 500000,
+            "description": "Monto en efectivo contado al momento de abrir la caja (Gs.)"
+          },
+          "notes": {
+            "type": "string",
+            "example": "Apertura del turno mañana"
+          }
+        },
+        "required": [
+          "openingAmount"
+        ]
+      },
+      "CloseCashSessionDto": {
+        "type": "object",
+        "properties": {
+          "closingAmount": {
+            "type": "number",
+            "example": 1350000,
+            "description": "Monto en efectivo contado físicamente al cerrar la caja (Gs.)"
+          },
+          "notes": {
+            "type": "string",
+            "example": "Todo en orden al cierre"
+          }
+        },
+        "required": [
+          "closingAmount"
+        ]
+      },
+      "CreateInternalReceiptDto": {
+        "type": "object",
+        "properties": {
+          "saleId": {
+            "type": "string",
+            "example": "uuid-de-la-venta"
+          },
+          "companyId": {
+            "type": "string",
+            "example": "uuid-de-la-empresa"
+          },
+          "customerId": {
+            "type": "string",
+            "example": "uuid-del-cliente"
+          }
+        },
+        "required": [
+          "saleId",
+          "companyId"
+        ]
+      }
+    }
+  }
+}
