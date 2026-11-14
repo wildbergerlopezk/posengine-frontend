@@ -8,9 +8,12 @@ import { ProductSearchModal } from "@/src/shared/components/ProductSearchModal"
 import { usePathname, useRouter } from "next/navigation"
 import {
     Search, Plus, Trash2, Package, AlertCircle,
-    Loader2, Check, X, ChevronDown,
+    Loader2, Check, X, ChevronDown, ChevronUp,
 } from "lucide-react"
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 import { useAuthStore } from "@/src/features/auth/store/auth.store"
+import transactionTableStyles from "@/src/shared/components/TransactionItemsTable/TransactionItemsTable.module.css"
+import dataTableStyles from "@/src/shared/components/DataTable/DataTable.module.css"
 import { formatCurrency } from "@/src/shared/hooks/useFormatCurrency"
 import { useCashSession } from "@/src/features/cash-session/hooks/useCashSession"
 import { API_BASE_URL } from "@/src/shared/config/api"
@@ -103,11 +106,13 @@ export function PurchasePage() {
     const [purchaseDate, setPurchaseDate] = useState(() => new Date().toISOString().slice(0, 10))
     const [paymentType, setPaymentType] = useState<"CASH" | "CREDIT">("CASH")
     const [notes, setNotes] = useState("")
+    const [purchaseDetailsCollapsed, setPurchaseDetailsCollapsed] = useState(false)
     const [zeroCostProducts, setZeroCostProducts] = useState<string[]>([])
 
     // ── Debt state ──────────────────────────────────────────────────────────────
     const [debtScheduleType, setDebtScheduleType] = useState<"NONE" | "OWNER_REMINDER" | "SUPPLIER_SCHEDULE">("NONE")
     const [debtDueDate, setDebtDueDate] = useState(() => new Date().toISOString().slice(0, 10))
+    const [showDebtModal, setShowDebtModal] = useState(false)
     const [debtInstallments, setDebtInstallments] = useState<{ number: number; amount: number; dueDate: string }[]>([
         { number: 1, amount: 0, dueDate: new Date().toISOString().slice(0, 10) }
     ])
@@ -155,11 +160,42 @@ export function PurchasePage() {
     const paymentCreditRef = useRef<HTMLButtonElement>(null)
     const debtScheduleTypeRef = useRef<HTMLSelectElement>(null)
     const debtDueDateRef = useRef<HTMLInputElement>(null)
+    const debtConfigureRef = useRef<HTMLButtonElement>(null)
+    const debtModalDoneRef = useRef<HTMLButtonElement>(null)
+    const debtModalRef = useRef<HTMLDivElement>(null)
+    const wasDebtModalOpenRef = useRef(false)
+    const pendingPurchaseDetailsFocusRef = useRef<"supplier" | "invoice" | "debt" | null>(null)
     const confirmAcceptRef = useRef<HTMLButtonElement>(null)
     const confirmCancelRef = useRef<HTMLButtonElement>(null)
     const editingInputRef = useRef<HTMLInputElement>(null)
     const isHydrated = useHydrated()
     const [isDraftLoaded, setIsDraftLoaded] = useState(false)
+
+    const focusPurchaseDetailsTarget = useCallback((target: "supplier" | "invoice" | "debt") => {
+        if (target === "supplier") {
+            supplierWrapperRef.current?.querySelector<HTMLElement>('button, [role="combobox"], input')?.focus()
+        } else if (target === "invoice") {
+            invoiceRef.current?.focus()
+        } else {
+            debtConfigureRef.current?.focus()
+        }
+    }, [])
+
+    const revealPurchaseDetailsForFocus = (target: "supplier" | "invoice" | "debt") => {
+        if (purchaseDetailsCollapsed) {
+            pendingPurchaseDetailsFocusRef.current = target
+            setPurchaseDetailsCollapsed(false)
+            return
+        }
+        focusPurchaseDetailsTarget(target)
+    }
+
+    useLayoutEffect(() => {
+        const target = pendingPurchaseDetailsFocusRef.current
+        if (purchaseDetailsCollapsed || !target) return
+        pendingPurchaseDetailsFocusRef.current = null
+        focusPurchaseDetailsTarget(target)
+    }, [focusPurchaseDetailsTarget, purchaseDetailsCollapsed])
 
     // ── Persistence: Load draft ───────────────────────────────────────────────
     useEffect(() => {
@@ -204,6 +240,54 @@ export function PurchasePage() {
 
     // ── Computed totals ────────────────────────────────────────────────────────
     const total = items.reduce((acc, i) => acc + i.total, 0)
+    const debtInstallmentsTotal = debtInstallments.reduce((acc, installment) => acc + installment.amount, 0)
+    const hasValidInstallmentSequence = debtInstallments
+        .map(installment => installment.number)
+        .sort((a, b) => a - b)
+        .every((number, index) => number === index + 1)
+    const debtScheduleNeedsReview = debtScheduleType === "NONE"
+        ? !debtDueDate
+        : debtInstallments.length === 0
+            || Math.abs(debtInstallmentsTotal - total) > 1
+            || !hasValidInstallmentSequence
+    const debtScheduleSummary = debtScheduleType === "NONE"
+        ? `Pago único${debtDueDate ? ` · vence ${new Date(`${debtDueDate}T00:00:00`).toLocaleDateString("es-PY")}` : " · falta fecha"}`
+        : `${debtScheduleType === "OWNER_REMINDER" ? "Recordatorio del dueño" : "Cuotas del proveedor"} · ${debtInstallments.length} ${debtInstallments.length === 1 ? "cuota" : "cuotas"}`
+
+    useLayoutEffect(() => {
+        if (showDebtModal) {
+            debtScheduleTypeRef.current?.focus()
+        } else if (wasDebtModalOpenRef.current) {
+            const focusTarget = paymentType === "CREDIT" ? debtConfigureRef.current : paymentCashRef.current
+            const activeElement = document.activeElement
+            // Preserve an intentional focus handoff (for example, Enter from Contado to Observación).
+            if (!activeElement || activeElement === document.body) focusTarget?.focus()
+        }
+        wasDebtModalOpenRef.current = showDebtModal
+    }, [showDebtModal, paymentType])
+
+    const trapDebtModalFocus = (event: React.KeyboardEvent<HTMLDivElement>) => {
+        if (event.key !== "Tab" || !debtModalRef.current) return
+
+        const focusableElements = Array.from(
+            debtModalRef.current.querySelectorAll<HTMLElement>(
+                'button:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])'
+            )
+        )
+        if (focusableElements.length === 0) return
+
+        const firstElement = focusableElements[0]
+        const lastElement = focusableElements[focusableElements.length - 1]
+        const activeElement = document.activeElement
+
+        if (event.shiftKey && (activeElement === firstElement || !debtModalRef.current.contains(activeElement))) {
+            event.preventDefault()
+            lastElement.focus()
+        } else if (!event.shiftKey && (activeElement === lastElement || !debtModalRef.current.contains(activeElement))) {
+            event.preventDefault()
+            firstElement.focus()
+        }
+    }
 
     // ── Fetch suppliers ────────────────────────────────────────────────────────
     useEffect(() => {
@@ -220,31 +304,45 @@ export function PurchasePage() {
     }, [accessToken])
 
     // ── Fetch products for modal ───────────────────────────────────────────────
-    const fetchProducts = useCallback(async (search: string) => {
+    const fetchProducts = useCallback(async (search: string, signal: AbortSignal) => {
         setLoadingProducts(true)
         try {
             const params = new URLSearchParams({ limit: "30" })
             if (search.trim()) params.set("search", search.trim())
-            const res = await fetch(`${API_BASE}/product?${params}`, { headers: authHeaders })
-            if (res.ok) {
+            const res = await fetch(`${API_BASE}/product/search?${params}`, { headers: authHeaders, signal })
+            if (res.ok && !signal.aborted) {
                 const data = await res.json()
-                setProducts(data.items ?? data)
+                if (!signal.aborted) setProducts(data.items ?? data)
             }
         } catch { /* silent */ }
-        finally { setLoadingProducts(false) }
+        finally {
+            if (!signal.aborted) setLoadingProducts(false)
+        }
     }, [accessToken])
 
     useEffect(() => {
         if (!showProductModal) return
-        const t = setTimeout(() => fetchProducts(productSearch), 250)
-        return () => clearTimeout(t)
+        const controller = new AbortController()
+        setLoadingProducts(true)
+
+        let debounce: ReturnType<typeof setTimeout> | null = null
+        const loadProducts = () => { void fetchProducts(productSearch, controller.signal) }
+        if (productSearch.trim()) {
+            debounce = setTimeout(loadProducts, 250)
+        } else {
+            loadProducts()
+        }
+
+        return () => {
+            if (debounce) clearTimeout(debounce)
+            controller.abort()
+        }
     }, [productSearch, showProductModal, fetchProducts])
 
-    useEffect(() => {
-        if (showProductModal) {
-            fetchProducts("")
-        }
-    }, [showProductModal, fetchProducts])
+    const openProductModal = useCallback(() => {
+        setLoadingProducts(true)
+        setShowProductModal(true)
+    }, [])
 
     // ── Generate invoice number (Alt+Q) ───────────────────────────────────────
     const generateInvoiceNumber = useCallback(async () => {
@@ -314,8 +412,16 @@ export function PurchasePage() {
     // ── Submit ─────────────────────────────────────────────────────────────────
     const handleSubmit = async () => {
         if (!canOperate) { setSubmitError("Abre caja antes de registrar compras"); return }
-        if (!supplierId) { setSubmitError("Seleccioná un proveedor"); return }
-        if (!invoiceNumber) { setSubmitError("El número de factura es requerido"); invoiceRef.current?.focus(); return }
+        if (!supplierId) {
+            setSubmitError("Seleccioná un proveedor")
+            revealPurchaseDetailsForFocus("supplier")
+            return
+        }
+        if (!invoiceNumber) {
+            setSubmitError("El número de factura es requerido")
+            revealPurchaseDetailsForFocus("invoice")
+            return
+        }
         if (items.length === 0) { setSubmitError("Agregá al menos un producto"); return }
 
         const invalidItems = items.filter(i => i.unitCost <= 0)
@@ -328,22 +434,26 @@ export function PurchasePage() {
             if (debtScheduleType === "NONE") {
                 if (!debtDueDate) {
                     setSubmitError("Debe indicar una fecha límite de pago para la compra a crédito")
+                    revealPurchaseDetailsForFocus("debt")
                     return
                 }
             } else {
                 if (!debtInstallments.length) {
                     setSubmitError("Debe indicar al menos una cuota")
+                    revealPurchaseDetailsForFocus("debt")
                     return
                 }
                 const sum = debtInstallments.reduce((acc, i) => acc + i.amount, 0)
                 if (Math.abs(sum - total) > 1) {
                     setSubmitError(`La suma de las cuotas (${sum}) no coincide con el total de la compra (${total})`)
+                    revealPurchaseDetailsForFocus("debt")
                     return
                 }
                 const numbers = debtInstallments.map(i => i.number).sort((a, b) => a - b)
                 for (let i = 0; i < numbers.length; i++) {
                     if (numbers[i] !== i + 1) {
                         setSubmitError("Las cuotas deben estar numeradas consecutivamente desde 1")
+                        revealPurchaseDetailsForFocus("debt")
                         return
                     }
                 }
@@ -456,6 +566,7 @@ export function PurchasePage() {
                 setInvoiceNumber("")
                 setNotes("")
                 setPaymentType("CASH")
+                setPurchaseDetailsCollapsed(false)
                 setPurchaseDate(new Date().toISOString().slice(0, 10))
                 setDebtScheduleType("NONE")
                 setDebtDueDate(new Date().toISOString().slice(0, 10))
@@ -465,6 +576,7 @@ export function PurchasePage() {
 
         } catch (err: unknown) {
             setSubmitError(err instanceof Error ? err.message : "Error al guardar la compra")
+            setPurchaseDetailsCollapsed(false)
             setSubmitStep(null)
         } finally {
             setSubmitting(false)
@@ -555,6 +667,11 @@ export function PurchasePage() {
 
             // ── Closing modals ────────────────────────────────────────────────────
             if (e.key === "Escape") {
+                if (showDebtModal) {
+                    e.preventDefault()
+                    setShowDebtModal(false)
+                    return
+                }
                 if (barcodeError) {
                     setBarcodeError(null)
                     return
@@ -570,23 +687,23 @@ export function PurchasePage() {
             }
 
             // ── Shortcuts existentes ──────────────────────────────────────────────
-            if (e.key === "F2" && !showProductModal) {
+            if (e.key === "F2" && !showProductModal && !showDebtModal) {
                 e.preventDefault()
-                setShowProductModal(true)
+                openProductModal()
             }
-            if (e.key === "F12" && !showProductModal && items.length > 0 && !showConfirmModal) {
+            if (e.key === "F12" && !showProductModal && !showDebtModal && items.length > 0 && !showConfirmModal) {
                 e.preventDefault()
                 setShowConfirmModal(true)
                 setConfirmModalSelectedButton("accept")
             }
-            if (e.altKey && e.key.toLowerCase() === "q") {
+            if (e.altKey && e.key.toLowerCase() === "q" && !showDebtModal) {
                 e.preventDefault()
                 void generateInvoiceNumber()
             }
         }
         window.addEventListener("keydown", handler)
         return () => window.removeEventListener("keydown", handler)
-    }, [showProductModal, showConfirmModal, barcodeBuffer, barcodeError, items, generateInvoiceNumber, handleBarcodeAdd, priceHistory.open])
+    }, [showProductModal, showDebtModal, showConfirmModal, barcodeBuffer, barcodeError, items, generateInvoiceNumber, handleBarcodeAdd, priceHistory.open, openProductModal])
 
     // Focus inicial al montar y al navegar a esta ruta
     useEffect(() => {
@@ -722,13 +839,41 @@ export function PurchasePage() {
                 {/* ══════════════════════════════════════════════════
             HEADER CARD — datos de la compra
         ══════════════════════════════════════════════════ */}
-                <div className={`${styles.headerCard} ${purchaseDisabled ? styles.disabledArea : ''}`}>
-                    <div className={styles.headerCardTitle}>Datos de la compra</div>
+                <Collapsible
+                    open={!purchaseDetailsCollapsed}
+                    onOpenChange={(open) => setPurchaseDetailsCollapsed(!open)}
+                    className={`${styles.headerCard} ${purchaseDetailsCollapsed ? styles.headerCardCollapsed : ''} ${purchaseDisabled ? styles.disabledArea : ''}`}
+                >
+                    <div className={styles.headerCardHeading}>
+                        <div className={styles.headerCardTitle}>Datos de la compra</div>
+                        {purchaseDetailsCollapsed && (
+                            <div className={styles.headerCollapsedSummary} title={[
+                                suppliers.find(supplier => supplier.id === supplierId)?.name ?? (supplierId ? "Proveedor seleccionado" : "Sin proveedor"),
+                                invoiceNumber || "Sin factura",
+                                paymentType === "CASH" ? "Contado" : "Crédito",
+                            ].join(" · ")}>
+                                <span>{suppliers.find(supplier => supplier.id === supplierId)?.name ?? (supplierId ? "Proveedor seleccionado" : "Sin proveedor")}</span>
+                                <span aria-hidden="true"> · </span>
+                                <span>{invoiceNumber || "Sin factura"}</span>
+                                <span aria-hidden="true"> · </span>
+                                <span>{paymentType === "CASH" ? "Contado" : "Crédito"}</span>
+                            </div>
+                        )}
+                        <CollapsibleTrigger asChild>
+                            <button
+                                type="button"
+                                className={styles.headerCardToggle}
+                                aria-label={purchaseDetailsCollapsed ? "Expandir datos de la compra" : "Contraer datos de la compra"}
+                            >
+                                {purchaseDetailsCollapsed ? <ChevronDown size={17} /> : <ChevronUp size={17} />}
+                            </button>
+                        </CollapsibleTrigger>
+                    </div>
 
-                    <div className={styles.headerGrid}>
+                    <CollapsibleContent className={styles.headerGrid}>
 
                         {/* Proveedor */}
-                        <div className={tableStyles.formGroup}>
+                        <div className={`${tableStyles.formGroup} ${styles.headerField}`}>
                             <label className={tableStyles.label}>Proveedor *</label>
                             {/* Wrapper que intercepta Tab/Enter cuando el popup está CERRADO */}
                             <div
@@ -781,7 +926,7 @@ export function PurchasePage() {
                         </div>
 
                         {/* Nro. Factura */}
-                        <div className={tableStyles.formGroup}>
+                        <div className={`${tableStyles.formGroup} ${styles.headerField}`}>
                             <label className={tableStyles.label} htmlFor="invoice">
                                 Nro. Factura *
                                 <span className={styles.labelHint}>Alt+Q para generar</span>
@@ -813,7 +958,7 @@ export function PurchasePage() {
                         </div>
 
                         {/* Fecha */}
-                        <div className={tableStyles.formGroup}>
+                        <div className={`${tableStyles.formGroup} ${styles.headerField}`}>
                             <label className={tableStyles.label} htmlFor="date">Fecha *</label>
                             <input
                                 ref={dateRef}
@@ -834,17 +979,16 @@ export function PurchasePage() {
                         </div>
 
                         {/* Tipo de pago */}
-                        <div className={tableStyles.formGroup}>
+                        <div className={`${tableStyles.formGroup} ${styles.headerField}`}>
                             <label className={tableStyles.label}>Tipo de pago</label>
                             <div className={styles.paymentToggle}>
                                 <button
                                     ref={paymentCashRef}
                                     type="button"
                                     className={`${styles.payToggleBtn} ${paymentType === "CASH" ? styles.payToggleBtnActive : ""}`}
-                                    onClick={() => setPaymentType("CASH")}
+                                    onClick={() => { setPaymentType("CASH"); setShowDebtModal(false) }}
                                     onKeyDown={e => {
-                                        if (e.key === "Enter") { e.preventDefault(); setPaymentType("CASH"); notesRef.current?.focus() }
-                                        if (e.key === "Tab" && !e.shiftKey) { e.preventDefault(); notesRef.current?.focus() }
+                                        if (e.key === "Enter") { e.preventDefault(); setPaymentType("CASH"); setShowDebtModal(false); notesRef.current?.focus() }
                                     }}
                                 >
                                     Contado
@@ -855,10 +999,10 @@ export function PurchasePage() {
                                     className={`${styles.payToggleBtn} ${paymentType === "CREDIT" ? styles.payToggleBtnActive : ""}`}
                                     onClick={() => setPaymentType("CREDIT")}
                                     onKeyDown={e => {
-                                        if (e.key === "Enter") { 
+                                        if (e.key === "Enter") {
                                             e.preventDefault()
                                             setPaymentType("CREDIT")
-                                            setTimeout(() => debtScheduleTypeRef.current?.focus(), 50)
+                                            setShowDebtModal(true)
                                         }
                                     }}
                                 >
@@ -867,381 +1011,248 @@ export function PurchasePage() {
                             </div>
                         </div>
 
-                        {paymentType === "CREDIT" && (
-                            <div className={`${styles.debtSubForm} ${styles.fullWidth}`}>
-                                <h3 className={styles.debtFormTitle}>Detalle de la Deuda</h3>
-                                <div className={styles.debtFormGrid}>
-                                    <div className={tableStyles.formGroup}>
-                                        <label className={tableStyles.label}>Tipo de Cronograma</label>
-                                        <select
-                                            ref={debtScheduleTypeRef}
-                                            className={tableStyles.input}
-                                            value={debtScheduleType}
-                                            onChange={e => {
-                                                const val = e.target.value as any
-                                                setDebtScheduleType(val)
-                                                if (val !== "NONE" && debtInstallments.length === 0) {
-                                                    setDebtInstallments([{ number: 1, amount: total, dueDate: new Date().toISOString().slice(0, 10) }])
-                                                }
-                                            }}
-                                            onKeyDown={e => {
-                                                if (e.key === "Enter") {
-                                                    e.preventDefault()
-                                                    if (debtScheduleType === "NONE") {
-                                                        debtDueDateRef.current?.focus()
-                                                    } else {
-                                                        setTimeout(() => document.getElementById("inst-amount-0")?.focus(), 50)
-                                                    }
-                                                }
-                                            }}
-                                        >
-                                            <option value="NONE">Pago Único (Sin Cuotas)</option>
-                                            <option value="OWNER_REMINDER">Recordatorio de Cuotas (Dueño)</option>
-                                            <option value="SUPPLIER_SCHEDULE">Cuotas Impuestas por Proveedor</option>
-                                        </select>
+                        <div className={`${styles.headerMetaRow} ${paymentType === "CREDIT" ? styles.headerMetaRowCredit : ""}`}>
+                            {paymentType === "CREDIT" && (
+                                <div className={styles.debtSummary}>
+                                    <div className={styles.debtSummaryInfo}>
+                                        <span className={styles.debtSummaryTitle}>Detalle de la deuda</span>
+                                        <span className={styles.debtSummaryText}>{debtScheduleSummary}</span>
+                                        <span className={debtScheduleNeedsReview ? styles.debtSummaryWarning : styles.debtSummaryReady}>
+                                            {debtScheduleNeedsReview ? "Revisar configuración" : "Configuración lista"}
+                                        </span>
                                     </div>
-
-                                    {debtScheduleType === "NONE" ? (
-                                        <div className={tableStyles.formGroup}>
-                                            <label className={tableStyles.label}>Fecha Límite de Pago</label>
-                                            <input
-                                                ref={debtDueDateRef}
-                                                type="date"
-                                                className={tableStyles.input}
-                                                value={debtDueDate}
-                                                onChange={e => setDebtDueDate(e.target.value)}
-                                                onKeyDown={e => {
-                                                    if (e.key === "Enter") {
-                                                        e.preventDefault()
-                                                        notesRef.current?.focus()
-                                                    }
-                                                }}
-                                                required
-                                            />
-                                        </div>
-                                    ) : (
-                                        <div className={`${styles.installmentsWrapper} ${styles.fullWidth}`}>
-                                            <div className={styles.installmentsHeader}>
-                                                <span className={styles.installmentsTitle}>Cuotas ({debtInstallments.length})</span>
-                                                <button
-                                                    type="button"
-                                                    className={styles.addInstallmentBtn}
-                                                    onClick={() => {
-                                                        const nextNum = debtInstallments.length + 1
-                                                        const sumCurrent = debtInstallments.reduce((acc, i) => acc + i.amount, 0)
-                                                        const remaining = Math.max(0, total - sumCurrent)
-                                                        setDebtInstallments([
-                                                            ...debtInstallments,
-                                                            { number: nextNum, amount: remaining, dueDate: new Date().toISOString().slice(0, 10) }
-                                                        ])
-                                                        setTimeout(() => {
-                                                            document.getElementById(`inst-amount-${nextNum - 1}`)?.focus()
-                                                        }, 50)
-                                                    }}
-                                                >
-                                                    + Agregar
-                                                </button>
-                                            </div>
-
-                                            <div className={styles.installmentsList}>
-                                                {debtInstallments.map((inst, index) => (
-                                                    <div key={index} className={styles.installmentRow}>
-                                                        <span className={styles.instNumber}>Cuota {inst.number}</span>
-                                                        <div className={tableStyles.formGroup}>
-                                                            <input
-                                                                id={`inst-amount-${index}`}
-                                                                type="text"
-                                                                placeholder="Monto"
-                                                                className={tableStyles.input}
-                                                                value={inst.amount ? new Intl.NumberFormat("es-AR", { minimumFractionDigits: 0 }).format(inst.amount) : ""}
-                                                                onChange={e => {
-                                                                    const clean = e.target.value.replace(/\D/g, "")
-                                                                    const val = clean ? parseInt(clean, 10) : 0
-                                                                    setDebtInstallments(
-                                                                        debtInstallments.map((itm, idx) => 
-                                                                            idx === index ? { ...itm, amount: val } : itm
-                                                                        )
-                                                                    )
-                                                                }}
-                                                                onKeyDown={e => {
-                                                                    if (e.key === "Enter") {
-                                                                        e.preventDefault()
-                                                                        document.getElementById(`inst-date-${index}`)?.focus()
-                                                                    }
-                                                                }}
-                                                            />
-                                                        </div>
-                                                        <div className={tableStyles.formGroup}>
-                                                            <input
-                                                                id={`inst-date-${index}`}
-                                                                type="date"
-                                                                className={tableStyles.input}
-                                                                value={inst.dueDate}
-                                                                onChange={e => {
-                                                                    setDebtInstallments(
-                                                                        debtInstallments.map((itm, idx) => 
-                                                                            idx === index ? { ...itm, dueDate: e.target.value } : itm
-                                                                        )
-                                                                    )
-                                                                }}
-                                                                onKeyDown={e => {
-                                                                    if (e.key === "Enter") {
-                                                                        e.preventDefault()
-                                                                        const nextAmount = document.getElementById(`inst-amount-${index + 1}`)
-                                                                        if (nextAmount) {
-                                                                            nextAmount.focus()
-                                                                        } else {
-                                                                            notesRef.current?.focus()
-                                                                        }
-                                                                    }
-                                                                }}
-                                                            />
-                                                        </div>
-                                                        <button
-                                                            type="button"
-                                                            className={styles.deleteInstallmentBtn}
-                                                            onClick={() => {
-                                                                const filtered = debtInstallments.filter((_, idx) => idx !== index)
-                                                                setDebtInstallments(
-                                                                    filtered.map((itm, idx) => ({ ...itm, number: idx + 1 }))
-                                                                )
-                                                            }}
-                                                        >
-                                                            X
-                                                        </button>
-                                                    </div>
-                                                ))}
-                                            </div>
-
-                                            <div className={styles.installmentsSummary}>
-                                                <span className={Math.abs(debtInstallments.reduce((acc, i) => acc + i.amount, 0) - total) > 1 ? styles.summaryAlert : styles.summaryOk}>
-                                                    Suma: {formatCurrency(debtInstallments.reduce((acc, i) => acc + i.amount, 0))} / Total: {formatCurrency(total)}
-                                                </span>
-                                            </div>
-                                        </div>
-                                    )}
+                                    <button
+                                        ref={debtConfigureRef}
+                                        type="button"
+                                        className={styles.configureDebtButton}
+                                        onClick={() => setShowDebtModal(true)}
+                                    >
+                                        Configurar cuotas
+                                    </button>
                                 </div>
-                            </div>
-                        )}
+                            )}
 
-                        {/* Observación — full width */}
-                        <div className={`${tableStyles.formGroup} ${styles.fullWidth}`}>
-                            <label className={tableStyles.label} htmlFor="notes">Observación</label>
-                            <input
-                                ref={notesRef}
-                                id="notes"
-                                className={tableStyles.input}
-                                value={notes}
-                                onChange={e => setNotes(e.target.value)}
-                                placeholder="Ej. Compra mensual de repuestos"
-                                maxLength={500}
-                                onKeyDown={e => {
-                                    if (e.key === "Enter") {
-                                        e.preventDefault()
-                                        // Enter desde observación → abrir modal de productos (equivale a F2)
-                                        setShowProductModal(true)
-                                    }
-                                }}
-                            />
+                            {/* Observación — comparte fila con el resumen cuando hay espacio */}
+                            <div className={`${tableStyles.formGroup} ${styles.headerField} ${styles.headerNotes}`}>
+                                <label className={tableStyles.label} htmlFor="notes">Observación</label>
+                                <input
+                                    ref={notesRef}
+                                    id="notes"
+                                    className={tableStyles.input}
+                                    value={notes}
+                                    onChange={e => setNotes(e.target.value)}
+                                    placeholder="Ej. Compra mensual de repuestos"
+                                    maxLength={500}
+                                    onKeyDown={e => {
+                                        if (e.key === "Enter") {
+                                            e.preventDefault()
+                                            // Enter desde observación → abrir modal de productos (equivale a F2)
+                                            openProductModal()
+                                        }
+                                    }}
+                                />
+                            </div>
                         </div>
 
-                    </div>
-                </div>
+                    </CollapsibleContent>
+                </Collapsible>
 
                 {/* ══════════════════════════════════════════════════
             ITEMS — tabla de productos
         ══════════════════════════════════════════════════ */}
-                <div className={`${tableStyles.tableCard} ${purchaseDisabled ? styles.disabledArea : ''}`}>
+                <div className={`${tableStyles.tableCard} ${dataTableStyles.flexColumn} ${transactionTableStyles.itemsTableCard} ${purchaseDisabled ? styles.disabledArea : ''}`}>
 
                     {/* Toolbar de items */}
-                    <div className={styles.itemsToolbar}>
-                        <span className={styles.itemsTitle}>
-                            Productos <span className={styles.itemsCount}>{items.length}</span>
+                    <div className={transactionTableStyles.itemsToolbar}>
+                        <span className={transactionTableStyles.itemsTitle}>
+                            Productos <span className={transactionTableStyles.itemsCount}>{items.length}</span>
                         </span>
-                        <div className={styles.itemsActions}>
-                            <span className={styles.shortcutHint}><kbd>F2</kbd> Agregar</span>
-                            <span className={styles.shortcutHint}><kbd>F12</kbd> Finalizar</span>
+                        <div className={transactionTableStyles.itemsActions}>
+                            <span className={transactionTableStyles.shortcutHint}><kbd>F2</kbd> Agregar</span>
+                            <span className={transactionTableStyles.shortcutHint}><kbd>F12</kbd> Finalizar</span>
                             <button
                                 type="button"
-                                className={tableStyles.newButton}
-                                onClick={() => setShowProductModal(true)}
+                                className={`${tableStyles.newButton} ${styles.addProductButton}`}
+                                onClick={openProductModal}
                             ><Plus size={15} /> Agregar producto
                             </button>
                         </div>
                     </div>
 
-                    <table className={tableStyles.table}>
-                        <thead className={tableStyles.tableHeader}>
-                            <tr>
-                                <th className={tableStyles.tableHeaderCell} style={{ width: 40 }}>#</th>
-                                <th className={tableStyles.tableHeaderCell} style={{ width: 130 }}>Código</th>
-                                <th className={tableStyles.tableHeaderCell}>Descripción</th>
-                                <th className={`${tableStyles.tableHeaderCell} ${tableStyles.tableHeaderCellRight}`} style={{ width: 110 }}>Cant.</th>
-                                <th className={`${tableStyles.tableHeaderCell} ${tableStyles.tableHeaderCellRight}`} style={{ width: 130 }}>Costo unit.</th>
-                                <th className={`${tableStyles.tableHeaderCell} ${tableStyles.tableHeaderCellRight}`} style={{ width: 90 }}>% Púb.</th>
-                                <th className={`${tableStyles.tableHeaderCell} ${tableStyles.tableHeaderCellRight}`} style={{ width: 120 }}>P. Público</th>
-                                <th className={`${tableStyles.tableHeaderCell} ${tableStyles.tableHeaderCellRight}`} style={{ width: 90 }}>% May.</th>
-                                <th className={`${tableStyles.tableHeaderCell} ${tableStyles.tableHeaderCellRight}`} style={{ width: 120 }}>P. Mayorista</th>
-                                <th className={`${tableStyles.tableHeaderCell} ${tableStyles.tableHeaderCellRight}`} style={{ width: 130 }}>SubTotal</th>
-                                <th className={tableStyles.tableHeaderCell} style={{ width: 44 }} />
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {items.length === 0 ? (
+                    <div className={dataTableStyles.viewport}>
+                        <table className={`${tableStyles.table} ${dataTableStyles.naturalRows} ${dataTableStyles.compactCells} ${transactionTableStyles.purchaseItemsTable}`}>
+                            <thead className={tableStyles.tableHeader}>
                                 <tr>
-                                <td colSpan={10}>
-                                        <div className={tableStyles.emptyState}>
-                                            <Package size={36} className={tableStyles.emptyStateIcon} />
-                                            <p className={tableStyles.emptyStateTitle}>Sin productos</p>
-                                            <p>Presioná <kbd className={styles.kbdInline}>F2</kbd> o el botón para agregar</p>
-                                        </div>
-                                    </td>
+                                    <th className={tableStyles.tableHeaderCell} style={{ width: 36 }}>#</th>
+                                    <th className={tableStyles.tableHeaderCell} style={{ width: 110 }}>Código</th>
+                                    <th className={tableStyles.tableHeaderCell}>Descripción</th>
+                                    <th className={`${tableStyles.tableHeaderCell} ${tableStyles.tableHeaderCellRight}`} style={{ width: 75 }}>Cant.</th>
+                                    <th className={`${tableStyles.tableHeaderCell} ${tableStyles.tableHeaderCellRight}`} style={{ width: 110 }}>Costo unit.</th>
+                                    <th className={`${tableStyles.tableHeaderCell} ${tableStyles.tableHeaderCellRight}`} style={{ width: 75 }}>% Púb.</th>
+                                    <th className={`${tableStyles.tableHeaderCell} ${tableStyles.tableHeaderCellRight}`} style={{ width: 110 }}>P. Público</th>
+                                    <th className={`${tableStyles.tableHeaderCell} ${tableStyles.tableHeaderCellRight}`} style={{ width: 75 }}>% May.</th>
+                                    <th className={`${tableStyles.tableHeaderCell} ${tableStyles.tableHeaderCellRight}`} style={{ width: 115 }}>P. Mayorista</th>
+                                    <th className={`${tableStyles.tableHeaderCell} ${tableStyles.tableHeaderCellRight}`} style={{ width: 115 }}>SubTotal</th>
+                                    <th className={tableStyles.tableHeaderCell} style={{ width: 48 }} />
                                 </tr>
-                            ) : (
-                                items.map((item, idx) => (
-                                    <tr key={item.product.id} className={tableStyles.tableRow}>
-
-                                        {/* # */}
-                                        <td className={tableStyles.tableCell}>
-                                            <span className={styles.rowNum}>{idx + 1}</span>
+                            </thead>
+                            <tbody>
+                                {items.length === 0 ? (
+                                    <tr>
+                                    <td colSpan={11}>
+                                            <div className={`${tableStyles.emptyState} ${transactionTableStyles.itemsTableEmptyState}`}>
+                                                <Package size={36} className={tableStyles.emptyStateIcon} />
+                                                <p className={tableStyles.emptyStateTitle}>Sin productos</p>
+                                                <p>Presioná <kbd className={transactionTableStyles.kbdInline}>F2</kbd> o el botón para agregar</p>
+                                            </div>
                                         </td>
+                                    </tr>
+                                ) : (
+                                    items.map((item, idx) => (
+                                        <tr key={item.product.id} className={tableStyles.tableRow}>
 
-                                        {/* Código */}
-                                        <td className={tableStyles.tableCell}>
-                                            <span className={styles.codeChip}>{item.product.barcode || item.product.sku || "—"}</span>
-                                        </td>
+                                            {/* # */}
+                                            <td className={tableStyles.tableCell}>
+                                                <span className={transactionTableStyles.rowNum}>{idx + 1}</span>
+                                            </td>
 
-                                        {/* Descripción */}
-                                        <td className={tableStyles.tableCell}>
-                                            <span style={{ fontWeight: 500 }}>{item.product.name}</span>
-                                            {!isUnitType(item.product.unitType) && (
-                                                <span className={styles.unitBadge}>{item.product.unitType}</span>
-                                            )}
-                                        </td>
+                                            {/* Código */}
+                                            <td className={tableStyles.tableCell}>
+                                                <span className={transactionTableStyles.codeChip}>{item.product.barcode || item.product.sku || "—"}</span>
+                                            </td>
 
-                                        {/* Cantidad — editable inline */}
-                                        <td className={`${tableStyles.tableCell} ${tableStyles.tableCellRight}`}>
-                                            {editingRowIndex === idx && editingField === "quantity" ? (
-                                                <input
-                                                    ref={editingInputRef}
-                                                    className={styles.inlineInput}
-                                                    type="number"
-                                                    value={editingValue}
-                                                    onChange={e => setEditingValue(e.target.value)}
-                                                    onKeyDown={e => {
-                                                        if (e.key === "Enter" || e.key === "Tab") {
-                                                            e.preventDefault()
-                                                            commitEdit()
-                                                            setPriceModalIndex(idx)
-                                                        }
-                                                        if (e.key === "Escape") cancelEdit()
-                                                    }}
-                                                    onBlur={commitEdit}
-                                                    min={isUnitType(item.product.unitType) ? "1" : "0.001"}
-                                                    step={isUnitType(item.product.unitType) ? "1" : "0.001"}
-                                                />
-                                            ) : (
+                                            {/* Descripción */}
+                                            <td className={tableStyles.tableCell}>
+                                                <span style={{ fontWeight: 500 }}>{item.product.name}</span>
+                                                {!isUnitType(item.product.unitType) && (
+                                                    <span className={transactionTableStyles.unitBadge}>{item.product.unitType}</span>
+                                                )}
+                                            </td>
+
+                                            {/* Cantidad — editable inline */}
+                                            <td className={`${tableStyles.tableCell} ${tableStyles.tableCellRight}`}>
+                                                {editingRowIndex === idx && editingField === "quantity" ? (
+                                                    <input
+                                                        ref={editingInputRef}
+                                                        className={styles.inlineInput}
+                                                        type="number"
+                                                        value={editingValue}
+                                                        onChange={e => setEditingValue(e.target.value)}
+                                                        onKeyDown={e => {
+                                                            if (e.key === "Enter" || e.key === "Tab") {
+                                                                e.preventDefault()
+                                                                commitEdit()
+                                                                setPriceModalIndex(idx)
+                                                            }
+                                                            if (e.key === "Escape") cancelEdit()
+                                                        }}
+                                                        onBlur={commitEdit}
+                                                        min={isUnitType(item.product.unitType) ? "1" : "0.001"}
+                                                        step={isUnitType(item.product.unitType) ? "1" : "0.001"}
+                                                    />
+                                                ) : (
+                                                    <button
+                                                        type="button"
+                                                        className={transactionTableStyles.editableCell}
+                                                        onClick={() => startEdit(idx, "quantity", item.quantity)}
+                                                        title="Clic para editar"
+                                                    >
+                                                        {formatQuantity(item.quantity, item.product.unitType)}
+                                                    </button>
+                                                )}
+                                            </td>
+
+                                            {/* Costo unitario — abre modal al hacer clic */}
+                                            <td className={`${tableStyles.tableCell} ${tableStyles.tableCellRight}`}>
                                                 <button
                                                     type="button"
-                                                    className={styles.editableCell}
-                                                    onClick={() => startEdit(idx, "quantity", item.quantity)}
-                                                    title="Clic para editar"
+                                                    className={transactionTableStyles.editableCell}
+                                                    onClick={() => setPriceModalIndex(idx)}
+                                                    title="Clic para ajustar precios"
                                                 >
-                                                    {formatQuantity(item.quantity, item.product.unitType)}
+                                                    {formatCurrency(item.unitCost)}
                                                 </button>
-                                            )}
-                                        </td>
+                                            </td>
 
-                                        {/* Costo unitario — abre modal al hacer clic */}
-                                        <td className={`${tableStyles.tableCell} ${tableStyles.tableCellRight}`}>
-                                            <button
-                                                type="button"
-                                                className={styles.editableCell}
-                                                onClick={() => setPriceModalIndex(idx)}
-                                                title="Clic para ajustar precios"
-                                            >
-                                                {formatCurrency(item.unitCost)}
-                                            </button>
-                                        </td>
+                                            {/* % Gan. Público */}
+                                            <td className={`${tableStyles.tableCell} ${tableStyles.tableCellRight}`}>
+                                                <button
+                                                    type="button"
+                                                    className={transactionTableStyles.editableCell}
+                                                    onClick={() => setPriceModalIndex(idx)}
+                                                    title="Clic para ajustar precios"
+                                                >
+                                                    {item.marginPercentage.toFixed(1)}%
+                                                </button>
+                                            </td>
 
-                                        {/* % Gan. Público */}
-                                        <td className={`${tableStyles.tableCell} ${tableStyles.tableCellRight}`}>
-                                            <button
-                                                type="button"
-                                                className={styles.editableCell}
-                                                onClick={() => setPriceModalIndex(idx)}
-                                                title="Clic para ajustar precios"
-                                            >
-                                                {item.marginPercentage.toFixed(1)}%
-                                            </button>
-                                        </td>
+                                            {/* Precio Público */}
+                                            <td className={`${tableStyles.tableCell} ${tableStyles.tableCellRight}`}>
+                                                <button
+                                                    type="button"
+                                                    className={transactionTableStyles.editableCell}
+                                                    onClick={() => setPriceModalIndex(idx)}
+                                                    title="Clic para ajustar precios"
+                                                >
+                                                    {formatCurrency(item.salePrice)}
+                                                </button>
+                                            </td>
 
-                                        {/* Precio Público */}
-                                        <td className={`${tableStyles.tableCell} ${tableStyles.tableCellRight}`}>
-                                            <button
-                                                type="button"
-                                                className={styles.editableCell}
-                                                onClick={() => setPriceModalIndex(idx)}
-                                                title="Clic para ajustar precios"
-                                            >
-                                                {formatCurrency(item.salePrice)}
-                                            </button>
-                                        </td>
+                                            {/* % Gan. Mayorista */}
+                                            <td className={`${tableStyles.tableCell} ${tableStyles.tableCellRight}`}>
+                                                <button
+                                                    type="button"
+                                                    className={transactionTableStyles.editableCell}
+                                                    onClick={() => setPriceModalIndex(idx)}
+                                                    title="Clic para ajustar precios"
+                                                >
+                                                    {(item.wholesaleMarginPercentage ?? 0).toFixed(1)}%
+                                                </button>
+                                            </td>
 
-                                        {/* % Gan. Mayorista */}
-                                        <td className={`${tableStyles.tableCell} ${tableStyles.tableCellRight}`}>
-                                            <button
-                                                type="button"
-                                                className={styles.editableCell}
-                                                onClick={() => setPriceModalIndex(idx)}
-                                                title="Clic para ajustar precios"
-                                            >
-                                                {(item.wholesaleMarginPercentage ?? 0).toFixed(1)}%
-                                            </button>
-                                        </td>
+                                            {/* Precio Mayorista */}
+                                            <td className={`${tableStyles.tableCell} ${tableStyles.tableCellRight}`}>
+                                                <button
+                                                    type="button"
+                                                    className={transactionTableStyles.editableCell}
+                                                    onClick={() => setPriceModalIndex(idx)}
+                                                    title="Clic para ajustar precios"
+                                                >
+                                                    {formatCurrency(item.wholesalePrice ?? 0)}
+                                                </button>
+                                            </td>
 
-                                        {/* Precio Mayorista */}
-                                        <td className={`${tableStyles.tableCell} ${tableStyles.tableCellRight}`}>
-                                            <button
-                                                type="button"
-                                                className={styles.editableCell}
-                                                onClick={() => setPriceModalIndex(idx)}
-                                                title="Clic para ajustar precios"
-                                            >
-                                                {formatCurrency(item.wholesalePrice ?? 0)}
-                                            </button>
-                                        </td>
+                                            {/* SubTotal */}
+                                            <td className={`${tableStyles.tableCell} ${tableStyles.tableCellRight}`}>
+                                                <strong>{formatCurrency(item.subtotal)}</strong>
+                                            </td>
 
-                                        {/* SubTotal */}
-                                        <td className={`${tableStyles.tableCell} ${tableStyles.tableCellRight}`}>
-                                            <strong>{formatCurrency(item.subtotal)}</strong>
-                                        </td>
+                                            {/* Eliminar */}
+                                            <td className={tableStyles.tableCell}>
+                                                <button
+                                                    type="button"
+                                                    className={transactionTableStyles.removeBtn}
+                                                    onClick={() => removeItem(idx)}
+                                                    title="Eliminar"
+                                                >
+                                                    <Trash2 size={14} />
+                                                </button>
+                                            </td>
 
-                                        {/* Eliminar */}
-                                        <td className={tableStyles.tableCell}>
-                                            <button
-                                                type="button"
-                                                className={styles.removeBtn}
-                                                onClick={() => removeItem(idx)}
-                                                title="Eliminar"
-                                            >
-                                                <Trash2 size={14} />
-                                            </button>
-                                        </td>
-
-                                    </tr>
-                                ))
-                            )}
-                        </tbody>
+                                        </tr>
+                                    ))
+                                )}
+                            </tbody>
                     </table>
+                    </div>
 
                     {/* ── Footer totales + acciones ── */}
                     {items.length > 0 && (
-                        <div className={styles.tableFooter}>
-                            <div className={styles.totalsBlock}>
-                                <div className={`${styles.totalRow} ${styles.totalRowFinal}`}>
-                                    <span className={styles.totalLabel}>Total</span>
-                                    <span className={styles.totalValueFinal}>{formatCurrency(total)}</span>
+                        <div className={transactionTableStyles.tableFooter}>
+                            <div className={transactionTableStyles.totalsBlock}>
+                                <div className={`${transactionTableStyles.totalRow} ${transactionTableStyles.totalRowFinal}`}>
+                                    <span className={transactionTableStyles.totalLabel}>Total</span>
+                                    <span className={transactionTableStyles.totalValueFinal}>{formatCurrency(total)}</span>
                                 </div>
                             </div>
 
@@ -1279,6 +1290,190 @@ export function PurchasePage() {
                 </div>
             </div>
 
+            {showDebtModal && paymentType === "CREDIT" && (
+                <div
+                    className={styles.debtModalOverlay}
+                    onClick={(event) => event.target === event.currentTarget && setShowDebtModal(false)}
+                >
+                    <div
+                        data-pos-modal
+                        role="dialog"
+                        aria-modal="true"
+                        aria-labelledby="purchase-debt-title"
+                        className={styles.debtModal}
+                        ref={debtModalRef}
+                        onKeyDown={trapDebtModalFocus}
+                        onClick={(event) => event.stopPropagation()}
+                    >
+                        <div className={styles.debtModalHeader}>
+                            <div>
+                                <h2 id="purchase-debt-title" className={styles.debtModalTitle}>Detalle de la deuda</h2>
+                                <p className={styles.debtModalSubtitle}>Configurá el cronograma para el total actual de la compra.</p>
+                            </div>
+                            <button type="button" className={styles.modalCloseBtn} onClick={() => setShowDebtModal(false)} aria-label="Cerrar configuración de deuda">
+                                <X size={18} />
+                            </button>
+                        </div>
+
+                        <div className={styles.debtModalBody}>
+                            <div className={styles.debtFormGrid}>
+                                <div className={tableStyles.formGroup}>
+                                    <label className={tableStyles.label} htmlFor="debt-schedule-type">Tipo de cronograma</label>
+                                    <select
+                                        id="debt-schedule-type"
+                                        ref={debtScheduleTypeRef}
+                                        className={tableStyles.input}
+                                        value={debtScheduleType}
+                                        onChange={e => {
+                                            const value = e.target.value as typeof debtScheduleType
+                                            setDebtScheduleType(value)
+                                            if (value !== "NONE" && debtInstallments.length === 0) {
+                                                setDebtInstallments([{ number: 1, amount: total, dueDate: new Date().toISOString().slice(0, 10) }])
+                                            }
+                                        }}
+                                        onKeyDown={e => {
+                                            if (e.key === "Enter") {
+                                                e.preventDefault()
+                                                if (debtScheduleType === "NONE") debtDueDateRef.current?.focus()
+                                                else window.setTimeout(() => document.getElementById("inst-amount-0")?.focus(), 50)
+                                            }
+                                        }}
+                                    >
+                                        <option value="NONE">Pago único (sin cuotas)</option>
+                                        <option value="OWNER_REMINDER">Recordatorio de cuotas (dueño)</option>
+                                        <option value="SUPPLIER_SCHEDULE">Cuotas impuestas por proveedor</option>
+                                    </select>
+                                </div>
+
+                                {debtScheduleType === "NONE" ? (
+                                    <div className={tableStyles.formGroup}>
+                                        <label className={tableStyles.label} htmlFor="debt-due-date">Fecha límite de pago</label>
+                                        <input
+                                            id="debt-due-date"
+                                            ref={debtDueDateRef}
+                                            type="date"
+                                            className={tableStyles.input}
+                                            value={debtDueDate}
+                                            onChange={e => setDebtDueDate(e.target.value)}
+                                            onKeyDown={e => {
+                                                if (e.key === "Enter") {
+                                                    e.preventDefault()
+                                                    debtModalDoneRef.current?.focus()
+                                                }
+                                            }}
+                                            required
+                                        />
+                                    </div>
+                                ) : (
+                                    <div className={`${styles.installmentsWrapper} ${styles.fullWidth}`}>
+                                        <div className={styles.installmentsHeader}>
+                                            <span className={styles.installmentsTitle}>Cuotas ({debtInstallments.length})</span>
+                                            <button
+                                                type="button"
+                                                className={styles.addInstallmentBtn}
+                                                onClick={() => {
+                                                    const nextNumber = debtInstallments.length + 1
+                                                    const remaining = Math.max(0, total - debtInstallmentsTotal)
+                                                    setDebtInstallments([
+                                                        ...debtInstallments,
+                                                        { number: nextNumber, amount: remaining, dueDate: new Date().toISOString().slice(0, 10) },
+                                                    ])
+                                                    window.setTimeout(() => document.getElementById(`inst-amount-${nextNumber - 1}`)?.focus(), 50)
+                                                }}
+                                            >
+                                                + Agregar cuota
+                                            </button>
+                                        </div>
+
+                                        <div className={styles.installmentsList}>
+                                            {debtInstallments.map((installment, index) => (
+                                                <div key={index} className={styles.installmentRow}>
+                                                    <span className={styles.instNumber}>Cuota {installment.number}</span>
+                                                    <div className={tableStyles.formGroup}>
+                                                        <label className={styles.visuallyHidden} htmlFor={`inst-amount-${index}`}>Importe de cuota {installment.number}</label>
+                                                        <input
+                                                            id={`inst-amount-${index}`}
+                                                            type="text"
+                                                            inputMode="numeric"
+                                                            placeholder="Monto"
+                                                            className={tableStyles.input}
+                                                            value={installment.amount ? new Intl.NumberFormat("es-AR", { minimumFractionDigits: 0 }).format(installment.amount) : ""}
+                                                            onChange={e => {
+                                                                const clean = e.target.value.replace(/\D/g, "")
+                                                                const value = clean ? parseInt(clean, 10) : 0
+                                                                setDebtInstallments(debtInstallments.map((item, itemIndex) =>
+                                                                    itemIndex === index ? { ...item, amount: value } : item
+                                                                ))
+                                                            }}
+                                                            onKeyDown={e => {
+                                                                if (e.key === "Enter") {
+                                                                    e.preventDefault()
+                                                                    document.getElementById(`inst-date-${index}`)?.focus()
+                                                                }
+                                                            }}
+                                                        />
+                                                    </div>
+                                                    <div className={tableStyles.formGroup}>
+                                                        <label className={styles.visuallyHidden} htmlFor={`inst-date-${index}`}>Vencimiento de cuota {installment.number}</label>
+                                                        <input
+                                                            id={`inst-date-${index}`}
+                                                            type="date"
+                                                            className={tableStyles.input}
+                                                            value={installment.dueDate}
+                                                            onChange={e => setDebtInstallments(debtInstallments.map((item, itemIndex) =>
+                                                                itemIndex === index ? { ...item, dueDate: e.target.value } : item
+                                                            ))}
+                                                            onKeyDown={e => {
+                                                                if (e.key === "Enter") {
+                                                                    e.preventDefault()
+                                                                    const nextAmount = document.getElementById(`inst-amount-${index + 1}`)
+                                                                    if (nextAmount) nextAmount.focus()
+                                                                    else debtModalDoneRef.current?.focus()
+                                                                }
+                                                            }}
+                                                        />
+                                                    </div>
+                                                    <button
+                                                        type="button"
+                                                        className={styles.deleteInstallmentBtn}
+                                                        aria-label={`Eliminar cuota ${installment.number}`}
+                                                        onClick={() => {
+                                                            const remainingInstallments = debtInstallments.filter((_, itemIndex) => itemIndex !== index)
+                                                            setDebtInstallments(remainingInstallments.map((item, itemIndex) => ({ ...item, number: itemIndex + 1 })))
+                                                        }}
+                                                    >
+                                                        <X size={15} />
+                                                    </button>
+                                                </div>
+                                            ))}
+                                        </div>
+
+                                        <div className={styles.installmentsSummary}>
+                                            <span className={debtScheduleNeedsReview ? styles.summaryAlert : styles.summaryOk}>
+                                                Suma: {formatCurrency(debtInstallmentsTotal)} / Total: {formatCurrency(total)}
+                                            </span>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+
+                        <div className={styles.debtModalFooter}>
+                            <div className={styles.debtModalTotals}>
+                                <span>Total de compra</span>
+                                <strong>{formatCurrency(total)}</strong>
+                                <span className={debtScheduleNeedsReview ? styles.debtSummaryWarning : styles.debtSummaryReady}>
+                                    {debtScheduleNeedsReview ? "El cronograma requiere revisión" : "Cronograma válido"}
+                                </span>
+                            </div>
+                            <button ref={debtModalDoneRef} type="button" className={styles.debtModalDone} onClick={() => setShowDebtModal(false)}>
+                                Guardar y volver
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {/* ══════════════════════════════════════════════════
           MODAL — búsqueda de productos (F2)
       ══════════════════════════════════════════════════ */}
@@ -1306,7 +1501,7 @@ export function PurchasePage() {
             {/* Confirm Modal */}
             {showConfirmModal && (
                 <div className={styles.modalOverlay}>
-                    <div className={styles.confirmModal}>
+                    <div data-pos-modal className={styles.confirmModal}>
                         <div className={styles.confirmIcon}>
                             <AlertCircle size={40} />
                         </div>
@@ -1344,7 +1539,7 @@ export function PurchasePage() {
             )}
             {barcodeError && (
                 <div className={styles.modalOverlay} onClick={() => setBarcodeError(null)}>
-                    <div className={styles.confirmModal} onClick={e => e.stopPropagation()}>
+                    <div data-pos-modal className={styles.confirmModal} onClick={e => e.stopPropagation()}>
                         <div className={styles.confirmIcon} style={{ background: "rgba(239,68,68,0.1)", color: "#ef4444" }}>
                             <AlertCircle size={40} />
                         </div>

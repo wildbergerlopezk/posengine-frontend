@@ -3,7 +3,7 @@
 import React from "react"
 import { 
   X, Keyboard, LayoutDashboard, Package, Users, Truck, 
-  Wallet, PlusCircle, History 
+  Wallet, PlusCircle, History, Tags
 } from "lucide-react"
 import styles from "./KeyboardShortcutsModal.module.css"
 
@@ -44,7 +44,7 @@ export function KeyboardShortcutsModal({ onClose }: KeyboardShortcutsModalProps)
 
   return (
     <div className={styles.overlay} onClick={onClose}>
-      <div className={styles.modal} onClick={handleModalClick}>
+      <div data-pos-modal className={styles.modal} onClick={handleModalClick}>
         <header className={styles.header}>
           <div className={styles.title}>
             <Keyboard size={24} />
@@ -61,6 +61,7 @@ export function KeyboardShortcutsModal({ onClose }: KeyboardShortcutsModalProps)
             <div className={styles.shortcutList}>
               <ShortcutItem icon={LayoutDashboard} label="Dashboard" keys={["Ctrl", "D"]} />
               <ShortcutItem icon={Package} label="Productos" keys={["Ctrl", "I"]} />
+              <ShortcutItem icon={Tags} label="Etiquetas de productos" keys={["Ctrl", "Alt", "E"]} />
               <ShortcutItem icon={Users} label="Clientes" keys={["Ctrl", "C"]} />
               <ShortcutItem icon={Truck} label="Proveedores" keys={["Ctrl", "P"]} />
               <ShortcutItem icon={Wallet} label="Caja" keys={["Ctrl", "K"]} />

@@ -2,7 +2,7 @@ import { Injectable, BadRequestException, NotFoundException } from '@nestjs/comm
 import { PrismaService } from '../../../prisma/prisma.service'
 import { CreateSaleDto } from '../dto/create-sale.dto'
 import { PaymentMethod, PaymentStatus } from '../../../generated/prisma/enums'
-import { Prisma } from '../../../generated/prisma/client'
+import type { Prisma } from '../../../generated/prisma/client'
 
 @Injectable()
 export class SaleCreditService {
@@ -63,7 +63,13 @@ export class SaleCreditService {
     remainingBalance: number,
     amountPaid: number,
     paymentMethod: PaymentMethod,
+    cashSessionId: string,
+    initialPaymentMethod?: 'CASH' | 'TRANSFER',
   ) {
+    // El registro de pagos de clientes representa únicamente cobros de ventas a crédito.
+    // Ventas CASH/CARD/TRANSFER ya se contabilizan por su total en la sesión de caja.
+    if (paymentMethod !== PaymentMethod.CREDIT) return
+
     // Incrementar deuda del cliente si quedó saldo pendiente
     if (customer && remainingBalance > 0) {
       await tx.customer.update({
@@ -74,13 +80,20 @@ export class SaleCreditService {
 
     // Si hubo seña, dejamos registro como CustomerPayment
     if (customer && amountPaid > 0) {
+      if (
+        initialPaymentMethod !== PaymentMethod.CASH &&
+        initialPaymentMethod !== PaymentMethod.TRANSFER
+      ) {
+        throw new BadRequestException('El abono inicial requiere un medio CASH o TRANSFER válido.')
+      }
       await tx.customerPayment.create({
         data: {
           tenantId,
           customerId: customer.id,
           saleId,
+          cashSessionId,
           amount: amountPaid,
-          paymentMethod,
+          paymentMethod: initialPaymentMethod,
         },
       })
     }
@@ -99,15 +112,8 @@ export class SaleCreditService {
       })
     }
 
-    // Anular cobros/señas registrados para esta venta
-    await tx.customerPayment.updateMany({
-      where: { saleId: sale.id, tenantId },
-      data: {
-        isVoided: true,
-        voidedAt: new Date(),
-        voidReason: 'Anulación automática por cancelación de venta',
-      },
-    })
+    // Los pagos tienen su propio ciclo de vida. Una anulación de venta nunca
+    // debe alterar ni reactivar pagos que fueron anulados por separado.
   }
 
   async restoreCreditDebtAndPayments(
@@ -142,14 +148,6 @@ export class SaleCreditService {
       })
     }
 
-    // Restaurar cobros/señas registrados para esta venta
-    await tx.customerPayment.updateMany({
-      where: { saleId: sale.id, tenantId },
-      data: {
-        isVoided: false,
-        voidedAt: null,
-        voidReason: null,
-      },
-    })
+    // Los pagos permanecen exactamente como estaban antes de la restauración.
   }
 }

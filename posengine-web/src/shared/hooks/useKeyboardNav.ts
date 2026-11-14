@@ -9,6 +9,7 @@ const DEFAULT_SHORTCUTS: ShortcutMap = {
   "ctrl+v": "/dashboard/sales/pos",
   "ctrl+h": "/dashboard/sales/history",
   "ctrl+i": "/dashboard/products",
+  "ctrl+alt+e": "/dashboard/printing/labels",
   "ctrl+b": "/dashboard/purchases/new",
   "ctrl+j": "/dashboard/purchases/history",
   "ctrl+c": "/dashboard/clients",
@@ -51,6 +52,7 @@ export function useKeyboardNav(shortcuts: ShortcutMap = DEFAULT_SHORTCUTS) {
       const href = shortcuts[combo]
       if (href) {
         e.preventDefault()
+        if (combo === "ctrl+alt+e" && isShortcutsModalOpen) closeShortcutsModal()
         router.push(href)
       }
     }

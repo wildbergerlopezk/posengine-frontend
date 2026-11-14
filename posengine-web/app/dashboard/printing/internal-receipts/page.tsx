@@ -524,7 +524,7 @@ export default function InternalReceiptsPage() {
       {/* MODAL: CREATE INTERNAL RECEIPT */}
       {isCreateOpen && (
         <div className={styles.modalOverlay}>
-          <div className={styles.modalContent}>
+          <div data-pos-modal className={styles.modalContent}>
             <div className={styles.modalHeader}>
               <h2 className={styles.modalTitle}>
                 <FileText style={{ color: "var(--primary)" }} size={20} />
@@ -604,7 +604,7 @@ export default function InternalReceiptsPage() {
       {/* MODAL: VOID RECEIPT */}
       {isVoidOpen && (
         <div className={styles.modalOverlay}>
-          <div className={styles.modalContent} style={{ padding: "1.25rem", gap: "1rem" }}>
+          <div data-pos-modal className={styles.modalContent} style={{ padding: "1.25rem", gap: "1rem" }}>
             <h2 className="text-lg font-bold flex items-center gap-2" style={{ color: "var(--destructive)", fontSize: "1.125rem", fontWeight: 700 }}>
               <AlertTriangle size={20} />
               Anular Comprobante
@@ -651,7 +651,7 @@ export default function InternalReceiptsPage() {
       {/* MODAL: DELETE RECEIPT */}
       {isDeleteOpen && (
         <div className={styles.modalOverlay}>
-          <div className={styles.modalContent} style={{ padding: "1.25rem", gap: "1rem" }}>
+          <div data-pos-modal className={styles.modalContent} style={{ padding: "1.25rem", gap: "1rem" }}>
             <h2 className="text-lg font-bold flex items-center gap-2" style={{ color: "var(--destructive)", fontSize: "1.125rem", fontWeight: 700 }}>
               <Trash2 size={20} />
               Eliminar Comprobante Definitivamente
@@ -688,7 +688,7 @@ export default function InternalReceiptsPage() {
       {/* MODAL: PDF VIEW & IFRAME PREVIEW */}
       {previewReceipt && (
         <div className={styles.modalOverlay}>
-          <div className={styles.pdfPreviewContent}>
+          <div data-pos-modal className={styles.pdfPreviewContent}>
             <div className={styles.pdfPreviewHeader}>
               <h2 className={styles.modalTitle}>
                 <Printer size={18} style={{ color: "var(--primary)" }} />

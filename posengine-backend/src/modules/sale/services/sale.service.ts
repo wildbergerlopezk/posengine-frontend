@@ -3,19 +3,24 @@ import {
   BadRequestException,
   ConflictException,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common'
+import { performance } from 'node:perf_hooks'
 import { PrismaService } from '../../../prisma/prisma.service'
 import { StockMovementService } from '../../stock-movement/stock-movement.service'
 import { SaleValidationService } from './sale-validation.service'
 import { SaleCreditService } from './sale-credit.service'
+import { CommercialOperationPolicy } from '../../../common/commercial-operation-policy'
 import { CreateSaleDto } from './../dto/create-sale.dto'
 import { SaleFilterDto } from './../dto/sale-filter.dto'
 import { CashSessionStatus, SaleStatus, PriceType, PaymentStatus, PaymentMethod } from '../../../generated/prisma/enums'
-import { Prisma } from '../../../generated/prisma/client'
+import type { Prisma } from '../../../generated/prisma/client'
 
 @Injectable()
 export class SaleService {
+  private readonly logger = new Logger(SaleService.name)
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly stockMovementService: StockMovementService,
@@ -25,6 +30,24 @@ export class SaleService {
 
   // ── Create ───────────────────────────────────────────────────────────────
   async create(tenantId: string, cashSessionId: string, dto: CreateSaleDto) {
+    const salePaymentMethod = dto.paymentMethod ?? PaymentMethod.CASH
+    const hasInitialPayment = (dto.amountPaid ?? 0) > 0
+    const initialMethod = dto.initialPaymentMethod
+    if (
+      salePaymentMethod === PaymentMethod.CREDIT &&
+      hasInitialPayment &&
+      initialMethod !== PaymentMethod.CASH &&
+      initialMethod !== PaymentMethod.TRANSFER
+    ) {
+      throw new BadRequestException('El abono inicial requiere seleccionar efectivo o transferencia.')
+    }
+    if (salePaymentMethod === PaymentMethod.CREDIT && !hasInitialPayment && initialMethod) {
+      throw new BadRequestException('No se puede indicar un medio de cobro sin un abono inicial.')
+    }
+    if (salePaymentMethod !== PaymentMethod.CREDIT && initialMethod) {
+      throw new BadRequestException('El medio del abono inicial solo aplica a ventas a crédito.')
+    }
+
     // 1. Validar que no haya productId duplicado en el mismo request
     const productIds = dto.items.map((i) => i.productId)
     const uniqueIds = new Set(productIds)
@@ -35,7 +58,7 @@ export class SaleService {
     }
 
     // 2. Cargar todos los productos de una sola consulta y validar
-    const products = await this.saleValidationService.validateAndFetchProducts(tenantId, dto.items)
+    await this.saleValidationService.validateAndFetchProducts(tenantId, dto.items)
 
     // 3. Calcular total de la venta
     const total = dto.items.reduce(
@@ -47,20 +70,20 @@ export class SaleService {
     const customer = await this.saleCreditService.validateCreditLimit(tenantId, dto, total)
 
     // 5. Ejecutar la transacción
-    return this.executeSaleTransaction(tenantId, cashSessionId, dto, products, customer, total)
+    return this.executeSaleTransaction(tenantId, cashSessionId, dto, customer, total)
   }
 
   private async executeSaleTransaction(
     tenantId: string,
     cashSessionId: string,
     dto: CreateSaleDto,
-    products: any[],
     customer: any,
     total: number,
   ) {
     const paymentMethod = dto.paymentMethod ?? PaymentMethod.CASH
-    const amountPaid = dto.amountPaid ?? 0
-    const remainingBalance = Math.max(0, total - amountPaid)
+    const isCreditSale = paymentMethod === PaymentMethod.CREDIT
+    const amountPaid = isCreditSale ? (dto.amountPaid ?? 0) : total
+    const remainingBalance = isCreditSale ? Math.max(0, total - amountPaid) : 0
 
     const paymentStatus =
       remainingBalance <= 0
@@ -71,82 +94,145 @@ export class SaleService {
 
     // Sort items by productId to prevent deadlocks
     const sortedItems = [...dto.items].sort((a, b) => a.productId.localeCompare(b.productId))
+    const startedAt = performance.now()
+    const stagesMs: Record<string, number> = {}
+    let succeeded = false
 
-    return this.prisma.$transaction(async (tx) => {
-      const sale = await tx.sale.create({
-        data: {
-          tenantId,
-          cashSessionId,
-          customerId: customer?.id,
-          total,
-          paymentMethod,
-          paymentStatus,
-          remainingBalance,
-        },
-      })
+    try {
+      const result = await this.prisma.$transaction(async (tx) => {
+        let transactionCustomer = customer
+        if (isCreditSale && customer?.id) {
+          const customerLock = await tx.customer.updateMany({
+            where: { id: customer.id, tenantId },
+            data: { currentDebt: { increment: 0 } },
+          })
+          if (customerLock.count !== 1) throw new ConflictException('El cliente ya no está disponible para crédito.')
+          transactionCustomer = await tx.customer.findFirst({ where: { id: customer.id, tenantId } })
+          if (!transactionCustomer || !transactionCustomer.isActive || !transactionCustomer.creditEnabled) {
+            throw new ConflictException('El cliente ya no está habilitado para crédito.')
+          }
+          if (Number(transactionCustomer.currentDebt) + remainingBalance > Number(transactionCustomer.creditLimit)) {
+            throw new ConflictException('El límite de crédito disponible cambió; revisá el saldo del cliente antes de confirmar.')
+          }
+        }
+        const activeSession = await tx.cashSession.updateMany({
+          where: {
+            id: cashSessionId,
+            tenantId,
+            status: CashSessionStatus.OPEN,
+          },
+          data: { totalSales: { increment: 0 } },
+        })
+        if (activeSession.count !== 1) {
+          throw new ConflictException('La caja ya está cerrada o no pertenece al negocio actual.')
+        }
 
-      for (const item of sortedItems) {
-        const saleItem = await tx.saleItem.create({
+        let stageStartedAt = performance.now()
+        const sale = await tx.sale.create({
           data: {
-            saleId: sale.id,
-            productId: item.productId,
-            quantity: item.quantity,
-            unitPrice: item.unitPrice,
-            priceType: item.priceType ?? PriceType.PUBLIC,
-            total: item.quantity * item.unitPrice,
+            tenantId,
+            cashSessionId,
+            customerId: customer?.id,
+            total,
+            paymentMethod,
+            paymentStatus,
+            remainingBalance,
           },
         })
+        stagesMs.saleCreate = performance.now() - stageStartedAt
 
-        // Descontar stock y registrar movimiento
-        await this.stockMovementService.registerSale(
-          tenantId,
-          item.productId,
-          item.quantity,
-          saleItem.id,
+        stageStartedAt = performance.now()
+        for (const item of sortedItems) {
+          const saleItem = await tx.saleItem.create({
+            data: {
+              saleId: sale.id,
+              productId: item.productId,
+              quantity: item.quantity,
+              unitPrice: item.unitPrice,
+              priceType: item.priceType ?? PriceType.PUBLIC,
+              total: item.quantity * item.unitPrice,
+            },
+          })
+
+          // Descontar stock y registrar movimiento
+          await this.stockMovementService.registerSale(
+            tenantId,
+            item.productId,
+            item.quantity,
+            saleItem.id,
+            tx,
+          )
+        }
+        stagesMs.itemsAndStock = performance.now() - stageStartedAt
+
+        // Solo lo cobrado en el momento entra a totalSales de la caja
+        stageStartedAt = performance.now()
+        await tx.cashSession.update({
+          where: { id: cashSessionId },
+          data: { totalSales: { increment: total - remainingBalance } },
+        })
+        stagesMs.cashUpdate = performance.now() - stageStartedAt
+
+        // Registrar deuda y señas/entregas del cliente
+        stageStartedAt = performance.now()
+        await this.saleCreditService.processCreditDebtAndPayments(
           tx,
+          tenantId,
+          sale.id,
+          transactionCustomer,
+          remainingBalance,
+          amountPaid,
+          paymentMethod,
+          cashSessionId,
+          dto.initialPaymentMethod,
         )
-      }
+        stagesMs.creditAccounting = performance.now() - stageStartedAt
 
-      // Solo lo cobrado en el momento entra a totalSales de la caja
-      await tx.cashSession.update({
-        where: { id: cashSessionId },
-        data: { totalSales: { increment: total - remainingBalance } },
-      })
-
-      // Registrar deuda y señas/entregas del cliente
-      await this.saleCreditService.processCreditDebtAndPayments(
-        tx,
-        tenantId,
-        sale.id,
-        customer,
-        remainingBalance,
-        amountPaid,
-        paymentMethod,
-      )
-
-      return tx.sale.findUnique({
-        where: { id: sale.id },
-        include: {
-          customer: { select: { id: true, name: true } },
-          items: {
-            include: {
-              product: { select: { id: true, name: true, sku: true, unitType: true } },
+        stageStartedAt = performance.now()
+        const createdSale = await tx.sale.findUnique({
+          where: { id: sale.id },
+          include: {
+            customer: { select: { id: true, name: true } },
+            items: {
+              include: {
+                product: { select: { id: true, name: true, sku: true, unitType: true } },
+              },
             },
           },
-        },
-      })
-    })
+        })
+        stagesMs.resultRead = performance.now() - stageStartedAt
+        return createdSale
+      }, { timeout: 15_000 })
+      succeeded = true
+      return result
+    } finally {
+      this.logger.log(JSON.stringify({
+        event: 'sale.transaction.completed',
+        outcome: succeeded ? 'success' : 'failure',
+        itemCount: sortedItems.length,
+        durationMs: Math.round(performance.now() - startedAt),
+        stagesMs: Object.fromEntries(
+          Object.entries(stagesMs).map(([stage, duration]) => [stage, Math.round(duration)]),
+        ),
+      }))
+    }
   }
 
   // ── FindAll ──────────────────────────────────────────────────────────────
   async findAll(tenantId: string, query: SaleFilterDto) {
-    const { status, dateFrom, dateTo, cashSessionId, page = 1, limit = 20 } = query
+    const { search, status, dateFrom, dateTo, cashSessionId, page = 1, limit = 20 } = query
     const skip = (page - 1) * limit
 
     const where: Prisma.SaleWhereInput = {
       tenantId,
       ...(status && { status }),
       ...(cashSessionId && { cashSessionId }),
+      ...(search && {
+        OR: [
+          { id: { contains: search, mode: 'insensitive' } },
+          { customer: { is: { name: { contains: search, mode: 'insensitive' } } } },
+        ],
+      }),
       ...((dateFrom || dateTo) && {
         saleDate: {
           ...(dateFrom && { gte: new Date(dateFrom) }),
@@ -204,14 +290,27 @@ export class SaleService {
   }
 
   // ── Cancel ───────────────────────────────────────────────────────────────
-  async cancel(id: string, tenantId: string) {
+  async cancel(id: string, tenantId: string, actorId: string, reason: string) {
+    CommercialOperationPolicy.assertEnabled('SALE_CANCELLATIONS')
+    if (!reason?.trim() || reason.trim().length < 5) {
+      throw new BadRequestException('Indicá un motivo de corrección de al menos cinco caracteres.')
+    }
     return this.prisma.$transaction(async (tx) => {
+      const reference = await tx.sale.findFirst({ where: { id, tenantId }, select: { customerId: true } })
+      if (!reference) throw new NotFoundException(`Venta con id "${id}" no encontrada`)
+      if (reference.customerId) {
+        const customerLock = await tx.customer.updateMany({
+          where: { id: reference.customerId, tenantId }, data: { currentDebt: { increment: 0 } },
+        })
+        if (customerLock.count !== 1) throw new NotFoundException('Cliente asociado a la venta no encontrado')
+      }
+      const locked = await tx.$queryRaw<Array<{ id: string }>>`
+        SELECT "id" FROM "sales" WHERE "id" = ${id} AND "tenantId" = ${tenantId} FOR UPDATE
+      `
+      if (locked.length !== 1) throw new NotFoundException(`Venta con id "${id}" no encontrada`)
       const sale = await tx.sale.findFirst({
         where: { id, tenantId },
-        include: {
-          cashSession: true,
-          items: true,
-        },
+        include: { cashSession: true, items: true, customerPayments: true, returns: true },
       })
 
       if (!sale) {
@@ -226,6 +325,18 @@ export class SaleService {
       if (sale.cashSession.status === CashSessionStatus.CLOSED) {
         throw new BadRequestException('No se puede anular una venta de una sesión de caja ya cerrada.')
       }
+      if (sale.returns.length > 0) throw new ConflictException('Una venta con devoluciones debe corregirse mediante el flujo de devoluciones.')
+      if (sale.customerPayments.length > 0) {
+        throw new ConflictException('No se puede anular una venta con historial de pagos; registrá una devolución y su liquidación financiera.')
+      }
+      if (Number(sale.total) - Number(sale.remainingBalance) > 0.01) {
+        throw new ConflictException('La venta registra dinero recibido. Usá una devolución con su liquidación financiera.')
+      }
+      const sessionLock = await tx.cashSession.updateMany({
+        where: { id: sale.cashSessionId, tenantId, status: CashSessionStatus.OPEN },
+        data: { totalSales: { increment: 0 } },
+      })
+      if (sessionLock.count !== 1) throw new ConflictException('La sesión de caja se cerró durante la anulación.')
 
       const statusUpdate = await tx.sale.updateMany({
         where: { id, tenantId, status: SaleStatus.COMPLETED },
@@ -235,6 +346,9 @@ export class SaleService {
       if (statusUpdate.count === 0) {
         throw new ConflictException('La venta ya está anulada')
       }
+      await tx.saleLifecycleEvent.create({
+        data: { tenantId, saleId: id, actorId, action: 'CANCEL', reason: reason.trim() },
+      })
 
       // Prevent deadlocks by sorting items deterministically
       const sortedItems = [...sale.items].sort((a, b) => a.productId.localeCompare(b.productId))
@@ -293,12 +407,29 @@ export class SaleService {
   }
 
   // ── Uncancel / Restore Sale ──────────────────────────────────────────────
-  async uncancel(id: string, tenantId: string) {
+  async uncancel(id: string, tenantId: string, actorId: string, reason: string) {
+    CommercialOperationPolicy.assertEnabled('SALE_RESTORATIONS')
+    if (!reason?.trim() || reason.trim().length < 5) {
+      throw new BadRequestException('Indicá un motivo de restauración de al menos cinco caracteres.')
+    }
     return this.prisma.$transaction(async (tx) => {
+      const reference = await tx.sale.findFirst({ where: { id, tenantId }, select: { customerId: true } })
+      if (!reference) throw new NotFoundException(`Venta con id "${id}" no encontrada`)
+      if (reference.customerId) {
+        const customerLock = await tx.customer.updateMany({
+          where: { id: reference.customerId, tenantId }, data: { currentDebt: { increment: 0 } },
+        })
+        if (customerLock.count !== 1) throw new NotFoundException('Cliente asociado a la venta no encontrado')
+      }
+      const locked = await tx.$queryRaw<Array<{ id: string }>>`
+        SELECT "id" FROM "sales" WHERE "id" = ${id} AND "tenantId" = ${tenantId} FOR UPDATE
+      `
+      if (locked.length !== 1) throw new NotFoundException(`Venta con id "${id}" no encontrada`)
       const sale = await tx.sale.findFirst({
         where: { id, tenantId },
         include: {
           cashSession: true,
+          returns: true,
           items: {
             include: {
               product: true,
@@ -314,11 +445,23 @@ export class SaleService {
       if (sale.status !== SaleStatus.CANCELLED) {
         throw new ConflictException('La venta no está anulada')
       }
+      const latestEvent = await tx.saleLifecycleEvent.findFirst({
+        where: { saleId: id, tenantId }, orderBy: { createdAt: 'desc' },
+      })
+      if (!latestEvent || latestEvent.action !== 'CANCEL') {
+        throw new ConflictException('La venta no tiene una anulación auditable compatible con restauración directa.')
+      }
 
       // Validar inmutabilidad de sesión de caja cerrada
       if (sale.cashSession.status === CashSessionStatus.CLOSED) {
         throw new BadRequestException('No se puede restaurar una venta de una sesión de caja ya cerrada.')
       }
+      if (sale.returns.length > 0) throw new ConflictException('Una venta con devoluciones no puede restaurarse directamente.')
+      const sessionLock = await tx.cashSession.updateMany({
+        where: { id: sale.cashSessionId, tenantId, status: CashSessionStatus.OPEN },
+        data: { totalSales: { increment: 0 } },
+      })
+      if (sessionLock.count !== 1) throw new ConflictException('La sesión de caja se cerró durante la restauración.')
 
       // 1. Validar stock suficiente y que el producto esté activo
       this.saleValidationService.validateStockAndActiveState(sale.items)
@@ -335,6 +478,9 @@ export class SaleService {
       if (statusUpdate.count === 0) {
         throw new ConflictException('La venta no está anulada o ya fue modificada')
       }
+      await tx.saleLifecycleEvent.create({
+        data: { tenantId, saleId: id, actorId, action: 'RESTORE', reason: reason.trim() },
+      })
 
       // Sort items to prevent deadlocks
       const sortedItems = [...sale.items].sort((a, b) => a.productId.localeCompare(b.productId))

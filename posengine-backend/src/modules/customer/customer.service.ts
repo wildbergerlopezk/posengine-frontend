@@ -8,6 +8,7 @@ import { PrismaService } from '../../prisma/prisma.service'
 import { CreateCustomerDto } from '../customer/dto/create-customer.dto'
 import { UpdateCustomerDto } from '../customer/dto/update-customer.dto'
 import { CustomerFilterDto } from '../customer/dto/customer-filter.dto'
+import type { Prisma } from '../../generated/prisma/client'
 
 @Injectable()
 export class CustomerService {
@@ -24,10 +25,10 @@ export class CustomerService {
 
   // ── FindAll ─────────────────────────────────────────────────────────────────
   async findAll(tenantId: string, filters: CustomerFilterDto) {
-    const { search, creditEnabled, page = 1, limit = 20 } = filters
+    const { search, creditEnabled, hasDebt, page = 1, limit = 20 } = filters
     const skip = (page - 1) * limit
 
-    const where: any = { tenantId, isActive: true }
+    const where: Prisma.CustomerWhereInput = { tenantId, isActive: true }
 
     if (search) {
       where.OR = [
@@ -41,6 +42,9 @@ export class CustomerService {
     }
 
     if (creditEnabled !== undefined) where.creditEnabled = creditEnabled
+    if (hasDebt !== undefined) {
+      where.currentDebt = hasDebt ? { gt: 0 } : { lte: 0 }
+    }
 
     const [items, total] = await Promise.all([
       this.prisma.customer.findMany({

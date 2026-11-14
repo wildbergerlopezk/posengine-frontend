@@ -13,6 +13,8 @@ import { Prisma } from '../../../generated/prisma/client'
 import { StockMovementService } from '../../stock-movement/stock-movement.service'
 import { PurchaseValidationService } from './purchase-validation.service'
 import { PurchaseDebtService } from './purchase-debt.service'
+import { CommercialOperationPolicy } from '../../../common/commercial-operation-policy'
+import { CancelPurchaseDto } from '../dto/cancel-purchase.dto'
 
 @Injectable()
 export class PurchaseService {
@@ -55,6 +57,14 @@ export class PurchaseService {
     const sortedItems = [...dto.items].sort((a, b) => a.productId.localeCompare(b.productId))
 
     return this.prisma.$transaction(async (tx) => {
+      const openSession = await tx.cashSession.updateMany({
+        where: { id: cashSessionId, tenantId, status: 'OPEN' },
+        data: { totalSales: { increment: 0 } },
+      })
+      if (openSession.count !== 1) {
+        throw new ConflictException('La sesión de caja indicada no existe, no pertenece a este negocio o ya está cerrada.')
+      }
+
       const purchase = await tx.purchase.create({
         data: {
           tenantId,
@@ -197,7 +207,13 @@ export class PurchaseService {
         },
         debt: {
           include: {
-            installments: { orderBy: { number: 'asc' } },
+            installments: {
+              orderBy: { number: 'asc' },
+              include: {
+                adjustments: { select: { amount: true } },
+                creditApplications: { select: { amount: true } },
+              },
+            },
             payments: { orderBy: { paymentDate: 'desc' } },
           },
         },
@@ -211,40 +227,81 @@ export class PurchaseService {
     return purchase
   }
   
-  async cancel(id: string, tenantId: string) {
-    const purchase = await this.prisma.purchase.findFirst({
-      where: { id, tenantId },
-      include: {
-        items: true,
-        returns: true,
-        debt: { include: { payments: true } },
-      },
-    })
-
-    if (!purchase) {
-      throw new NotFoundException(`Compra con id "${id}" no encontrada`)
+  async cancel(id: string, tenantId: string, actorId: string, dto: CancelPurchaseDto) {
+    CommercialOperationPolicy.assertEnabled('PURCHASE_CANCELLATIONS')
+    if (dto.supplierReceivedNothing !== true) {
+      throw new BadRequestException('Solo se puede cancelar una compra errónea cuando el proveedor confirma que no recibió el pago.')
     }
-
-    if (purchase.status === PurchaseStatus.CANCELLED) {
-      throw new ConflictException('La compra ya está cancelada')
+    if (!dto.reason?.trim() || dto.reason.trim().length < 5) {
+      throw new BadRequestException('Indicá un motivo de corrección de al menos cinco caracteres.')
     }
-
-    if (purchase.returns.length > 0) {
-      throw new BadRequestException(
-        'No se puede cancelar una compra que tiene devoluciones registradas',
-      )
-    }
-
-    if (purchase.debt && Number(purchase.debt.paidAmount) > 0) {
-      throw new BadRequestException(
-        'No se puede cancelar una compra a crédito que ya tiene pagos registrados',
-      )
-    }
-
-    // Sort items to prevent deadlocks
-    const sortedItems = [...purchase.items].sort((a, b) => a.productId.localeCompare(b.productId))
-
     return this.prisma.$transaction(async (tx) => {
+      const lockedPurchase = await tx.$queryRaw<Array<{ id: string }>>`
+        SELECT "id"
+        FROM "purchases"
+        WHERE "id" = ${id} AND "tenantId" = ${tenantId}
+        FOR UPDATE
+      `
+      if (lockedPurchase.length === 0) {
+        throw new NotFoundException(`Compra con id "${id}" no encontrada`)
+      }
+
+      const purchase = await tx.purchase.findFirst({
+        where: { id, tenantId },
+        include: {
+          items: true,
+          returns: true,
+          cashSession: true,
+          debt: { include: { payments: true, adjustments: true, installments: true } },
+        },
+      })
+      if (!purchase) throw new NotFoundException(`Compra con id "${id}" no encontrada`)
+      if (purchase.status === PurchaseStatus.CANCELLED) {
+        throw new ConflictException('La compra ya está cancelada')
+      }
+      if (purchase.status !== PurchaseStatus.RECEIVED) {
+        throw new BadRequestException('Solo se pueden cancelar compras en estado RECEIVED')
+      }
+      if (purchase.paymentType === 'CASH') {
+        throw new ConflictException('Una compra al contado representa efectivo ya entregado; registrá el reembolso mediante una devolución del proveedor.')
+      }
+      if (!purchase.debt) {
+        throw new ConflictException('No se puede cancelar una compra a crédito sin su registro de deuda vinculado.')
+      }
+      if (purchase.cashSession.status !== 'OPEN') {
+        throw new ConflictException('No se puede modificar una compra vinculada a una sesión de caja cerrada.')
+      }
+      const sessionLock = await tx.cashSession.updateMany({
+        where: { id: purchase.cashSessionId, tenantId, status: 'OPEN' },
+        data: { totalPurchases: { increment: 0 } },
+      })
+      if (sessionLock.count !== 1) throw new ConflictException('La sesión de caja se cerró durante la anulación.')
+      if (purchase.debt) {
+        const debtLock = await tx.$queryRaw<Array<{ id: string }>>`
+          SELECT "id" FROM "purchase_debts" WHERE "id" = ${purchase.debt.id} AND "tenantId" = ${tenantId} FOR UPDATE
+        `
+        if (debtLock.length !== 1) throw new ConflictException('La deuda de la compra cambió durante la anulación.')
+      }
+      const currentDebt = purchase.debt
+        ? await tx.purchaseDebt.findFirst({
+            where: { id: purchase.debt.id, tenantId },
+            include: { payments: true, adjustments: true, installments: true },
+          })
+        : null
+      if (purchase.returns.length > 0) {
+        throw new BadRequestException('No se puede cancelar una compra que tiene devoluciones registradas')
+      }
+      if (currentDebt && (Number(currentDebt.paidAmount) > 0 || currentDebt.payments.length > 0)) {
+        throw new BadRequestException('No se puede cancelar una compra a crédito que ya tiene pagos registrados')
+      }
+      if (currentDebt?.adjustments.length) {
+        throw new BadRequestException('No se puede cancelar una compra cuyo saldo ya fue ajustado; corregila con una operación vinculada.')
+      }
+      if (currentDebt?.installments.length) {
+        throw new BadRequestException('No se puede cancelar una compra con cuotas programadas; el calendario requiere una corrección específica.')
+      }
+
+      const sortedItems = [...purchase.items].sort((a, b) => a.productId.localeCompare(b.productId))
       // Validate stock availability using the validation service
       await this.purchaseValidationService.validateCancelStockAvailability(tx, purchase, tenantId)
 
@@ -259,11 +316,27 @@ export class PurchaseService {
         )
       }
 
-      return tx.purchase.update({
-        where: { id },
+      const statusUpdate = await tx.purchase.updateMany({
+        where: { id, tenantId, status: PurchaseStatus.RECEIVED },
         data: { status: PurchaseStatus.CANCELLED },
+      })
+      if (statusUpdate.count !== 1) {
+        throw new ConflictException('La compra cambió durante la anulación')
+      }
+      if (currentDebt) {
+        await tx.purchaseDebt.update({
+          where: { purchaseId: purchase.id },
+          data: { balance: 0, status: 'CANCELLED' },
+        })
+      }
+      await tx.purchaseLifecycleEvent.create({
+        data: { tenantId, purchaseId: id, actorId, action: 'CANCEL', reason: dto.reason.trim() },
+      })
+
+      return tx.purchase.findFirst({
+        where: { id, tenantId },
         include: { supplier: true },
       })
-    })
+    }, { timeout: 15_000 })
   }
 }

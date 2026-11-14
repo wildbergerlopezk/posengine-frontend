@@ -7,7 +7,12 @@ import {
   ApiBearerAuth, ApiBody, ApiParam, ApiQuery,
 } from '@nestjs/swagger';
 import { PurchaseReturnService } from '../services/purchase-return.service';
-import { CreatePurchaseReturnDto } from '../dto/create-purchase-return.dto';
+import {
+  ApplyPurchaseReturnCreditDto,
+  ConfirmPurchaseReturnDto,
+  CreatePurchaseReturnDto,
+  SettlePurchaseReturnRefundDto,
+} from '../dto/create-purchase-return.dto';
 import { CurrentUser } from '../../../common/decorators/current-user.decorator';
 import { Roles } from '../../../common/decorators/roles.decorator';
 import { UserRole } from '../../../generated/prisma/enums';
@@ -28,9 +33,10 @@ export class PurchaseReturnController {
   @ApiResponse({ status: 404, description: 'Compra o ítem no encontrado' })
   create(
     @CurrentUser('tenantId') tenantId: string,
+    @CurrentUser('id') actorId: string,
     @Body() dto: CreatePurchaseReturnDto,
   ) {
-    return this.purchaseReturnService.create(tenantId, dto);
+    return this.purchaseReturnService.create(tenantId, dto, actorId);
   }
 
   @Patch(':id/confirm')
@@ -42,8 +48,34 @@ export class PurchaseReturnController {
   confirm(
     @Param('id') id: string,
     @CurrentUser('tenantId') tenantId: string,
+    @CurrentUser('id') actorId: string,
+    @Body() dto: ConfirmPurchaseReturnDto,
   ) {
-    return this.purchaseReturnService.confirm(id, tenantId);
+    return this.purchaseReturnService.confirm(id, tenantId, dto, actorId);
+  }
+
+  @Patch('settlements/:settlementId/settle')
+  @Roles(UserRole.ADMIN, UserRole.SUPERADMIN)
+  @ApiOperation({ summary: 'Registrar que un reembolso pendiente fue recibido' })
+  settleRefund(
+    @Param('settlementId') settlementId: string,
+    @CurrentUser('tenantId') tenantId: string,
+    @CurrentUser('id') actorId: string,
+    @Body() dto: SettlePurchaseReturnRefundDto,
+  ) {
+    return this.purchaseReturnService.settleRefund(settlementId, tenantId, dto, actorId);
+  }
+
+  @Post('settlements/:settlementId/apply-credit')
+  @Roles(UserRole.ADMIN, UserRole.SUPERADMIN)
+  @ApiOperation({ summary: 'Aplicar crédito de proveedor a una compra a crédito del mismo proveedor' })
+  applySupplierCredit(
+    @Param('settlementId') settlementId: string,
+    @CurrentUser('tenantId') tenantId: string,
+    @CurrentUser('id') actorId: string,
+    @Body() dto: ApplyPurchaseReturnCreditDto,
+  ) {
+    return this.purchaseReturnService.applySupplierCredit(settlementId, tenantId, dto, actorId);
   }
 
   @Patch(':id/cancel')
@@ -65,8 +97,9 @@ export class PurchaseReturnController {
   findAll(
     @CurrentUser('tenantId') tenantId: string,
     @Query('purchaseId') purchaseId?: string,
+    @Query('supplierId') supplierId?: string,
   ) {
-    return this.purchaseReturnService.findAll(tenantId, purchaseId);
+    return this.purchaseReturnService.findAll(tenantId, purchaseId, supplierId);
   }
 
   @Get(':id')

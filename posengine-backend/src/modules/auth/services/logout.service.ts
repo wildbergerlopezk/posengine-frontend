@@ -1,17 +1,14 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { PrismaService } from '../../../prisma/prisma.service';
-import { RefreshTokenDto } from '../dto/refresh-token.dto';
-import { hashToken } from '../utils/hash-token.util';
 
 @Injectable()
 export class LogoutService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async logout(dto: RefreshTokenDto) {
-    const tokenHash = hashToken(dto.refreshToken);
-
+  async logout(userId: string, sessionId: string) {
+    if (!sessionId) throw new UnauthorizedException('Sesión inválida.');
     await this.prisma.refreshToken.updateMany({
-      where: { tokenHash, revokedAt: null },
+      where: { tokenHash: sessionId, userId, revokedAt: null },
       data: { revokedAt: new Date() },
     });
 

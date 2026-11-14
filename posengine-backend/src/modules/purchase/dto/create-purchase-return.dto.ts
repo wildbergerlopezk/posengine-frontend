@@ -2,7 +2,7 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import {
   IsArray, IsDateString, IsNotEmpty, IsNumber,
-  IsOptional, IsPositive, IsString, IsUUID,
+  IsIn, IsOptional, IsPositive, IsString, IsUUID,
   MaxLength, Min, ValidateNested,
 } from 'class-validator';
 
@@ -44,4 +44,53 @@ export class CreatePurchaseReturnDto {
   @ValidateNested({ each: true })
   @Type(() => CreatePurchaseReturnItemDto)
   items!: CreatePurchaseReturnItemDto[];
+}
+
+export class ConfirmPurchaseReturnDto {
+  @ApiPropertyOptional({
+    enum: ['REFUND_PENDING', 'REFUND_CASH', 'REFUND_TRANSFER', 'SUPPLIER_CREDIT'],
+    description: 'Destino explícito del excedente después de compensar deuda pendiente.',
+  })
+  @IsOptional()
+  @IsIn(['REFUND_PENDING', 'REFUND_CASH', 'REFUND_TRANSFER', 'SUPPLIER_CREDIT'])
+  settlementDisposition?: 'REFUND_PENDING' | 'REFUND_CASH' | 'REFUND_TRANSFER' | 'SUPPLIER_CREDIT'
+}
+
+export class SettlePurchaseReturnRefundDto {
+  @ApiProperty({ description: 'Importe recibido en este abono' })
+  @IsNumber()
+  @Min(0.01)
+  amount!: number
+
+  @ApiProperty({ enum: ['CASH', 'TRANSFER'] })
+  @IsIn(['CASH', 'TRANSFER'])
+  paymentMethod!: 'CASH' | 'TRANSFER'
+
+  @ApiPropertyOptional({ example: '2026-11-13T15:30:00.000Z' })
+  @IsOptional()
+  @IsDateString()
+  effectiveAt?: string
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  reference?: string
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  notes?: string
+}
+
+export class ApplyPurchaseReturnCreditDto {
+  @ApiProperty({ description: 'Compra a crédito del mismo proveedor' })
+  @IsUUID()
+  purchaseId!: string
+
+  @ApiProperty({ description: 'Monto del crédito a aplicar' })
+  @IsNumber()
+  @Min(0.01)
+  amount!: number
 }

@@ -1,0 +1,2 @@
+-- RenameIndex
+ALTER INDEX "cash_payment_classification_audits_tenantId_cashSessionId_creat" RENAME TO "cash_payment_classification_audits_tenantId_cashSessionId_c_idx";

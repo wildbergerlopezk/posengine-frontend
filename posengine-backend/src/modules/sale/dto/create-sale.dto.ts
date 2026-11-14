@@ -11,6 +11,7 @@ import {
   MaxLength,
   Min,
   IsEnum,
+  IsIn,
   ValidateIf,
 } from 'class-validator'
 import { Type, Transform } from 'class-transformer'
@@ -73,4 +74,19 @@ export class CreateSaleDto {
   @Min(0, { message: 'amountPaid no puede ser negativo' })
   @IsOptional()
   amountPaid?: number
+
+  @ApiPropertyOptional({
+    enum: [PaymentMethod.CASH, PaymentMethod.TRANSFER],
+    description: 'Medio real del abono inicial. Requerido cuando amountPaid es mayor que 0 en una venta CREDIT.',
+  })
+  @ValidateIf(
+    (o) =>
+      o.paymentMethod === PaymentMethod.CREDIT &&
+      typeof o.amountPaid === 'number' &&
+      o.amountPaid > 0,
+  )
+  @IsIn([PaymentMethod.CASH, PaymentMethod.TRANSFER], {
+    message: 'initialPaymentMethod debe ser CASH o TRANSFER cuando hay un abono inicial.',
+  })
+  initialPaymentMethod?: 'CASH' | 'TRANSFER'
 }

@@ -4,11 +4,12 @@ enum UserRole {
 }
 
 model User {
-  id        String   @id @default(uuid())
-  tenantId  String?
-  name      String
-  email     String   @unique
-  password  String
+  id       String  @id @default(uuid())
+  tenantId String?
+  name     String
+  email    String  @unique
+  password String
+  quickPinHash String?
 
   emailVerified   Boolean   @default(false)
   emailVerifiedAt DateTime?
@@ -18,10 +19,19 @@ model User {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  tenant Tenant? @relation(fields: [tenantId], references: [id])
-  refreshTokens RefreshToken[]
-  passwordResetTokens PasswordResetToken[]
-  emailVerificationTokens EmailVerificationToken[]
+  tenant                          Tenant?                           @relation(fields: [tenantId], references: [id])
+  refreshTokens                   RefreshToken[]
+  quickPinDevices                 QuickPinDevice[]
+  passwordResetTokens             PasswordResetToken[]
+  emailVerificationTokens         EmailVerificationToken[]
+  cashPaymentClassificationAudits CashPaymentClassificationAudit[]
+  purchaseReturnRefundReceipts    PurchaseReturnRefundReceipt[]     @relation("PurchaseReturnRefundReceiptActor")
+  saleReturnsCreated              SaleReturn[]                      @relation("SaleReturnActor")
+  saleReturnRefundReceipts        SaleReturnRefundReceipt[]         @relation("SaleReturnRefundReceiptActor")
+  saleLifecycleEvents             SaleLifecycleEvent[]              @relation("SaleLifecycleEventActor")
+  purchaseLifecycleEvents         PurchaseLifecycleEvent[]          @relation("PurchaseLifecycleEventActor")
+  purchaseReturnsCreated          PurchaseReturn[]                  @relation("PurchaseReturnActor")
+  supplierCreditApplications      PurchaseReturnCreditApplication[] @relation("PurchaseReturnCreditApplicationActor")
 
   @@unique([email, tenantId])
   @@index([tenantId])

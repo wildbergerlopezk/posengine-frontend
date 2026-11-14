@@ -1,28 +1,31 @@
 model Sale {
-  id            String @id @default(uuid())
+  id            String  @id @default(uuid())
   tenantId      String
   cashSessionId String
   customerId    String?
 
   saleDate DateTime @default(now())
-  total    Decimal @db.Decimal(12, 2)
+  total    Decimal  @db.Decimal(12, 2)
 
   status        SaleStatus    @default(COMPLETED)
   paymentStatus PaymentStatus @default(PAID)
   paymentMethod PaymentMethod @default(CASH)
 
-  remainingBalance Decimal @db.Decimal(12, 2) @default(0)
+  remainingBalance Decimal @default(0) @db.Decimal(12, 2)
 
-  createdAt DateTime   @default(now())
-  updatedAt DateTime   @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  tenant           Tenant            @relation(fields: [tenantId], references: [id])
-  cashSession      CashSession       @relation(fields: [cashSessionId], references: [id])
-  customer         Customer?         @relation(fields: [customerId], references: [id])
-  items            SaleItem[]
-  customerPayments CustomerPayment[]
-  internalReceipt  InternalReceipt?
-  
+  tenant            Tenant                     @relation(fields: [tenantId], references: [id])
+  cashSession       CashSession                @relation(fields: [cashSessionId], references: [id])
+  customer          Customer?                  @relation(fields: [customerId], references: [id])
+  items             SaleItem[]
+  customerPayments  CustomerPayment[]
+  internalReceipt   InternalReceipt?
+  returns           SaleReturn[]
+  returnAdjustments SaleReturnDebtAdjustment[]
+  lifecycleEvents   SaleLifecycleEvent[]
+
   @@index([tenantId])
   @@index([cashSessionId])
   @@index([customerId])

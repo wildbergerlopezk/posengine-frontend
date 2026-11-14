@@ -17,9 +17,9 @@ export class TokenService {
     private readonly prisma: PrismaService,
   ) {}
 
-  signAccessToken(user: { id: string; email: string; tenantId: string | null }): string {
+  signAccessToken(user: { id: string; email: string; tenantId: string | null }, refreshToken: string): string {
     return this.jwtService.sign(
-      { sub: user.id, email: user.email, tenantId: user.tenantId },
+      { sub: user.id, email: user.email, tenantId: user.tenantId, sid: hashToken(refreshToken) },
       { expiresIn: ACCESS_TOKEN_TTL },
     );
   }

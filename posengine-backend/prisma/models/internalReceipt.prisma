@@ -1,9 +1,9 @@
 model InternalReceipt {
   id String @id @default(uuid())
 
-  tenantId  String
-  companyId String
-  saleId    String  @unique // un comprobante por venta
+  tenantId   String
+  companyId  String
+  saleId     String  @unique // un comprobante por venta
   customerId String?
 
   // Correlativo interno por empresa (no es timbrado fiscal, es solo

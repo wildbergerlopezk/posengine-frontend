@@ -8,15 +8,4 @@ export class UpdateUserDto {
   @MaxLength(50)
   @Transform(({ value }) => value?.trim())
   name?: string;
-
-  @IsOptional()
-  @IsString()
-  @MinLength(8)
-  password?: string;
-
-  @IsOptional()
-  tenantId?: string;
-
-  @IsOptional()
-  active?: boolean;
 }

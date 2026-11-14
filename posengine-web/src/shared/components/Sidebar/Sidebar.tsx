@@ -9,6 +9,8 @@ import {
   PlusCircle, List, Tags, Tag, Building2, LogOut, Menu,
   ChevronDown, ChevronRight, HelpCircle, Layers
 } from "lucide-react"
+import { toast } from "sonner"
+import { apiClient } from "@/src/shared/api/apiClient"
 import { useAuthStore } from "@/src/features/auth/store/auth.store"
 import styles from "./Sidebar.module.css"
 
@@ -26,24 +28,25 @@ const navItems = [
   },
 
   {
-    href: "/dashboard/products",
-    label: "Inventario",
-    icon: Package,
-    subItems: [
-      { href: "/dashboard/products", label: "Productos", icon: List },
-      { href: "/dashboard/stock/history", label: "Historial de stock", icon: History },
-      { href: "/dashboard/categories", label: "Categorías", icon: Tags },
-      { href: "/dashboard/subcategories", label: "Subcategorías", icon: Tag },
-    ],
-  },
-
-  {
     href: "/dashboard/purchases",
     label: "Compras",
     icon: ShoppingBag,
     subItems: [
       { href: "/dashboard/purchases/new", label: "Registrar compra", icon: PlusCircle },
       { href: "/dashboard/purchases/history", label: "Historial de compras", icon: History },
+    ],
+  },
+
+  {
+    href: "/dashboard/products",
+    label: "Inventario",
+    icon: Package,
+    subItems: [
+      { href: "/dashboard/products", label: "Productos", icon: List },
+      { href: "/dashboard/printing/labels", label: "Etiquetas", icon: Tag },
+      { href: "/dashboard/stock/history", label: "Historial de stock", icon: History },
+      { href: "/dashboard/categories", label: "Categorías", icon: Tags },
+      { href: "/dashboard/subcategories", label: "Subcategorías", icon: Tag },
     ],
   },
 
@@ -93,20 +96,15 @@ export function Sidebar() {
 
   const handleLogout = async () => {
     const { refreshToken, accessToken } = useAuthStore.getState()
-    if (refreshToken) {
-      try {
-        const { API_BASE_URL } = await import("@/src/shared/config/api")
-        await fetch(`${API_BASE_URL}/auth/logout`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${accessToken}`,
-          },
-          body: JSON.stringify({ refreshToken }),
-        })
-      } catch (err) {
-        console.error("Error revoking refresh token", err)
-      }
+    if (!refreshToken || !accessToken) {
+      toast.error("No se pudo cerrar la sesión en el servidor. Volvé a intentar.")
+      return
+    }
+    try {
+      await apiClient.post("/auth/logout")
+    } catch {
+      toast.error("No se pudo cerrar la sesión en el servidor. Volvé a intentar.")
+      return
     }
     logout()
     router.push("/login")
@@ -242,11 +240,7 @@ export function Sidebar() {
               </button>
             </>
           ) : (
-            <button
-              className={styles.logoutButtonCollapsed}
-              onClick={handleLogout}
-              title="Cerrar sesión"
-            >
+            <button className={styles.logoutButtonCollapsed} onClick={handleLogout} title="Cerrar sesión" aria-label="Cerrar sesión">
               <LogOut size={18} />
             </button>
           )}

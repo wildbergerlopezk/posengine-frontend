@@ -6,7 +6,6 @@ import { NestExpressApplication } from '@nestjs/platform-express'
 import { join } from 'path'
 import { writeFileSync } from 'fs'
 import { AllExceptionsFilter } from './common/filters/http-exception.filter'
-import { MailService } from './common/mail/mail.service'
 import { Prisma } from './generated/prisma/client'
 
 // Forzar a que los Decimal de Prisma se serialicen como números en JSON
@@ -17,15 +16,15 @@ import { Prisma } from './generated/prisma/client'
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule)
 
-  const allowedOrigins = process.env.CORS_ORIGIN?.split(',') ?? ['http://localhost:3000']
+  const allowedOrigins = (process.env.CORS_ORIGIN ?? 'http://localhost:3000')
+    .split(',')
+    .map((origin) => origin.trim())
+    .filter(Boolean)
 
   app.enableCors({
     origin: (origin, callback) => {
       if (!origin) return callback(null, true)
-      const isLocalNetwork = /^http:\/\/192\.168\.\d+\.\d+:\d+$/.test(origin)
-      const isVercelPreview = /^https:\/\/.*\.vercel\.app$/.test(origin)
-      const isAllowed = allowedOrigins.includes(origin)
-      if (isLocalNetwork || isVercelPreview || isAllowed) {
+      if (allowedOrigins.includes(origin)) {
         return callback(null, true)
       }
       return callback(new Error(`CORS bloqueado: ${origin}`))
@@ -45,8 +44,7 @@ async function bootstrap() {
     }),
   )
 
-  const mailService = app.get(MailService)
-  app.useGlobalFilters(new AllExceptionsFilter(mailService))
+  app.useGlobalFilters(new AllExceptionsFilter())
 
   const config = new DocumentBuilder()
     .setTitle('PosEngine API')

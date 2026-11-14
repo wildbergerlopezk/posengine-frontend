@@ -9,10 +9,13 @@ import styles from "./ProductSearchModal.module.css"
 export interface ProductSearchItem {
   id: string
   name: string
+  description?: string
   barcode?: string
   sku?: string
   price: number
+  wholesalePrice?: number
   stock: number
+  imageUrl?: string
   cost?: number
   unitType: "UNIT" | "KG" | "G" | "L" | "ML" | "MG"
 }
@@ -53,6 +56,12 @@ interface ProductSearchModalProps {
   onExtraKeyDown?: (e: React.KeyboardEvent, selectedProduct: ProductSearchItem | null) => void
   /** Hints extra que se muestran en la barra inferior (además de los básicos) */
   extraHints?: React.ReactNode
+  /** Contenido opcional para flujos que requieren confirmar datos antes de seleccionar. */
+  footerContent?: React.ReactNode
+  /** Mensaje mostrado cuando la búsqueda no devuelve productos. */
+  emptyMessage?: React.ReactNode
+  /** Permite ocultar existencias en usos que no representan una venta. */
+  showStock?: boolean
 }
 
 function isUnitType(unitType?: string) {
@@ -77,6 +86,9 @@ export const ProductSearchModal = forwardRef<ProductSearchModalHandle, ProductSe
       priceColumn = "price",
       onExtraKeyDown,
       extraHints,
+      footerContent,
+      emptyMessage,
+      showStock = true,
     },
     ref
   ) {
@@ -95,10 +107,7 @@ export const ProductSearchModal = forwardRef<ProductSearchModalHandle, ProductSe
 
   // Foco al abrir
   useEffect(() => {
-    if (open) {
-      const t = setTimeout(() => searchRef.current?.focus(), 80)
-      return () => clearTimeout(t)
-    }
+    if (open) searchRef.current?.focus()
   }, [open])
 
   const handleKeyDown = useCallback(
@@ -144,7 +153,14 @@ export const ProductSearchModal = forwardRef<ProductSearchModalHandle, ProductSe
       aria-modal="true"
       aria-label="Buscar producto"
     >
-      <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
+      <div
+        data-pos-modal
+        className={`${styles.modal} ${showStock ? "" : styles.modalWithoutStock}`}
+        onClick={(e) => e.stopPropagation()}
+        onKeyDown={(event) => {
+          if (event.key === "Escape" && event.target !== searchRef.current) onClose()
+        }}
+      >
 
         {/* ── Header ── */}
         <div className={styles.header}>
@@ -186,7 +202,7 @@ export const ProductSearchModal = forwardRef<ProductSearchModalHandle, ProductSe
           ) : products.length === 0 ? (
             <div className={styles.emptyState}>
               <Package size={28} className={styles.emptyIcon} />
-              <p>{searchValue.trim() ? "Sin resultados" : "Cargando productos…"}</p>
+              <p>{emptyMessage ?? (searchValue.trim() ? "Sin resultados" : "Cargando productos…")}</p>
             </div>
           ) : (
             <ul className={styles.list} role="listbox">
@@ -209,9 +225,7 @@ export const ProductSearchModal = forwardRef<ProductSearchModalHandle, ProductSe
                     <span className={styles.colUnit}>
                       {!isUnitType(product.unitType) ? product.unitType : ""}
                     </span>
-                    <span className={styles.colStock}>
-                      Stock: {formatQuantity(product.stock, product.unitType)}
-                    </span>
+                    {showStock && <span className={styles.colStock}>Stock: {formatQuantity(product.stock, product.unitType)}</span>}
                     <span className={styles.colPrice}>{displayPrice(product)}</span>
                   </button>
                 </li>
@@ -219,6 +233,8 @@ export const ProductSearchModal = forwardRef<ProductSearchModalHandle, ProductSe
             </ul>
           )}
         </div>
+
+        {footerContent && <div className={styles.footerContent}>{footerContent}</div>}
 
         {/* ── Hints bar ── */}
         <div className={styles.hints}>

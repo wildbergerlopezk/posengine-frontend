@@ -12,6 +12,7 @@ import {
   UseGuards,
   Request,
 } from '@nestjs/common';
+import { CancelPurchaseDto } from '../dto/cancel-purchase.dto'
 import {
   ApiTags,
   ApiOperation,
@@ -104,8 +105,10 @@ export class PurchaseController {
   cancel(
     @Param('id') id: string,
     @CurrentUser('tenantId') tenantId: string,
+    @CurrentUser('id') actorId: string,
+    @Body() dto: CancelPurchaseDto,
   ) {
-    return this.purchaseService.cancel(id, tenantId);
+    return this.purchaseService.cancel(id, tenantId, actorId, dto);
   }
 
   @Get(':id/debt')

@@ -1,56 +1,74 @@
-import type { Product } from "@/src/shared/types"
-import { API_BASE_URL } from "@/src/shared/config/api"
-
-const API_BASE = API_BASE_URL
+import { apiClient } from '@/src/shared/api/apiClient'
 
 export interface DashboardDataResponse {
-  todaySales: number
-  todayRevenue: number
-  monthRevenue: number
-  lowStockProducts: Product[]
-  recentSales: SaleData[]
-  weeklySalesData: WeeklySalesData[]
-  categorySalesData: CategorySalesData[]
+  timezone: string
+  returnTrackingAvailable: boolean
+  billing: {
+    today: number
+    todayReturns: number
+    netToday: number
+    todaySalesCount: number
+    creditBalanceToday: number
+    month: number
+    monthReturns: number
+    netMonth: number
+  }
+  collections: {
+    today: number
+    cash: number
+    card: number
+    transfer: number
+    electronic: number
+    unclassified: number
+  }
+  cash: {
+    status: 'OPEN' | 'CLOSED'
+    expectedAmount: number | null
+    reconciliationPending: boolean
+  }
+  receivables: {
+    balance: number
+    customersCount: number
+  }
+  stock: {
+    lowStockCount: number
+    outOfStockCount: number
+    items: LowStockProduct[]
+  }
+  recentSales: RecentSale[]
 }
 
-export interface SaleData {
+export interface LowStockProduct {
+  id: string
+  name: string
+  sku: string | null
+  stock: number
+  stockMinimum: number
+  unitType: 'UNIT' | 'KG' | 'G' | 'L' | 'ML' | 'MG'
+}
+
+export interface RecentSale {
   id: string
   total: number
-  paymentMethod: string
-  status: string
-  createdAt: string
-  items: Array<{
-    productId: string
-    productName: string
-    quantity: number
-    unitPrice: number
-  }>
+  saleDate: string
+  customerName: string
+  paymentType: 'CASH' | 'CREDIT'
+  itemCount: number
 }
 
-export interface WeeklySalesData {
-  day: string
-  ventas: number
-}
+const inFlightRequests = new Map<string, Promise<DashboardDataResponse>>()
 
-export interface CategorySalesData {
-  name: string
-  ventas: number
-}
+export function getDashboardData(accessToken: string): Promise<DashboardDataResponse> {
+  const currentRequest = inFlightRequests.get(accessToken)
+  if (currentRequest) return currentRequest
 
-export async function getDashboardData(accessToken: string): Promise<DashboardDataResponse> {
-  const headers = {
-    "Content-Type": "application/json",
-    Authorization: `Bearer ${accessToken}`,
-  }
-
-  const response = await fetch(`${API_BASE}/dashboard/stats`, {
-    headers,
+  const request = apiClient.get<DashboardDataResponse>('/dashboard/stats', {
+    headers: { Authorization: `Bearer ${accessToken}` },
   })
 
-  if (!response.ok) {
-    throw new Error(`Error fetching dashboard statistics: ${response.statusText}`)
-  }
-
-  return response.json()
+  inFlightRequests.set(accessToken, request)
+  void request.finally(() => {
+    if (inFlightRequests.get(accessToken) === request) inFlightRequests.delete(accessToken)
+  }).catch(() => undefined)
+  return request
 }
-

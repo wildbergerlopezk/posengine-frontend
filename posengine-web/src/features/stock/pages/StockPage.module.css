@@ -1,5 +1,6 @@
 .page {
   min-height: 100vh;
+  min-height: 100dvh;
 }
 
 .container {
@@ -7,6 +8,15 @@
   display: flex;
   flex-direction: column;
   gap: 1.5rem;
+  min-width: 0;
+}
+
+@media (max-width: 1200px) {
+  .container { padding: 1rem; gap: 1rem; }
+}
+
+@media (max-width: 640px) {
+  .container { padding: 0.75rem; }
 }
 
 .summaryGrid {
@@ -112,10 +122,47 @@
 }
 
 .tableCard {
-  background-color: var(--color-card);
+  background-color: var(--color-background);
   border: 1px solid var(--color-border);
   border-radius: 0.75rem;
   overflow: hidden;
+}
+
+:where(.tableCard tbody tr) { background-color: var(--color-card); }
+
+.pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.75rem 1rem;
+  border-top: 1px solid var(--color-border);
+  color: var(--color-muted-foreground);
+  font-size: 0.8125rem;
+}
+
+.paginationControls {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.pageButton {
+  width: 2rem;
+  height: 2rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--color-border);
+  border-radius: 0.375rem;
+  background: var(--color-card);
+  color: var(--color-foreground);
+  cursor: pointer;
+}
+
+.pageButton:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
 }
 
 .table {

@@ -75,20 +75,21 @@ export class MailService {
   }
 
   async sendErrorAlert(subject: string, htmlContent: string) {
-    if (!this.transporter) {
-      this.logger.warn(`SMTP no configurado — Alerta no enviada: ${subject}`);
+    const recipients = this.config.get<string>('ERROR_ALERT_RECIPIENTS')
+      ?.split(',').map((email) => email.trim()).filter(Boolean);
+    if (!this.transporter || !recipients?.length) {
+      this.logger.warn(`Alerta de error no enviada: ${subject}`);
       return;
     }
     try {
       await this.transporter.sendMail({
         from: this.config.get<string>('MAIL_FROM'),
-        to: 'elytechsys@gmail.com, wildbergerlopezk@gmail.com, businesswildberger@gmail.com',
-        subject: `🚨 [Error POSENGINE] - ${subject}`,
+        to: recipients,
+        subject: `[Error PosEngine] ${subject}`,
         html: htmlContent,
       });
-      this.logger.log(`Alerta de error enviada por correo con éxito: ${subject}`);
-    } catch (err) {
-      this.logger.error('Error al enviar alerta de correo:', err);
+    } catch (error) {
+      this.logger.error('No se pudo enviar la alerta de error.', error);
     }
   }
 }

@@ -2,11 +2,13 @@
 
 import { useState, useEffect, useCallback } from "react"
 import { Header } from "@/src/shared/components/Header"
-import { Search, Package, AlertTriangle, ArrowUpCircle, ArrowDownCircle, Warehouse, Loader2 } from "lucide-react"
+import { Search, Package, AlertTriangle, ArrowUpCircle, ArrowDownCircle, Warehouse, Loader2, ChevronLeft, ChevronRight } from "lucide-react"
 import { useAuthStore } from "@/src/features/auth/store/auth.store"
 import { API_BASE_URL } from "@/src/shared/config/api"
 import type { Product } from "@/src/shared/types"
 import styles from "./StockPage.module.css"
+
+const PAGE_SIZE = 50
 
 export function StockPage() {
   const { accessToken } = useAuthStore()
@@ -14,47 +16,88 @@ export function StockPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [searchQuery, setSearchQuery] = useState("")
+  const [debouncedSearch, setDebouncedSearch] = useState("")
   const [activeTab, setActiveTab] = useState<"all" | "low" | "normal">("all")
+  const [activeOnly, setActiveOnly] = useState(false)
+  const [queryApplied, setQueryApplied] = useState(false)
+  const [page, setPage] = useState(1)
+  const [total, setTotal] = useState(0)
+  const [stockSummary, setStockSummary] = useState({ total: 0, lowStock: 0, normalStock: 0 })
   const [adjustProduct, setAdjustProduct] = useState<Product | null>(null)
   const [adjustType, setAdjustType] = useState<"add" | "remove">("add")
   const [adjustQuantity, setAdjustQuantity] = useState("")
   const [submittingAdjust, setSubmittingAdjust] = useState(false)
 
-  const fetchProducts = useCallback(async () => {
+  const fetchProducts = useCallback(async (signal: AbortSignal) => {
     setLoading(true)
     setError(null)
     try {
-      const res = await fetch(`${API_BASE_URL}/product?limit=1000`, {
+      const params = new URLSearchParams({ page: String(page), limit: String(PAGE_SIZE) })
+      if (debouncedSearch) params.set("search", debouncedSearch)
+      if (activeTab === "low") params.set("stockStatus", "LOW")
+      if (activeTab === "normal") params.set("stockStatus", "NORMAL")
+      if (activeOnly) params.set("isActive", "true")
+
+      const res = await fetch(`${API_BASE_URL}/product?${params}`, {
         headers: {
           Authorization: `Bearer ${accessToken}`,
         },
+        signal,
       })
       if (!res.ok) throw new Error("Error al cargar productos del inventario")
       const data = await res.json()
-      setProducts(data.items ?? data)
+      if (!signal.aborted) {
+        setProducts(data.items ?? data)
+        setTotal(data.total ?? 0)
+      }
     } catch (err: any) {
-      setError(err.message)
+      if (!signal.aborted) setError(err.message)
     } finally {
-      setLoading(false)
+      if (!signal.aborted) setLoading(false)
     }
-  }, [accessToken])
+  }, [accessToken, page, debouncedSearch, activeTab, activeOnly])
 
   useEffect(() => {
-    if (accessToken) {
-      fetchProducts()
+    const params = new URLSearchParams(window.location.search)
+    if (params.get("stockStatus") === "LOW") setActiveTab("low")
+    if (params.get("stockStatus") === "NORMAL") setActiveTab("normal")
+    setActiveOnly(params.get("isActive") === "true")
+    setQueryApplied(true)
+  }, [])
+
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(searchQuery.trim()), 300)
+    return () => clearTimeout(timer)
+  }, [searchQuery])
+
+  useEffect(() => {
+    if (!accessToken || !queryApplied || searchQuery.trim() !== debouncedSearch) return
+    const controller = new AbortController()
+    void fetchProducts(controller.signal)
+    return () => controller.abort()
+  }, [accessToken, queryApplied, searchQuery, debouncedSearch, fetchProducts])
+
+  useEffect(() => {
+    if (!accessToken) return
+    const controller = new AbortController()
+    const loadSummary = async () => {
+      try {
+        const res = await fetch(`${API_BASE_URL}/product/stock-summary`, {
+          headers: { Authorization: `Bearer ${accessToken}` },
+          signal: controller.signal,
+        })
+        if (!res.ok) throw new Error("Error al cargar el resumen del inventario")
+        const summary = await res.json()
+        if (!controller.signal.aborted) setStockSummary(summary)
+      } catch (err) {
+        if (!controller.signal.aborted) console.error(err)
+      }
     }
-  }, [accessToken, fetchProducts])
+    void loadSummary()
+    return () => controller.abort()
+  }, [accessToken])
 
-  const filteredProducts = products.filter(
-    (product) =>
-      product.name.toLowerCase().includes(searchQuery.toLowerCase()) || product.barcode?.includes(searchQuery),
-  )
-
-  const lowStockProducts = filteredProducts.filter((p) => p.stock <= p.stockMinimum)
-  const normalStockProducts = filteredProducts.filter((p) => p.stock > p.stockMinimum)
-
-  const displayProducts =
-    activeTab === "low" ? lowStockProducts : activeTab === "normal" ? normalStockProducts : filteredProducts
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE))
 
   const handleAdjustStock = async () => {
     if (!adjustProduct || !adjustQuantity || !accessToken) return
@@ -80,7 +123,16 @@ export function StockPage() {
       if (!res.ok) throw new Error("Error al guardar el ajuste de stock en el servidor")
       const updated = await res.json()
       
-      setProducts(products.map((p) => (p.id === adjustProduct.id ? { ...p, stock: updated.stock } : p)))
+      setProducts((current) => current.map((p) => (p.id === adjustProduct.id ? { ...p, stock: updated.stock } : p)))
+      setStockSummary((current) => {
+        const wasLow = adjustProduct.stock <= adjustProduct.stockMinimum
+        const isLow = updated.stock <= adjustProduct.stockMinimum
+        return {
+          ...current,
+          lowStock: current.lowStock + Number(isLow) - Number(wasLow),
+          normalStock: current.normalStock + Number(!isLow) - Number(!wasLow),
+        }
+      })
       setAdjustProduct(null)
       setAdjustQuantity("")
     } catch (err: any) {
@@ -108,7 +160,7 @@ export function StockPage() {
               <span className={styles.summaryLabel}>Total Productos</span>
               <Package size={16} color="#64748b" />
             </div>
-            <div className={styles.summaryValue}>{loading ? "..." : products.length}</div>
+            <div className={styles.summaryValue}>{loading && stockSummary.total === 0 ? "..." : stockSummary.total}</div>
           </div>
           <div className={styles.summaryCard}>
             <div className={styles.summaryHeader}>
@@ -116,7 +168,7 @@ export function StockPage() {
               <AlertTriangle size={16} color="#f59e0b" />
             </div>
             <div className={`${styles.summaryValue} ${styles.summaryValueWarning}`}>
-              {loading ? "..." : products.filter((p) => p.stock <= p.stockMinimum).length}
+              {loading && stockSummary.total === 0 ? "..." : stockSummary.lowStock}
             </div>
           </div>
           <div className={styles.summaryCard}>
@@ -125,7 +177,7 @@ export function StockPage() {
               <Warehouse size={16} color="#64748b" />
             </div>
             <div className={`${styles.summaryValue} ${styles.summaryValueSuccess}`}>
-              {loading ? "..." : products.filter((p) => p.stock > p.stockMinimum).length}
+              {loading && stockSummary.total === 0 ? "..." : stockSummary.normalStock}
             </div>
           </div>
         </div>
@@ -136,7 +188,10 @@ export function StockPage() {
           <input
             placeholder="Buscar productos..."
             value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
+            onChange={(e) => {
+              setSearchQuery(e.target.value)
+              setPage(1)
+            }}
             className={styles.searchInput}
             disabled={loading}
           />
@@ -146,29 +201,29 @@ export function StockPage() {
         <div className={styles.tabs}>
           <button
             className={`${styles.tabButton} ${activeTab === "all" ? styles.tabButtonActive : ""}`}
-            onClick={() => setActiveTab("all")}
+            onClick={() => { setActiveTab("all"); setPage(1) }}
             disabled={loading}
           >
-            Todos ({loading ? 0 : filteredProducts.length})
+            Todos ({stockSummary.total})
           </button>
           <button
             className={`${styles.tabButton} ${activeTab === "low" ? styles.tabButtonActive : ""} ${styles.tabButtonWarning}`}
-            onClick={() => setActiveTab("low")}
+            onClick={() => { setActiveTab("low"); setPage(1) }}
             disabled={loading}
           >
-            Stock Bajo ({loading ? 0 : lowStockProducts.length})
+            Stock Bajo ({stockSummary.lowStock})
           </button>
           <button
             className={`${styles.tabButton} ${activeTab === "normal" ? styles.tabButtonActive : ""}`}
-            onClick={() => setActiveTab("normal")}
+            onClick={() => { setActiveTab("normal"); setPage(1) }}
             disabled={loading}
           >
-            Stock Normal ({loading ? 0 : normalStockProducts.length})
+            Stock Normal ({stockSummary.normalStock})
           </button>
         </div>
 
         {/* Table / Loader */}
-        {loading ? (
+        {loading && products.length === 0 ? (
           <div className={styles.loadingWrapper} style={{ display: "flex", justifyContent: "center", padding: "3rem" }}>
             <Loader2 className={styles.spinner} size={32} style={{ animation: "spin 1s linear infinite" }} />
           </div>
@@ -190,7 +245,7 @@ export function StockPage() {
                 </tr>
               </thead>
               <tbody>
-                {displayProducts.length === 0 ? (
+                {products.length === 0 ? (
                   <tr>
                     <td colSpan={6}>
                       <div className={styles.emptyState}>
@@ -200,7 +255,7 @@ export function StockPage() {
                     </td>
                   </tr>
                 ) : (
-                  displayProducts.map((product) => {
+                  products.map((product) => {
                     const isLowStock = product.stock <= product.stockMinimum
                     return (
                       <tr key={product.id} className={styles.tableRow}>
@@ -247,6 +302,22 @@ export function StockPage() {
                 )}
               </tbody>
             </table>
+            {totalPages > 1 && (
+              <div className={styles.pagination}>
+                <span className={styles.paginationInfo}>
+                  Mostrando {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, total)} de {total}
+                </span>
+                <div className={styles.paginationControls}>
+                  <button type="button" className={styles.pageButton} onClick={() => setPage((current) => Math.max(1, current - 1))} disabled={page === 1}>
+                    <ChevronLeft size={15} />
+                  </button>
+                  <span>Página {page} de {totalPages}</span>
+                  <button type="button" className={styles.pageButton} onClick={() => setPage((current) => Math.min(totalPages, current + 1))} disabled={page === totalPages}>
+                    <ChevronRight size={15} />
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -254,7 +325,7 @@ export function StockPage() {
       {/* Adjust Stock Modal */}
       {adjustProduct && (
         <div className={styles.modalOverlay} onClick={() => setAdjustProduct(null)}>
-          <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
+          <div data-pos-modal className={styles.modal} onClick={(e) => e.stopPropagation()}>
             <div className={styles.modalHeader}>
               <h2 className={styles.modalTitle}>{adjustType === "add" ? "Entrada de Stock" : "Salida de Stock"}</h2>
               <p className={styles.modalDescription}>

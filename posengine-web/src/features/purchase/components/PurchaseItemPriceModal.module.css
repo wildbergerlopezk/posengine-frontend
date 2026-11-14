@@ -10,24 +10,31 @@
   align-items: center;
   justify-content: center;
   z-index: 1100;
+  padding: 0.75rem;
+  overflow-y: auto;
   animation: fadeIn 0.2s ease-out;
 }
 
 .modal {
   background: var(--color-card, #1a1a1a);
   border: 1px solid var(--color-border, #333);
-  border-radius: 1.25rem;
-  width: 90%;
-  max-width: 440px;
+  border-radius: 0.875rem;
+  width: min(680px, 100%);
+  max-height: calc(100vh - 1.5rem);
+  max-height: calc(100dvh - 1.5rem);
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
   box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
   color: var(--color-foreground, #fff);
   position: relative;
-  overflow: hidden;
+  overflow: visible;
   animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .header {
-  padding: 1.5rem;
+  flex: 0 0 auto;
+  padding: 0.75rem 1rem;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -38,7 +45,7 @@
 .title {
   display: flex;
   align-items: center;
-  gap: 1rem;
+  gap: 0.75rem;
 }
 
 .titleIcon {
@@ -87,17 +94,20 @@
 }
 
 .content {
-  padding: 1.5rem;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 0.875rem 1rem;
 }
 
 .infoGrid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 1rem;
-  margin-bottom: 1.5rem;
-  padding: 1rem;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+  padding: 0.625rem 0.75rem;
   background: rgba(0, 0, 0, 0.2);
-  border-radius: 1rem;
+  border-radius: 0.625rem;
   border: 1px solid var(--color-border, #333);
 }
 
@@ -116,7 +126,7 @@
 }
 
 .infoValue {
-  font-size: 1rem;
+  font-size: 0.9rem;
   font-weight: 700;
   color: var(--color-foreground, #fff);
 }
@@ -124,23 +134,23 @@
 .form {
   display: flex;
   flex-direction: column;
-  gap: 1.25rem;
+  gap: 0.625rem;
 }
 
 .row {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 1rem;
+  gap: 0.75rem;
 }
 
 .formGroup {
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
+  gap: 0.35rem;
 }
 
 .formGroup label {
-  font-size: 0.875rem;
+  font-size: 0.8rem;
   font-weight: 500;
   color: var(--color-muted-foreground, #a1a1aa);
 }
@@ -153,7 +163,7 @@
 
 .inputIcon {
   position: absolute;
-  left: 1rem;
+  left: 0.75rem;
   color: var(--color-muted-foreground, #a1a1aa);
   pointer-events: none;
 }
@@ -162,16 +172,17 @@
   width: 100%;
   background: var(--color-background, #09090b);
   border: 1px solid var(--color-border, #333);
-  border-radius: 0.75rem;
-  padding: 0.75rem 1rem;
+  border-radius: 0.5rem;
+  min-height: 2.375rem;
+  padding: 0.45rem 0.75rem;
   color: var(--color-foreground, #fff);
-  font-size: 1rem;
+  font-size: 0.9rem;
   font-weight: 600;
   transition: all 0.2s;
 }
 
 .inputIcon + input {
-  padding-left: 2.75rem;
+  padding-left: 2.4rem;
 }
 
 .inputWrapper input:focus {
@@ -182,7 +193,9 @@
 }
 
 .footer {
-  padding: 1.25rem 1.5rem;
+  flex: 0 0 auto;
+  gap: 0.75rem;
+  padding: 0.625rem 1rem;
   background: rgba(0, 0, 0, 0.2);
   border-top: 1px solid var(--color-border, #333);
   display: flex;
@@ -199,8 +212,8 @@
   background: var(--color-primary, #3b82f6);
   color: white;
   border: none;
-  padding: 0.75rem 1.5rem;
-  border-radius: 0.75rem;
+  padding: 0.55rem 1rem;
+  border-radius: 0.5rem;
   font-weight: 600;
   display: flex;
   align-items: center;
@@ -249,4 +262,32 @@
 .separator {
   margin: 0 0.5rem;
   opacity: 0.3;
+}
+
+@media (max-height: 700px) {
+  .overlay { padding-top: 0.5rem; padding-bottom: 0.5rem; }
+  .modal { max-height: calc(100vh - 1rem); max-height: calc(100dvh - 1rem); }
+  .header { padding-top: 0.5rem; padding-bottom: 0.5rem; }
+  .content { padding-top: 0.625rem; padding-bottom: 0.625rem; }
+  .infoGrid { margin-bottom: 0.5rem; padding-top: 0.45rem; padding-bottom: 0.45rem; }
+  .form { gap: 0.45rem; }
+  .row { gap: 0.625rem; }
+  .formGroup { gap: 0.25rem; }
+  .inputWrapper input { min-height: 2.125rem; padding-top: 0.35rem; padding-bottom: 0.35rem; }
+  .footer { padding-top: 0.5rem; padding-bottom: 0.5rem; }
+  .saveButton { padding-top: 0.45rem; padding-bottom: 0.45rem; }
+}
+
+@media (max-width: 560px) {
+  .overlay { padding: 0.5rem; }
+  .modal { width: 100%; max-height: calc(100dvh - 1rem); }
+  .header { padding-left: 0.75rem; padding-right: 0.75rem; }
+  .title { gap: 0.5rem; min-width: 0; }
+  .titleText { min-width: 0; }
+  .titleText small { max-width: min(65vw, 280px); }
+  .content { padding: 0.75rem; }
+  .row { grid-template-columns: minmax(0, 1fr); gap: 0.625rem; }
+  .footer { align-items: flex-start; flex-wrap: wrap; padding: 0.625rem 0.75rem; }
+  .footerHint { flex: 1 1 100%; }
+  .saveButton { margin-left: auto; }
 }

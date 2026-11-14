@@ -112,18 +112,24 @@
 .tableWrapper {
   border: 1px solid var(--color-border);
   border-radius: 0.75rem;
-  overflow: hidden;
+  min-width: 0;
+  overflow-x: auto;
+  background: var(--color-muted);
 }
+
+:where(.tableWrapper tbody tr) { background: var(--color-card); }
 
 .table {
   width: 100%;
+  min-width: 660px;
+  table-layout: fixed;
   border-collapse: collapse;
-  font-size: 0.875rem;
+  font-size: 0.75rem;
 }
 
 .table th {
   background-color: var(--color-muted);
-  padding: 0.75rem 1rem;
+  padding: 0.55rem 0.5rem;
   text-align: left;
   font-weight: 600;
   color: var(--color-muted-foreground);
@@ -133,7 +139,7 @@
 }
 
 .table td {
-  padding: 0.75rem 1rem;
+  padding: 0.5rem;
   border-bottom: 1px solid var(--color-border);
   vertical-align: middle;
 }
@@ -343,4 +349,52 @@
 
 .rowError {
   background-color: color-mix(in srgb, #ef4444 5%, transparent);
+}
+
+.inlinePanel {
+  display: grid;
+  min-width: 0;
+  gap: 0.85rem;
+  padding: 0.8rem 0.9rem 1rem;
+  color: var(--color-foreground);
+}
+.inlineHeader { display: flex; align-items: center; justify-content: space-between; gap: 0.7rem; }
+.inlineHeader h3 { margin: 0; color: var(--color-foreground); font-size: 0.88rem; }
+.inlineHeader p { margin: 0.15rem 0 0; color: var(--color-muted-foreground); font-size: 0.72rem; }
+.inlineBody { display: grid; min-width: 0; gap: 0.85rem; }
+.formBlock { display: grid; min-width: 0; gap: 0.55rem; padding: 0.7rem 0.75rem; border: 1px solid var(--color-border); border-radius: 0.55rem; background: var(--color-card); }
+.blockTitle { margin: 0; color: var(--color-foreground); font-size: 0.76rem; font-weight: 700; }
+.helperText { margin: 0; color: var(--color-muted-foreground); font-size: 0.71rem; line-height: 1.4; }
+.notice { display: flex; align-items: flex-start; gap: 0.45rem; padding: 0.6rem 0.7rem; border: 1px solid var(--color-border); border-left: 2px solid var(--color-primary); border-radius: 0.5rem; background: var(--color-muted); color: var(--color-muted-foreground); font-size: 0.74rem; line-height: 1.4; }
+.notice svg { flex: 0 0 auto; color: var(--color-primary); }
+.productCell { min-width: 0; }
+.productName { display: block; overflow: hidden; color: var(--color-foreground); font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+.productCell small { display: block; overflow: hidden; margin-top: 0.1rem; color: var(--color-muted-foreground); font-size: 0.66rem; text-overflow: ellipsis; white-space: nowrap; }
+.numeric { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.table th:nth-child(1) { width: 33%; }
+.table th:nth-child(2), .table th:nth-child(3), .table th:nth-child(4) { width: 8%; text-align: right; }
+.table th:nth-child(5) { width: 15%; text-align: right; }
+.table th:nth-child(6) { width: 20%; text-align: right; }
+.quantityInput { min-height: 2.05rem; padding: 0.32rem 0.4rem; text-align: right; font-size: 0.74rem; }
+.inputGrid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 2fr); gap: 0.7rem; }
+.summaryBox { display: grid; min-width: 0; gap: 0.7rem; padding: 0.65rem 0.75rem; border: 1px solid var(--color-border); border-radius: 0.6rem; background: var(--color-muted); }
+.summaryValues { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.5rem; color: var(--color-muted-foreground); font-size: 0.7rem; }
+.summaryValues > div { display: grid; min-width: 0; gap: 0.25rem; }
+.summaryValues strong { display: block; color: var(--color-foreground); font-size: 0.82rem; font-variant-numeric: tabular-nums; }
+.infoText { margin: 0; color: var(--color-muted-foreground); font-size: 0.7rem; line-height: 1.4; }
+.empty { display: flex; align-items: center; gap: 0.4rem; margin: 0; color: var(--color-muted-foreground); font-size: 0.75rem; }
+.closeInline { justify-self: end; border: 1px solid var(--color-border); border-radius: 0.4rem; padding: 0.4rem 0.7rem; background: var(--color-card); color: var(--color-foreground); }
+.confirmation { display: flex; min-width: 0; align-items: center; justify-content: flex-end; gap: 0.65rem; flex-wrap: wrap; padding-top: 0.7rem; border-top: 1px solid var(--color-border); }
+.blockedNotice { flex: 1 1 260px; margin: 0; color: var(--color-muted-foreground); font-size: 0.73rem; line-height: 1.4; }
+.retryButton { border: 1px solid var(--color-border); border-radius: 0.4rem; padding: 0.45rem 0.65rem; background: var(--color-card); color: var(--color-foreground); font: inherit; font-size: 0.72rem; cursor: pointer; }
+.srOnly { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
+.submitBtn { display: inline-flex; min-height: 2.2rem; align-items: center; justify-content: center; gap: 0.4rem; padding: 0.45rem 0.8rem; border: 1px solid var(--color-primary); border-radius: 0.45rem; background: var(--color-primary); color: var(--color-primary-foreground); font-size: 0.76rem; }
+
+@media (max-width: 680px) {
+  .inlinePanel { padding-inline: 0.65rem; }
+  .inputGrid { grid-template-columns: 1fr; }
+  .summaryValues { grid-template-columns: 1fr; }
+  .summaryValues > div { grid-template-columns: 1fr auto; align-items: center; }
+  .confirmation { align-items: stretch; flex-direction: column; }
+  .confirmation > * { width: 100%; }
 }

@@ -1,7 +1,8 @@
 model PurchaseReturn {
-  id         String @id @default(uuid())
-  tenantId   String
-  purchaseId String
+  id              String  @id @default(uuid())
+  tenantId        String
+  purchaseId      String
+  createdByUserId String?
 
   status PurchaseReturnStatus @default(PENDING)
 
@@ -11,16 +12,110 @@ model PurchaseReturn {
 
   total Decimal @db.Decimal(12, 2)
 
-  items PurchaseReturnItem[]
+  items           PurchaseReturnItem[]
+  debtAdjustments PurchaseDebtAdjustment[]
+  settlements     PurchaseReturnSettlement[]
 
-  purchase Purchase @relation(fields: [purchaseId], references: [id])
-  tenant   Tenant   @relation(fields: [tenantId], references: [id])
+  purchase      Purchase @relation(fields: [purchaseId], references: [id])
+  tenant        Tenant   @relation(fields: [tenantId], references: [id])
+  createdByUser User?    @relation("PurchaseReturnActor", fields: [createdByUserId], references: [id], onDelete: Restrict)
 
   createdAt DateTime @default(now())
 
   @@index([tenantId])
   @@index([purchaseId])
+  @@index([createdByUserId])
   @@map("purchase_returns")
+}
+
+enum PurchaseReturnSettlementType {
+  REFUND
+  SUPPLIER_CREDIT
+}
+
+enum PurchaseReturnSettlementStatus {
+  PENDING
+  PARTIALLY_SETTLED
+  SETTLED
+  PARTIALLY_APPLIED
+  APPLIED
+}
+
+model PurchaseReturnSettlement {
+  id               String @id @default(uuid())
+  tenantId         String
+  purchaseReturnId String
+
+  type          PurchaseReturnSettlementType
+  status        PurchaseReturnSettlementStatus @default(PENDING)
+  amount        Decimal                        @db.Decimal(12, 2)
+  appliedAmount Decimal                        @default(0) @db.Decimal(12, 2)
+  paymentMethod PaymentMethod?
+  cashSessionId String?
+  settledAt     DateTime?
+  notes         String?
+  createdAt     DateTime                       @default(now())
+
+  tenant         Tenant                            @relation(fields: [tenantId], references: [id])
+  purchaseReturn PurchaseReturn                    @relation(fields: [purchaseReturnId], references: [id])
+  cashSession    CashSession?                      @relation(fields: [cashSessionId], references: [id], onDelete: Restrict)
+  applications   PurchaseReturnCreditApplication[]
+  receipts       PurchaseReturnRefundReceipt[]
+
+  @@index([tenantId])
+  @@index([purchaseReturnId])
+  @@index([cashSessionId])
+  @@map("purchase_return_settlements")
+}
+
+model PurchaseReturnRefundReceipt {
+  id              String  @id @default(uuid())
+  tenantId        String
+  settlementId    String
+  cashSessionId   String?
+  createdByUserId String?
+
+  amount        Decimal       @db.Decimal(12, 2)
+  paymentMethod PaymentMethod
+  effectiveAt   DateTime
+  reference     String?
+  notes         String?
+  createdAt     DateTime      @default(now())
+
+  tenant        Tenant                   @relation(fields: [tenantId], references: [id])
+  settlement    PurchaseReturnSettlement @relation(fields: [settlementId], references: [id])
+  cashSession   CashSession?             @relation(fields: [cashSessionId], references: [id], onDelete: Restrict)
+  createdByUser User?                    @relation("PurchaseReturnRefundReceiptActor", fields: [createdByUserId], references: [id], onDelete: Restrict)
+
+  @@index([tenantId])
+  @@index([settlementId])
+  @@index([cashSessionId])
+  @@index([createdByUserId])
+  @@map("purchase_return_refund_receipts")
+}
+
+model PurchaseReturnCreditApplication {
+  id              String   @id @default(uuid())
+  tenantId        String
+  settlementId    String
+  purchaseId      String
+  installmentId   String?
+  createdByUserId String?
+  amount          Decimal  @db.Decimal(12, 2)
+  createdAt       DateTime @default(now())
+
+  tenant        Tenant                   @relation(fields: [tenantId], references: [id])
+  settlement    PurchaseReturnSettlement @relation(fields: [settlementId], references: [id])
+  purchase      Purchase                 @relation(fields: [purchaseId], references: [id])
+  installment   PurchaseDebtInstallment? @relation(fields: [installmentId], references: [id])
+  createdByUser User?                    @relation("PurchaseReturnCreditApplicationActor", fields: [createdByUserId], references: [id], onDelete: Restrict)
+
+  @@index([tenantId])
+  @@index([settlementId])
+  @@index([purchaseId])
+  @@index([installmentId])
+  @@index([createdByUserId])
+  @@map("purchase_return_credit_applications")
 }
 
 enum PurchaseReturnStatus {

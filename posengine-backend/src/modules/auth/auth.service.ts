@@ -35,8 +35,8 @@ export class AuthService {
     return this.refreshTokenService.refresh(dto);
   }
 
-  async logout(dto: RefreshTokenDto) {
-    return this.logoutService.logout(dto);
+  async logout(userId: string, sessionId: string) {
+    return this.logoutService.logout(userId, sessionId);
   }
 
   async logoutAll(userId: string) {

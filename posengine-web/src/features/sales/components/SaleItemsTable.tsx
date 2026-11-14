@@ -6,6 +6,8 @@ import { Trash2, ShoppingCart, Check, Loader2, Plus, AlertCircle } from "lucide-
 import { formatCurrency } from "@/src/shared/hooks/useFormatCurrency"
 import styles from "../pages/SalesPage.module.css"
 import tableStyles from "@/src/features/products/pages/ProductsPage.module.css"
+import transactionTableStyles from "@/src/shared/components/TransactionItemsTable/TransactionItemsTable.module.css"
+import dataTableStyles from "@/src/shared/components/DataTable/DataTable.module.css"
 
 interface Product {
   id: string
@@ -140,203 +142,202 @@ export function SaleItemsTable({
   }
 
   return (
-    <div className={`${tableStyles.tableCard} ${salesDisabled ? styles.disabledArea : ""}`}>
+    <div className={`${tableStyles.tableCard} ${dataTableStyles.flexColumn} ${transactionTableStyles.itemsTableCard} ${salesDisabled ? styles.disabledArea : ""}`}>
       {/* Toolbar */}
-      <div className={styles.itemsToolbar}>
-        <span className={styles.itemsTitle}>
-          Productos <span className={styles.itemsCount}>{items.length}</span>
+      <div className={`${transactionTableStyles.itemsToolbar} ${styles.salesItemsToolbar}`}>
+        <span className={transactionTableStyles.itemsTitle}>
+          Productos <span className={transactionTableStyles.itemsCount}>{items.length}</span>
         </span>
-        <div className={styles.itemsActions}>
-          <span className={styles.shortcutHint}><kbd>F12</kbd> Cobrar</span>
+        <div className={transactionTableStyles.itemsActions}>
+          <span className={transactionTableStyles.shortcutHint}><kbd>F12</kbd> Cobrar</span>
           <button
             type="button"
             className={`${tableStyles.newButton} ${selectedCustomer ? styles.creditModeBtn : styles.cashModeBtn}`}
             onClick={onOpenCustomerModal}
-            style={{ marginLeft: 8 }}
           >
-            Cliente: {selectedCustomer ? selectedCustomer.name : "Consumidor Final"} <kbd className={styles.kbdInline} style={{ marginLeft: 6 }}>F8</kbd>
+            Cliente: {selectedCustomer ? selectedCustomer.name : "Consumidor Final"} <kbd className={transactionTableStyles.kbdInline} style={{ marginLeft: 6 }}>F8</kbd>
           </button>
           <button
             type="button"
             className={`${tableStyles.newButton} ${paymentMethod === "CREDIT" ? styles.creditModeBtn : styles.cashModeBtn}`}
             onClick={() => onPaymentMethodChange(paymentMethod === "CASH" ? "CREDIT" : "CASH")}
-            style={{ marginLeft: 8 }}
           >
-            Tipo de venta: {paymentMethod === "CASH" ? "Contado" : "Crédito"} <kbd className={styles.kbdInline} style={{ marginLeft: 6 }}>F9</kbd>
+            Tipo de venta: {paymentMethod === "CASH" ? "Contado" : "Crédito"} <kbd className={transactionTableStyles.kbdInline} style={{ marginLeft: 6 }}>F9</kbd>
           </button>
           <button
             type="button"
             className={tableStyles.newButton}
             onClick={onOpenProductModal}
-            style={{ marginLeft: 8 }}
           >
-            <Plus size={15} /> Agregar producto <span className={styles.shortcutHint}><kbd>F2</kbd></span>
+            <Plus size={15} /> Agregar producto <span className={transactionTableStyles.shortcutHint}><kbd>F2</kbd></span>
           </button>
         </div>
       </div>
 
       {paymentMethod === "CREDIT" && selectedCustomer && (selectedCustomer.currentDebt + Math.max(0, total) > selectedCustomer.creditLimit) && (
-        <div className={tableStyles.errorBanner} style={{ marginTop: 8, marginBottom: 8 }}>
+        <div className={`${tableStyles.errorBanner} ${transactionTableStyles.tableNotice}`} style={{ marginTop: 8, marginBottom: 8 }}>
           <AlertCircle size={16} />
           Límite de crédito superado para {selectedCustomer.name}. Disponible: {formatCurrency(Math.max(0, selectedCustomer.creditLimit - selectedCustomer.currentDebt))}, Requerido: {formatCurrency(total)}
         </div>
       )}
 
-      <table className={tableStyles.table}>
-        <thead className={tableStyles.tableHeader}>
-          <tr>
-            <th className={tableStyles.tableHeaderCell} style={{ width: 40 }}>#</th>
-            <th className={tableStyles.tableHeaderCell} style={{ width: 130 }}>Código</th>
-            <th className={tableStyles.tableHeaderCell}>Descripción</th>
-            <th className={`${tableStyles.tableHeaderCell} ${tableStyles.tableHeaderCellRight}`} style={{ width: 110 }}>Cant.</th>
-            <th className={tableStyles.tableHeaderCell} style={{ width: 100 }}>Venta</th>
-            <th className={tableStyles.tableHeaderCell} style={{ width: 100 }}>Tipo</th>
-            <th className={`${tableStyles.tableHeaderCell} ${tableStyles.tableHeaderCellRight}`} style={{ width: 140 }}>Precio unit.</th>
-            <th className={`${tableStyles.tableHeaderCell} ${tableStyles.tableHeaderCellRight}`} style={{ width: 140 }}>SubTotal</th>
-            <th className={tableStyles.tableHeaderCell} style={{ width: 44 }} />
-          </tr>
-        </thead>
-        <tbody>
-          {items.length === 0 ? (
+      <div className={dataTableStyles.viewport}>
+        <table className={`${tableStyles.table} ${dataTableStyles.naturalRows} ${dataTableStyles.compactCells} ${transactionTableStyles.saleItemsTable}`}>
+          <thead className={tableStyles.tableHeader}>
             <tr>
-              <td colSpan={9}>
-                <div className={tableStyles.emptyState}>
-                  <ShoppingCart size={36} className={tableStyles.emptyStateIcon} />
-                  <p className={tableStyles.emptyStateTitle}>Sin productos</p>
-                  <p>Escaneá un código de barras o presioná <kbd className={styles.kbdInline}>F2</kbd> para buscar</p>
-                </div>
-              </td>
+              <th className={tableStyles.tableHeaderCell} style={{ width: 40 }}>#</th>
+              <th className={tableStyles.tableHeaderCell} style={{ width: 130 }}>Código</th>
+              <th className={tableStyles.tableHeaderCell}>Descripción</th>
+              <th className={`${tableStyles.tableHeaderCell} ${tableStyles.tableHeaderCellRight}`} style={{ width: 110 }}>Cant.</th>
+              <th className={tableStyles.tableHeaderCell} style={{ width: 100 }}>Venta</th>
+              <th className={tableStyles.tableHeaderCell} style={{ width: 100 }}>Tipo</th>
+              <th className={`${tableStyles.tableHeaderCell} ${tableStyles.tableHeaderCellRight}`} style={{ width: 140 }}>Precio unit.</th>
+              <th className={`${tableStyles.tableHeaderCell} ${tableStyles.tableHeaderCellRight}`} style={{ width: 140 }}>SubTotal</th>
+              <th className={tableStyles.tableHeaderCell} style={{ width: 44 }} />
             </tr>
-          ) : (
-            items.map((item, idx) => (
-              <tr key={item.product.id} className={tableStyles.tableRow}>
-                <td className={tableStyles.tableCell}>
-                  <span className={styles.rowNum}>{idx + 1}</span>
-                </td>
-
-                <td className={tableStyles.tableCell}>
-                  <span className={styles.codeChip}>{item.product.barcode || item.product.sku || "—"}</span>
-                </td>
-
-                <td className={tableStyles.tableCell}>
-                  <span style={{ fontWeight: 500 }}>{item.product.name}</span>
-                  {item.product.unitType !== "UNIT" && (
-                    <span className={styles.unitBadge}>{item.product.unitType}</span>
-                  )}
-                </td>
-
-                {/* Cantidad — editable inline */}
-                <td className={`${tableStyles.tableCell} ${tableStyles.tableCellRight}`}>
-                  {editingRowIndex === idx && editingField === "quantity" ? (
-                    <input
-                      ref={editingInputRef}
-                      className={styles.inlineInput}
-                      type="number"
-                      value={editingValue}
-                      onChange={e => setEditingValue(e.target.value)}
-                      onKeyDown={e => {
-                        if (e.key === "Enter" || e.key === "Tab") {
-                          e.preventDefault()
-                          e.stopPropagation()
-                          commitEdit()
-                        }
-                        if (e.key === "Escape") cancelEdit()
-                      }}
-                      onBlur={commitEdit}
-                      min={isUnitType(item.product.unitType) ? "1" : "0.001"}
-                      step={isUnitType(item.product.unitType) ? "1" : "0.001"}
-                    />
-                  ) : (
-                    <button
-                      type="button"
-                      className={styles.editableCell}
-                      onClick={() => startEdit(idx, "quantity", item.quantity)}
-                      title="Clic para editar"
-                    >
-                      {formatQuantity(item.quantity, item.product.unitType)}
-                    </button>
-                  )}
-                </td>
-
-                {/* Modo de venta (Contado / Crédito) */}
-                <td className={tableStyles.tableCell}>
-                  <span className={paymentMethod === "CREDIT" ? styles.creditBadgeInline : styles.cashBadgeInline}>
-                    {paymentMethod === "CREDIT" ? "Crédito" : "Contado"}
-                  </span>
-                </td>
-
-                <td className={tableStyles.tableCell}>
-                  <button
-                    type="button"
-                    className={`${styles.priceTypeBtn} ${item.priceType === "WHOLESALE" ? styles.priceTypeBtnWholesale : ""}`}
-                    onClick={() => setItems(prev => prev.map((it, i) => {
-                      if (i !== idx) return it
-                      const newType = it.priceType === "PUBLIC" ? "WHOLESALE" : "PUBLIC"
-                      const newPrice = newType === "WHOLESALE" ? it.product.wholesalePrice : it.product.price
-                      return { ...it, priceType: newType, unitPrice: newPrice }
-                    }))}
-                    title="Cambiar tipo de precio (Público/Mayorista)"
-                  >
-                    {item.priceType === "WHOLESALE" ? "Mayorista" : "Público"}
-                  </button>
-                </td>
-
-                {/* Precio unitario — editable inline */}
-                <td className={`${tableStyles.tableCell} ${tableStyles.tableCellRight}`}>
-                  {editingRowIndex === idx && editingField === "unitPrice" ? (
-                    <input
-                      ref={editingInputRef}
-                      className={styles.inlineInput}
-                      type="number"
-                      value={editingValue}
-                      onChange={e => setEditingValue(e.target.value)}
-                      onKeyDown={e => {
-                        if (e.key === "Enter" || e.key === "Tab") { e.preventDefault(); commitEdit() }
-                        if (e.key === "Escape") cancelEdit()
-                      }}
-                      onBlur={commitEdit}
-                      min={item.product.price}
-                      step="any"
-                    />
-                  ) : (
-                    <button
-                      type="button"
-                      className={`${styles.editableCell} ${item.unitPrice > item.product.price ? styles.editableCellModified : ""}`}
-                      onClick={() => startEdit(idx, "unitPrice", item.unitPrice)}
-                      title={`Precio base: ${formatCurrency(item.product.price)}. Clic para modificar (solo se puede subir)`}
-                    >
-                      {formatCurrency(item.unitPrice)}
-                    </button>
-                  )}
-                </td>
-
-                <td className={`${tableStyles.tableCell} ${tableStyles.tableCellRight}`}>
-                  <strong>{formatCurrency(item.quantity * item.unitPrice)}</strong>
-                </td>
-
-                <td className={tableStyles.tableCell}>
-                  <button
-                    type="button"
-                    className={styles.removeBtn}
-                    onClick={() => removeItem(idx)}
-                    title="Eliminar"
-                  >
-                    <Trash2 size={14} />
-                  </button>
+          </thead>
+          <tbody>
+            {items.length === 0 ? (
+              <tr>
+                <td colSpan={9}>
+                  <div className={`${tableStyles.emptyState} ${transactionTableStyles.itemsTableEmptyState}`}>
+                    <ShoppingCart size={36} className={tableStyles.emptyStateIcon} />
+                    <p className={tableStyles.emptyStateTitle}>Sin productos</p>
+                    <p>Escaneá un código de barras o presioná <kbd className={transactionTableStyles.kbdInline}>F2</kbd> para buscar</p>
+                  </div>
                 </td>
               </tr>
-            ))
-          )}
-        </tbody>
+            ) : (
+              items.map((item, idx) => (
+                <tr key={item.product.id} className={tableStyles.tableRow}>
+                  <td className={tableStyles.tableCell}>
+                    <span className={transactionTableStyles.rowNum}>{idx + 1}</span>
+                  </td>
+
+                  <td className={tableStyles.tableCell}>
+                    <span className={transactionTableStyles.codeChip}>{item.product.barcode || item.product.sku || "—"}</span>
+                  </td>
+
+                  <td className={tableStyles.tableCell}>
+                    <span style={{ fontWeight: 500 }}>{item.product.name}</span>
+                    {item.product.unitType !== "UNIT" && (
+                      <span className={transactionTableStyles.unitBadge}>{item.product.unitType}</span>
+                    )}
+                  </td>
+
+                  {/* Cantidad — editable inline */}
+                  <td className={`${tableStyles.tableCell} ${tableStyles.tableCellRight}`}>
+                    {editingRowIndex === idx && editingField === "quantity" ? (
+                      <input
+                        ref={editingInputRef}
+                        className={styles.inlineInput}
+                        type="number"
+                        value={editingValue}
+                        onChange={e => setEditingValue(e.target.value)}
+                        onKeyDown={e => {
+                          if (e.key === "Enter" || e.key === "Tab") {
+                            e.preventDefault()
+                            e.stopPropagation()
+                            commitEdit()
+                          }
+                          if (e.key === "Escape") cancelEdit()
+                        }}
+                        onBlur={commitEdit}
+                        min={isUnitType(item.product.unitType) ? "1" : "0.001"}
+                        step={isUnitType(item.product.unitType) ? "1" : "0.001"}
+                      />
+                    ) : (
+                      <button
+                        type="button"
+                        className={transactionTableStyles.editableCell}
+                        onClick={() => startEdit(idx, "quantity", item.quantity)}
+                        title="Clic para editar"
+                      >
+                        {formatQuantity(item.quantity, item.product.unitType)}
+                      </button>
+                    )}
+                  </td>
+
+                  {/* Modo de venta (Contado / Crédito) */}
+                  <td className={tableStyles.tableCell}>
+                    <span className={paymentMethod === "CREDIT" ? styles.creditBadgeInline : styles.cashBadgeInline}>
+                      {paymentMethod === "CREDIT" ? "Crédito" : "Contado"}
+                    </span>
+                  </td>
+
+                  <td className={tableStyles.tableCell}>
+                    <button
+                      type="button"
+                      className={`${styles.priceTypeBtn} ${item.priceType === "WHOLESALE" ? styles.priceTypeBtnWholesale : ""}`}
+                      onClick={() => setItems(prev => prev.map((it, i) => {
+                        if (i !== idx) return it
+                        const newType = it.priceType === "PUBLIC" ? "WHOLESALE" : "PUBLIC"
+                        const newPrice = newType === "WHOLESALE" ? it.product.wholesalePrice : it.product.price
+                        return { ...it, priceType: newType, unitPrice: newPrice }
+                      }))}
+                      title="Cambiar tipo de precio (Público/Mayorista)"
+                    >
+                      {item.priceType === "WHOLESALE" ? "Mayorista" : "Público"}
+                    </button>
+                  </td>
+
+                  {/* Precio unitario — editable inline */}
+                  <td className={`${tableStyles.tableCell} ${tableStyles.tableCellRight}`}>
+                    {editingRowIndex === idx && editingField === "unitPrice" ? (
+                      <input
+                        ref={editingInputRef}
+                        className={styles.inlineInput}
+                        type="number"
+                        value={editingValue}
+                        onChange={e => setEditingValue(e.target.value)}
+                        onKeyDown={e => {
+                          if (e.key === "Enter" || e.key === "Tab") { e.preventDefault(); commitEdit() }
+                          if (e.key === "Escape") cancelEdit()
+                        }}
+                        onBlur={commitEdit}
+                        min={item.product.price}
+                        step="any"
+                      />
+                    ) : (
+                      <button
+                        type="button"
+                        className={`${transactionTableStyles.editableCell} ${item.unitPrice > item.product.price ? styles.editableCellModified : ""}`}
+                        onClick={() => startEdit(idx, "unitPrice", item.unitPrice)}
+                        title={`Precio base: ${formatCurrency(item.product.price)}. Clic para modificar (solo se puede subir)`}
+                      >
+                        {formatCurrency(item.unitPrice)}
+                      </button>
+                    )}
+                  </td>
+
+                  <td className={`${tableStyles.tableCell} ${tableStyles.tableCellRight}`}>
+                    <strong>{formatCurrency(item.quantity * item.unitPrice)}</strong>
+                  </td>
+
+                  <td className={tableStyles.tableCell}>
+                    <button
+                      type="button"
+                      className={transactionTableStyles.removeBtn}
+                      onClick={() => removeItem(idx)}
+                      title="Eliminar"
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  </td>
+                </tr>
+              ))
+            )}
+          </tbody>
       </table>
+      </div>
 
       {/* Footer totales */}
       {items.length > 0 && (
-        <div className={styles.tableFooter}>
-          <div className={styles.totalsBlock}>
-            <div className={`${styles.totalRow} ${styles.totalRowFinal}`}>
-              <span className={styles.totalLabel}>Total</span>
-              <span className={styles.totalValueFinal}>{formatCurrency(total)}</span>
+        <div className={transactionTableStyles.tableFooter}>
+          <div className={transactionTableStyles.totalsBlock}>
+            <div className={`${transactionTableStyles.totalRow} ${transactionTableStyles.totalRowFinal}`}>
+              <span className={transactionTableStyles.totalLabel}>Total</span>
+              <span className={transactionTableStyles.totalValueFinal}>{formatCurrency(total)}</span>
             </div>
           </div>
           <div className={styles.footerActions}>

@@ -1,8 +1,7 @@
 "use client"
 
-import type React from "react"
-import { useRef, useEffect, useState } from "react"
-import { Search, X, User, ChevronLeft, ChevronRight } from "lucide-react"
+import { Fragment, useRef, useEffect, useState } from "react"
+import { Search, X, User, ChevronLeft, ChevronRight, Loader2 } from "lucide-react"
 import { formatCurrency } from "@/src/shared/hooks/useFormatCurrency"
 import styles from "./CustomerSearchModal.module.css"
 
@@ -18,8 +17,12 @@ export interface CustomerSearchItem {
 interface CustomerSearchModalProps {
   open: boolean
   customers: CustomerSearchItem[]
+  totalItems: number
+  page: number
+  loading?: boolean
   searchValue: string
   onSearchChange: (value: string) => void
+  onPageChange: (page: number) => void
   onSelect: (customer: CustomerSearchItem | null) => void
   onClose: () => void
 }
@@ -29,26 +32,23 @@ const LIMIT = 10
 export function CustomerSearchModal({
   open,
   customers,
+  totalItems,
+  page,
+  loading = false,
   searchValue,
   onSearchChange,
+  onPageChange,
   onSelect,
   onClose,
 }: CustomerSearchModalProps) {
   const [selectedIndex, setSelectedIndex] = useState(0)
-  const [page, setPage] = useState(1)
   const searchRef = useRef<HTMLInputElement>(null)
 
-  const filtered = customers.filter((c) => {
-    const s = searchValue.toLowerCase()
-    return (
-      c.name.toLowerCase().includes(s) ||
-      (c.documentNumber && c.documentNumber.toLowerCase().includes(s))
-    )
-  })
-
-  const totalItems = filtered.length
   const totalPages = Math.ceil(totalItems / LIMIT)
-  const pageCustomers = filtered.slice((page - 1) * LIMIT, page * LIMIT)
+  const pageCustomers = customers
+  const pageNumbers = Array.from(new Set([1, page - 1, page, page + 1, totalPages]))
+    .filter((value) => value >= 1 && value <= totalPages)
+    .sort((a, b) => a - b)
 
   // "Consumidor Final" es una fila más al final de la lista, navegable con flechas
   const totalRows = pageCustomers.length + 1
@@ -56,8 +56,7 @@ export function CustomerSearchModal({
 
   useEffect(() => {
     setSelectedIndex(0)
-    setPage(1)
-  }, [searchValue])
+  }, [searchValue, customers])
 
   useEffect(() => {
     if (open) {
@@ -79,17 +78,18 @@ export function CustomerSearchModal({
       } else if (e.key === "ArrowRight" && e.ctrlKey) {
         if (page < totalPages) {
           e.preventDefault()
-          setPage((p) => p + 1)
+          onPageChange(page + 1)
           setSelectedIndex(0)
         }
       } else if (e.key === "ArrowLeft" && e.ctrlKey) {
         if (page > 1) {
           e.preventDefault()
-          setPage((p) => p - 1)
+          onPageChange(page - 1)
           setSelectedIndex(0)
         }
       } else if (e.key === "Enter") {
         e.preventDefault()
+        if (loading) return
         if (isConsumerFinalSelected) {
           onSelect(null)
         } else if (pageCustomers[selectedIndex]) {
@@ -103,13 +103,13 @@ export function CustomerSearchModal({
 
     window.addEventListener("keydown", handleKeyDown)
     return () => window.removeEventListener("keydown", handleKeyDown)
-  }, [open, pageCustomers, selectedIndex, totalRows, isConsumerFinalSelected, onSelect, onClose, page, totalPages])
+  }, [open, pageCustomers, selectedIndex, totalRows, isConsumerFinalSelected, onSelect, onClose, page, totalPages, onPageChange, loading])
 
   if (!open) return null
 
   return (
     <div className={styles.overlay} onClick={onClose}>
-      <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
+      <div data-pos-modal className={styles.modal} onClick={(e) => e.stopPropagation()}>
 
         <div className={styles.header}>
           <h3 className={styles.title}>Buscar Cliente (F8)</h3>
@@ -131,7 +131,12 @@ export function CustomerSearchModal({
         </div>
 
         <div className={styles.listWrapper}>
-          {pageCustomers.length > 0 ? (
+          {loading ? (
+            <div className={styles.emptyState} role="status" aria-live="polite">
+              <Loader2 size={24} className={styles.spinner} />
+              <span>Buscando clientes…</span>
+            </div>
+          ) : pageCustomers.length > 0 ? (
             pageCustomers.map((c, index) => {
               const available = Math.max(0, c.creditLimit - c.currentDebt)
               return (
@@ -196,29 +201,31 @@ export function CustomerSearchModal({
                 className={styles.pageBtn}
                 disabled={page === 1}
                 onClick={() => {
-                  setPage((p) => p - 1)
+                  onPageChange(page - 1)
                   setSelectedIndex(0)
                 }}
               >
                 <ChevronLeft size={14} />
               </button>
-              {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
-                <button
-                  key={p}
-                  className={`${styles.pageBtn} ${page === p ? styles.pageBtnActive : ""}`}
-                  onClick={() => {
-                    setPage(p)
-                    setSelectedIndex(0)
-                  }}
-                >
-                  {p}
-                </button>
+              {pageNumbers.map((p, index) => (
+                <Fragment key={p}>
+                  {index > 0 && p - pageNumbers[index - 1] > 1 && <span className={styles.pageBtn}>…</span>}
+                  <button
+                    className={`${styles.pageBtn} ${page === p ? styles.pageBtnActive : ""}`}
+                    onClick={() => {
+                      onPageChange(p)
+                      setSelectedIndex(0)
+                    }}
+                  >
+                    {p}
+                  </button>
+                </Fragment>
               ))}
               <button
                 className={styles.pageBtn}
                 disabled={page === totalPages}
                 onClick={() => {
-                  setPage((p) => p + 1)
+                  onPageChange(page + 1)
                   setSelectedIndex(0)
                 }}
               >

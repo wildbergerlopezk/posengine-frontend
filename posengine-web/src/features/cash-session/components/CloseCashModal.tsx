@@ -27,6 +27,27 @@ interface ContentProps {
   onConfirm: (closingAmount: number, notes?: string) => Promise<void>
 }
 
+type FinancialTone = 'neutral' | 'positive' | 'negative' | 'warning'
+
+function FinancialRow({
+  label,
+  value,
+  tone = 'neutral',
+  emphasized = false,
+}: {
+  label: string
+  value: string
+  tone?: FinancialTone
+  emphasized?: boolean
+}) {
+  return (
+    <div className={`${styles.summaryRow} ${styles[`tone_${tone}`]} ${emphasized ? styles.summaryRowEmphasized : ''}`}>
+      <span className={styles.summaryLabel}>{label}</span>
+      <span className={styles.summaryValue}>{value}</span>
+    </div>
+  )
+}
+
 function CloseCashModalContent({
   session,
   loading,
@@ -56,12 +77,16 @@ function CloseCashModalContent({
 
   const parsed = parseFloat(amount.replace(/\./g, '').replace(',', '.'))
   const isAmountValid = !isNaN(parsed)
-  const expected = session.openingAmount + session.totalSales - session.totalPurchases
-  const difference = isAmountValid ? parsed - expected : null
+  const expected = session.expectedCashAmount ?? null
+  const difference = isAmountValid && expected !== null ? parsed - expected : null
 
   const handleClose = async () => {
     if (!isAmountValid) {
       setError('Ingresá un monto válido')
+      return
+    }
+    if (expected === null) {
+      setError('No se puede cerrar: hay pagos con medio sin clasificar que requieren conciliación.')
       return
     }
 
@@ -75,7 +100,7 @@ function CloseCashModalContent({
 
   return (
     <div className={styles.overlay} onClick={onClose}>
-      <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
+      <div data-pos-modal className={styles.modal} onClick={(e) => e.stopPropagation()}>
         <div className={styles.header}>
           <div className={styles.headerLeft}>
             <div className={styles.iconWrap}>
@@ -92,46 +117,70 @@ function CloseCashModalContent({
         </div>
 
         <div className={styles.body}>
-          <div className={styles.summaryCard}>
-            <div className={styles.summaryRow}>
-              <span className={styles.summaryLabel}>Monto inicial</span>
-              <span className={styles.summaryValue}>{formatGs(session.openingAmount)}</span>
-            </div>
-            <div className={styles.summaryRow} style={{ alignItems: 'flex-start' }}>
-              <span className={styles.summaryLabel}>+ Ventas del día</span>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem', alignItems: 'flex-end' }}>
-                <span className={`${styles.summaryValue} ${styles.positive}`} style={{ fontSize: '0.82rem' }}>
-                  Al contado: {formatGs(session.totalCashSales ?? session.totalSales)}
-                </span>
-                <span className={`${styles.summaryValue} ${styles.positive}`} style={{ fontSize: '0.82rem' }}>
-                  Cobros deuda: {formatGs(session.totalDebtPayments ?? 0)}
-                </span>
-                <span className={`${styles.summaryValue}`} style={{ fontSize: '0.72rem', color: 'var(--color-muted-foreground)', fontWeight: 'normal' }}>
-                  A crédito: {formatGs(session.totalCreditSales ?? 0)}
-                </span>
+          <div className={styles.openingSummary}>
+            <span className={styles.summaryLabel}>Monto inicial</span>
+            <span className={styles.openingValue}>{formatGs(session.openingAmount)}</span>
+          </div>
+
+          <div className={styles.cashFlowGrid}>
+            <section className={`${styles.summarySection} ${styles.inflowSection}`} aria-labelledby="cash-inflows-title">
+              <h3 id="cash-inflows-title" className={styles.sectionTitle}>Entradas de efectivo</h3>
+              <div className={styles.summaryRows}>
+                <FinancialRow label="Ventas en efectivo" value={formatGs(session.totalPhysicalCashSales ?? 0)} tone="positive" />
+                <FinancialRow label="Abonos de clientes" value={formatGs(session.totalCashDebtPayments ?? 0)} tone="positive" />
+                <FinancialRow label="Ingresos manuales" value={formatGs(session.totalManualInflows ?? 0)} tone="positive" />
               </div>
-            </div>
-            <div className={styles.summaryRow} style={{ alignItems: 'flex-start' }}>
-              <span className={styles.summaryLabel}>− Compras del día</span>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem', alignItems: 'flex-end' }}>
-                <span className={`${styles.summaryValue} ${styles.negative}`} style={{ fontSize: '0.82rem' }}>
-                  Al contado: {formatGs(session.totalCashPurchases ?? session.totalPurchases)}
-                </span>
-                <span className={`${styles.summaryValue} ${styles.negative}`} style={{ fontSize: '0.82rem' }}>
-                  Pagos deuda: {formatGs(session.totalPurchaseDebtPayments ?? 0)}
-                </span>
-                <span className={`${styles.summaryValue}`} style={{ fontSize: '0.72rem', color: 'var(--color-muted-foreground)', fontWeight: 'normal' }}>
-                  A crédito: {formatGs(session.totalCreditPurchases ?? 0)}
-                </span>
+            </section>
+
+            <section className={`${styles.summarySection} ${styles.outflowSection}`} aria-labelledby="cash-outflows-title">
+              <h3 id="cash-outflows-title" className={styles.sectionTitle}>Salidas de efectivo</h3>
+              <div className={styles.summaryRows}>
+                <FinancialRow label="Compras al contado" value={formatGs(session.totalCashPurchases ?? session.totalPurchases)} tone="negative" />
+                <FinancialRow label="Pagos a proveedores" value={formatGs(session.totalCashPurchaseDebtPayments ?? 0)} tone="negative" />
+                <FinancialRow label="Egresos manuales" value={formatGs(session.totalManualOutflows ?? 0)} tone="negative" />
               </div>
+            </section>
+          </div>
+
+          <section className={`${styles.summarySection} ${styles.nonCashSection}`} aria-labelledby="non-cash-title">
+            <h3 id="non-cash-title" className={styles.sectionTitle}>Operaciones que no afectan el efectivo</h3>
+            <div className={styles.summaryRows}>
+              <FinancialRow label="Ventas electrónicas" value={formatGs(session.totalElectronicSales ?? 0)} />
+              <FinancialRow label="Abonos electrónicos" value={formatGs(session.totalElectronicDebtPayments ?? 0)} />
+              <FinancialRow label="Ventas a crédito" value={formatGs(session.totalCreditSales ?? 0)} />
+              <FinancialRow label="Compras a crédito" value={formatGs(session.totalCreditPurchases ?? 0)} />
+              <FinancialRow label="Transferencias a proveedores" value={formatGs(session.totalElectronicPurchaseDebtPayments ?? 0)} />
             </div>
+          </section>
+
+          {((session.unclassifiedCustomerPayments ?? 0) > 0 || (session.unclassifiedSupplierPayments ?? 0) > 0) && (
+            <section className={`${styles.summarySection} ${styles.pendingSection}`} aria-labelledby="pending-payments-title">
+              <h3 id="pending-payments-title" className={styles.sectionTitle}>Conciliación pendiente</h3>
+              <div className={styles.summaryRows}>
+                {(session.unclassifiedCustomerPayments ?? 0) > 0 && (
+                  <FinancialRow label="Abonos de clientes sin clasificar" value={formatGs(session.unclassifiedCustomerPayments ?? 0)} tone="warning" />
+                )}
+                {(session.unclassifiedSupplierPayments ?? 0) > 0 && (
+                  <FinancialRow label="Pagos a proveedores sin clasificar" value={formatGs(session.unclassifiedSupplierPayments ?? 0)} tone="warning" />
+                )}
+              </div>
+            </section>
+          )}
+
+          <div className={`${styles.summarySection} ${styles.resultSection}`}>
             <div className={`${styles.summaryRow} ${styles.summaryTotal}`}>
               <span className={styles.summaryLabel}>Efectivo esperado</span>
-              <span className={`${styles.summaryValue} ${styles.totalValue}`}>
-                {formatGs(expected)}
+              <span className={`${styles.summaryValue} ${expected === null ? styles.pendingValue : styles.totalValue}`}>
+                {expected === null ? 'Pendiente de conciliación' : formatGs(expected)}
               </span>
             </div>
           </div>
+
+          {expected === null && (
+            <p className={`${styles.errorMsg} ${styles.pendingWarning}`} role="alert">
+              No se puede calcular el efectivo esperado hasta clasificar los pagos indicados.
+            </p>
+          )}
 
           <div className={styles.field}>
             <label className={styles.label} htmlFor="closing-amount">
@@ -198,7 +247,7 @@ function CloseCashModalContent({
             <button
               className={styles.confirmBtn}
               onClick={handleClose}
-              disabled={loading || !isAmountValid}
+              disabled={loading || !isAmountValid || expected === null}
               type="button"
             >
               {loading ? (

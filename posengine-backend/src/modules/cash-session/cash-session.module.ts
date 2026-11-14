@@ -5,5 +5,6 @@ import { CashSessionController } from './cash-session.controller';
 @Module({
   controllers: [CashSessionController],
   providers: [CashSessionService],
+  exports: [CashSessionService],
 })
 export class CashSessionModule {}

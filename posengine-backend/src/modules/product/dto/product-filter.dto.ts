@@ -39,4 +39,9 @@ export class ProductFilterDto extends PaginationQueryDto {
     return value;
   })
   lowStock?: boolean;
+
+  @ApiPropertyOptional({ enum: ['LOW', 'NORMAL'], description: 'Estado comparado con el stock mínimo' })
+  @IsOptional()
+  @IsEnum(['LOW', 'NORMAL'])
+  stockStatus?: 'LOW' | 'NORMAL';
 }

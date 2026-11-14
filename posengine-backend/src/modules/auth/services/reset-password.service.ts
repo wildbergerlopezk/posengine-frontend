@@ -50,6 +50,10 @@ export class ResetPasswordService {
           revokedAt: new Date(),
         },
       }),
+      this.prisma.quickPinDevice.updateMany({
+        where: { userId: resetToken.userId, revokedAt: null },
+        data: { revokedAt: new Date() },
+      }),
       this.prisma.passwordResetToken.update({
         where: {
           id: resetToken.id,

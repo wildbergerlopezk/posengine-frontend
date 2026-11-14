@@ -22,6 +22,7 @@ import {
   ApiQuery,
 } from '@nestjs/swagger'
 import { SaleService } from '../services/sale.service'
+import { SaleLifecycleActionDto } from '../dto/sale-lifecycle-action.dto'
 import { CreateSaleDto } from './../dto/create-sale.dto'
 import { SaleFilterDto } from './../dto/sale-filter.dto'
 import {
@@ -102,8 +103,10 @@ export class SaleController {
   cancel(
     @Param('id') id: string,
     @CurrentUser('tenantId') tenantId: string,
+    @CurrentUser('id') actorId: string,
+    @Body() dto: SaleLifecycleActionDto,
   ) {
-    return this.saleService.cancel(id, tenantId)
+    return this.saleService.cancel(id, tenantId, actorId, dto.reason)
   }
 
   @Patch(':id/uncancel')
@@ -116,7 +119,9 @@ export class SaleController {
   uncancel(
     @Param('id') id: string,
     @CurrentUser('tenantId') tenantId: string,
+    @CurrentUser('id') actorId: string,
+    @Body() dto: SaleLifecycleActionDto,
   ) {
-    return this.saleService.uncancel(id, tenantId)
+    return this.saleService.uncancel(id, tenantId, actorId, dto.reason)
   }
 }

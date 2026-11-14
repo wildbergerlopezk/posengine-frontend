@@ -10,16 +10,26 @@ export interface CashSession {
   openingAmount: number
   closingAmount?: number
   expectedAmount?: number
+  expectedCashAmount?: number | null
   totalSales: number
   totalCreditSales?: number
   totalCashSales?: number
+  totalPhysicalCashSales?: number
+  totalElectronicSales?: number
   totalDebtPayments?: number
+  totalCashDebtPayments?: number
+  totalElectronicDebtPayments?: number
+  unclassifiedCustomerPayments?: number
   totalPurchases: number
   totalCashPurchases?: number
   totalCreditPurchases?: number
   totalPurchaseDebtPayments?: number
+  totalCashPurchaseDebtPayments?: number
+  totalElectronicPurchaseDebtPayments?: number
+  unclassifiedSupplierPayments?: number
   totalManualInflows?: number
   totalManualOutflows?: number
+  cashReconciliationRequired?: boolean
   movements?: Array<{
     id: string
     amount: number
@@ -34,6 +44,25 @@ export interface CashSession {
 
 export interface CurrentSessionResponse {
   session: CashSession | null
+}
+
+export type ReconciliationMethod = 'CASH' | 'TRANSFER' | 'CARD'
+export interface ReconciliationPayment {
+  id: string
+  type: 'CUSTOMER' | 'SUPPLIER'
+  customer?: { id: string; name: string }
+  supplier?: { id: string; name: string }
+  date: string
+  amount: number | string
+  reference: string
+  paymentMethod: string | null
+  canClassify: boolean
+  reason: string | null
+}
+export interface ReconciliationResponse {
+  sessionId: string
+  customers: ReconciliationPayment[]
+  suppliers: ReconciliationPayment[]
 }
 
 import { useAuthStore } from '@/src/features/auth/store/auth.store'
@@ -63,14 +92,14 @@ export function useCashSession() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  const fetchCurrent = useCallback(async () => {
+  const fetchCurrent = useCallback(async (showLoading = true) => {
     if (!accessToken) return
     if (typeof navigator !== "undefined" && !navigator.onLine) {
       setError("Sin conexión a internet")
       setLoading(false)
       return
     }
-    setLoading(true)
+    if (showLoading) setLoading(true)
     setError(null)
     try {
       const data = await apiFetch<CurrentSessionResponse>(`${API_BASE}/current`, accessToken)
@@ -78,9 +107,26 @@ export function useCashSession() {
     } catch (err: any) {
       setError(err.message)
     } finally {
-      setLoading(false)
+      if (showLoading) setLoading(false)
     }
   }, [accessToken])
+
+  const getReconciliationItems = useCallback(async () => {
+    return apiFetch<ReconciliationResponse>(`${API_BASE}/current/reconciliation`, accessToken!)
+  }, [accessToken])
+
+  const classifyPayment = useCallback(
+    async (type: 'CUSTOMER' | 'SUPPLIER', paymentId: string, paymentMethod: ReconciliationMethod, reason: string) => {
+      const result = await apiFetch<{ id: string }>(
+        `${API_BASE}/current/reconciliation/${type}/${paymentId}`,
+        accessToken!,
+        { method: 'PATCH', body: JSON.stringify({ paymentMethod, reason }) },
+      )
+      await fetchCurrent(false)
+      return result
+    },
+    [accessToken, fetchCurrent],
+  )
 
   useEffect(() => {
     fetchCurrent()
@@ -136,13 +182,6 @@ export function useCashSession() {
     [accessToken, fetchCurrent],
   )
 
-  const getReport = useCallback(
-    async (sessionId: string) => {
-      return apiFetch<any>(`${API_BASE}/${sessionId}/report`, accessToken!)
-    },
-    [accessToken],
-  )
-
   return {
     session,
     loading,
@@ -151,7 +190,8 @@ export function useCashSession() {
     openCash,
     closeCash,
     addMovement,
-    getReport,
+    getReconciliationItems,
+    classifyPayment,
   }
 }
 

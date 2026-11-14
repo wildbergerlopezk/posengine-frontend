@@ -83,8 +83,8 @@ export class RegisterService {
 
     await this.emailVerificationService.sendVerificationEmail(user.id);
 
-    const accessToken = this.tokenService.signAccessToken(user);
     const refreshToken = await this.tokenService.issueRefreshToken(user.id);
+    const accessToken = this.tokenService.signAccessToken(user, refreshToken);
 
     return {
       accessToken,

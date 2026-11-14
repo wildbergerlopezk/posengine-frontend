@@ -8,7 +8,7 @@ model Purchase {
 
   paymentType PurchasePaymentType
 
-  total         Decimal             @db.Decimal(12, 2)
+  total         Decimal @db.Decimal(12, 2)
   cashSessionId String
 
   status PurchaseStatus @default(RECEIVED)
@@ -22,9 +22,11 @@ model Purchase {
   supplier    Supplier    @relation(fields: [supplierId], references: [id])
   cashSession CashSession @relation(fields: [cashSessionId], references: [id])
 
-  items   PurchaseItem[]
-  debt    PurchaseDebt?
-  returns PurchaseReturn[]
+  items                      PurchaseItem[]
+  debt                       PurchaseDebt?
+  returns                    PurchaseReturn[]
+  supplierCreditApplications PurchaseReturnCreditApplication[]
+  lifecycleEvents            PurchaseLifecycleEvent[]
 
   @@unique([invoiceNumber, tenantId])
   @@index([tenantId])

@@ -1,4 +1,4 @@
-import React from "react"
+import React, { type ReactNode } from "react"
 import { AlertTriangle, X, Loader2 } from "lucide-react"
 import styles from "./ConfirmDialog.module.css"
 
@@ -10,6 +10,8 @@ interface Props {
   cancelText?: string
   type?: "danger" | "warning" | "info"
   loading?: boolean
+  confirmDisabled?: boolean
+  children?: ReactNode
   onConfirm: () => void
   onCancel: () => void
 }
@@ -22,14 +24,16 @@ export function ConfirmDialog({
   cancelText = "Cancelar",
   type = "danger",
   loading = false,
+  confirmDisabled = false,
   onConfirm,
-  onCancel
+  onCancel,
+  children,
 }: Props) {
   if (!open) return null
 
   return (
     <div className={styles.overlay} onClick={onCancel}>
-      <div className={styles.dialog} onClick={e => e.stopPropagation()}>
+      <div data-pos-modal className={styles.dialog} onClick={e => e.stopPropagation()}>
         <div className={styles.header}>
           <div className={`${styles.iconWrapper} ${styles[type]}`}>
             <AlertTriangle size={24} />
@@ -42,6 +46,7 @@ export function ConfirmDialog({
         <div className={styles.body}>
           <h3 className={styles.title}>{title}</h3>
           <p className={styles.message}>{message}</p>
+          {children && <div className={styles.customContent}>{children}</div>}
         </div>
 
         <div className={styles.footer}>
@@ -55,7 +60,7 @@ export function ConfirmDialog({
           <button 
             className={`${styles.confirmBtn} ${styles[`confirm-${type}`]}`} 
             onClick={onConfirm}
-            disabled={loading}
+            disabled={loading || confirmDisabled}
           >
             {loading ? <Loader2 className={styles.spinner} size={18} /> : confirmText}
           </button>

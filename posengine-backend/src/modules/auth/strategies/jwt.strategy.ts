@@ -9,6 +9,7 @@ export interface JwtPayload {
   sub: string;
   email: string;
   tenantId: string;
+  sid: string;
 }
 
 export interface AuthenticatedUser {
@@ -18,6 +19,7 @@ export interface AuthenticatedUser {
   role: UserRole;
   name: string;
   emailVerified: boolean;
+  sessionId: string;
 }
 
 @Injectable()
@@ -34,13 +36,27 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
   }
 
   async validate(payload: JwtPayload): Promise<AuthenticatedUser> {
+    if (!payload.sid) throw new UnauthorizedException('Sesión inválida');
     const user = await this.prisma.user.findUnique({
       where: { id: payload.sub },
-      select: { id: true, email: true, tenantId: true, role: true, active: true, name: true, emailVerified: true },
+      select: {
+        id: true,
+        email: true,
+        tenantId: true,
+        role: true,
+        active: true,
+        name: true,
+        emailVerified: true,
+        refreshTokens: {
+          where: { tokenHash: payload.sid, revokedAt: null, expiresAt: { gt: new Date() } },
+          select: { id: true },
+        },
+      },
     });
 
     if (!user) throw new UnauthorizedException('Credenciales inválidas');
     if (!user.active) throw new UnauthorizedException('Cuenta inactiva');
+    if (user.refreshTokens.length !== 1) throw new UnauthorizedException('Sesión revocada');
 
     return {
       id: user.id,
@@ -49,6 +65,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       role: user.role,
       name: user.name,
       emailVerified: user.emailVerified,
+      sessionId: payload.sid,
     };
   }
 }

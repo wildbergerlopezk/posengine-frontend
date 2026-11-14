@@ -1,4 +1,4 @@
-import { IsEmail, IsString, IsNotEmpty, IsOptional,IsBoolean } from 'class-validator';
+import { IsEmail, IsString, IsNotEmpty, IsOptional, IsBoolean } from 'class-validator';
 import { Transform } from 'class-transformer';
 import { ApiProperty } from '@nestjs/swagger';
 
@@ -8,6 +8,7 @@ export class LoginDto {
     example: 'juan.perez@example.com',
     required: true,
   })
+  @IsString({ message: 'El correo electrónico debe ser un texto' })
   @IsEmail({}, { message: 'El correo electrónico debe ser válido' })
   @IsNotEmpty({ message: 'El correo electrónico no puede estar vacío' })
   @Transform(({ value }) => value?.trim().toLowerCase())

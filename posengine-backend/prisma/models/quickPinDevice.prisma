@@ -1,0 +1,17 @@
+model QuickPinDevice {
+  id             String    @id @default(uuid())
+  userId         String
+  tokenHash      String    @unique
+  failedAttempts Int       @default(0)
+  lockedUntil    DateTime?
+  expiresAt      DateTime
+  revokedAt      DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, revokedAt])
+  @@index([expiresAt])
+  @@map("quick_pin_devices")
+}

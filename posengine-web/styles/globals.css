@@ -2,56 +2,70 @@
    TEMA CLARO
    ============================================ */
 :root {
-  --background: #f8f9fa;
-  --foreground: #121214;
-  --card: #ffffff;
-  --card-foreground: #121214;
-  --popover: #ffffff;
-  --popover-foreground: #121214;
-  --primary: #1db954;
+  /* Superficies neutrales del tema claro */
+  --background: #d7d9dc;
+  --foreground: #1b1c1f;
+  --card: #e4e5e8;
+  --card-foreground: #1b1c1f;
+  --popover: #e9eaec;
+  --popover-foreground: #1b1c1f;
+  --primary: #15803d;
   --primary-foreground: #ffffff;
-  --secondary: #f1f3f5;
-  --secondary-foreground: #212529;
-  --muted: #f8f9fa;
-  --muted-foreground: #6c757d;
-  --accent: #e8f8ed;
-  --accent-foreground: #1db954;
-  --destructive: #fa5252;
+  --secondary: #d0d3d7;
+  --secondary-foreground: #1b1c1f;
+  --muted: #d0d3d7;
+  --muted-foreground: #555a61;
+  --accent: #d3e6d9;
+  --accent-foreground: #14532d;
+  --destructive: #dc2626;
   --destructive-foreground: #ffffff;
-  --border: #e9ecef;
-  --input: #e9ecef;
-  --ring: #1db954;
+  --border: #b4b9c0;
+  --input: #b4b9c0;
+  --ring: #15803d;
   --radius: 0.5rem;
 
-  --color-background: #f8f9fa;
-  --color-foreground: #121214;
-  --color-card: #ffffff;
-  --color-card-foreground: #121214;
-  --color-primary: #1db954;
-  --color-primary-hover: #1aa34a;
+  --color-background: #d7d9dc;
+  --color-foreground: #1b1c1f;
+  --color-card: #e4e5e8;
+  --color-card-foreground: #1b1c1f;
+  --color-primary: #15803d;
+  --color-primary-hover: #14532d;
   --color-primary-foreground: #ffffff;
-  --color-secondary: #f1f3f5;
-  --color-secondary-foreground: #212529;
-  --color-muted: #f8f9fa;
-  --color-muted-foreground: #6c757d;
-  --color-accent: #e8f8ed;
-  --color-accent-foreground: #1db954;
-  --color-destructive: #fa5252;
+  --color-secondary: #d0d3d7;
+  --color-secondary-foreground: #1b1c1f;
+  --color-muted: #d0d3d7;
+  --color-muted-foreground: #555a61;
+  --color-accent: #d3e6d9;
+  --color-accent-foreground: #14532d;
+  --color-destructive: #dc2626;
   --color-destructive-foreground: #ffffff;
-  --color-border: #e9ecef;
-  --color-input: #e9ecef;
-  --color-ring: #1db954;
-  --color-success: #1db954;
+  --color-border: #b4b9c0;
+  --color-input: #b4b9c0;
+  --color-ring: #15803d;
+  --color-success: #15803d;
   --color-success-foreground: #ffffff;
-  --color-warning: #fab005;
-  --color-warning-foreground: #121214;
-  --color-sidebar-bg: #121214;
-  --color-sidebar-foreground: #f8f9fa;
-  --color-sidebar-hover: #1e1e21;
-  --color-sidebar-active: #1db954;
+  --color-warning: #b45309;
+  --color-warning-foreground: #ffffff;
+  --color-modal-border: color-mix(in srgb, var(--color-primary) 62%, var(--color-border));
+  --color-sidebar-surface: #cdd0d5;
+  --color-sidebar-bg: #cdd0d5;
+  --color-sidebar-foreground: #1b1c1f;
+  --color-sidebar-hover: #c2c6cc;
+  --color-sidebar-active: #15803d;
 
-  --color-header-card: #e8f8ed;
-  --color-header-card-border: #bfe9cd;
+  --color-header-card: #d0d3d7;
+  --color-header-card-border: #b4b9c0;
+
+  /* Alias usados por el modal de conciliación de caja */
+  --bg-primary: #d7d9dc;
+  --bg-secondary: #e4e5e8;
+  --text-primary: #1b1c1f;
+  --text-secondary: #555a61;
+  --border-color: #b4b9c0;
+  --color-warning-text: #92400e;
+  --color-error-surface: #f6dcdc;
+  --color-error-border: #e5b4b4;
+  --color-error-text: #991b1b;
 }
 
 /* ============================================
@@ -100,13 +114,26 @@ html.dark {
   --color-success-foreground: #09090b;
   --color-warning: #fab005;
   --color-warning-foreground: #09090b;
+  --color-modal-border: color-mix(in srgb, var(--color-primary) 62%, var(--color-border));
   --color-sidebar-bg: #0c0c0d;
+  --color-sidebar-surface: #141416;
   --color-sidebar-foreground: #f4f4f5;
   --color-sidebar-hover: #141416;
   --color-sidebar-active: #1db954;
 
   --color-header-card: #0e2616;
   --color-header-card-border: #163f24;
+
+  /* Valores originales del modal de conciliación en el tema oscuro */
+  --bg-primary: #101010;
+  --bg-secondary: #171717;
+  --text-primary: #f5f5f5;
+  --text-secondary: #a3a3a3;
+  --border-color: #303030;
+  --color-warning-text: #fbbf24;
+  --color-error-surface: rgba(248, 113, 113, .1);
+  --color-error-border: rgba(248, 113, 113, .4);
+  --color-error-text: #fca5a5;
 }
 
 /* ============================================
@@ -116,6 +143,21 @@ html.dark {
   margin: 0;
   padding: 0;
   box-sizing: border-box;
+}
+
+:root [data-pos-modal] {
+  box-sizing: border-box;
+  border: 1px solid var(--color-modal-border);
+}
+
+:root [data-pos-modal] > :first-child:not([data-pos-modal-floating]) {
+  border-top-left-radius: inherit;
+  border-top-right-radius: inherit;
+}
+
+:root [data-pos-modal] > :last-child:not([data-pos-modal-floating]) {
+  border-bottom-left-radius: inherit;
+  border-bottom-right-radius: inherit;
 }
 
 body {

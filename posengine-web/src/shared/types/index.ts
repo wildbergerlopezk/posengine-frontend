@@ -3,7 +3,7 @@ export interface Category {
   tenantId: string
   name: string
   parentId?: string
-  subcategories?: Category[]
+  subcategories?: Subcategory[]
   createdAt: Date
   updatedAt: Date
 }

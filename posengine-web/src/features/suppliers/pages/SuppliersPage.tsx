@@ -89,9 +89,10 @@ export function SuppliersPage() {
   }, [debouncedSearch])
 
   const fetchSuppliers = useCallback(
-    async (override?: { page?: number; search?: string }) => {
+    async (override?: { page?: number; search?: string; signal?: AbortSignal }) => {
       const p = override?.page ?? page
       const s = override?.search ?? debouncedSearch
+      const signal = override?.signal
       setLoading(true)
       setError(null)
       try {
@@ -100,25 +101,29 @@ export function SuppliersPage() {
           limit: String(PAGE_SIZE),
         })
         if (s) params.set("search", s)
-        const res = await fetch(`${API_BASE}/suppliers?${params}`, { headers: authHeaders })
+        const res = await fetch(`${API_BASE}/suppliers?${params}`, { headers: authHeaders, signal })
         if (!res.ok) {
           const body = await res.json().catch(() => ({}))
           throw new Error(readApiError(body))
         }
         const data = await res.json()
-        setItems(data.items ?? [])
-        setTotal(typeof data.total === "number" ? data.total : 0)
+        if (!signal?.aborted) {
+          setItems(data.items ?? [])
+          setTotal(typeof data.total === "number" ? data.total : 0)
+        }
       } catch (err: unknown) {
-        setError(err instanceof Error ? err.message : "Error al cargar proveedores")
+        if (!signal?.aborted) setError(err instanceof Error ? err.message : "Error al cargar proveedores")
       } finally {
-        setLoading(false)
+        if (!signal?.aborted) setLoading(false)
       }
     },
     [accessToken, page, debouncedSearch],
   )
 
   useEffect(() => {
-    void fetchSuppliers()
+    const controller = new AbortController()
+    void fetchSuppliers({ signal: controller.signal })
+    return () => controller.abort()
   }, [fetchSuppliers])
 
   useEffect(() => {
@@ -269,7 +274,7 @@ export function SuppliersPage() {
           </div>
         </div>
 
-        <div className={tableStyles.tableCard}>
+        <div className={`${tableStyles.tableCard} ${styles.suppliersTableCard}`}>
           {loading ? (
             <div className={tableStyles.loadingState}>
               <Loader2 size={32} className={tableStyles.spinner} />
@@ -386,7 +391,7 @@ export function SuppliersPage() {
 
       {isDialogOpen && (
         <div className={tableStyles.modalOverlay} onClick={() => { setIsDialogOpen(false); resetForm() }}>
-          <div className={tableStyles.modal} onClick={(e) => e.stopPropagation()}>
+          <div data-pos-modal className={tableStyles.modal} onClick={(e) => e.stopPropagation()}>
             <div className={tableStyles.modalHeader}>
               <h2 className={tableStyles.modalTitle}>{editing ? "Editar proveedor" : "Nuevo proveedor"}</h2>
               <p className={tableStyles.modalDescription}>
@@ -480,7 +485,7 @@ export function SuppliersPage() {
 
       {confirm.open && (
         <div className={tableStyles.confirmOverlay} onClick={closeConfirm}>
-          <div className={tableStyles.confirmDialog} onClick={(e) => e.stopPropagation()}>
+          <div data-pos-modal className={tableStyles.confirmDialog} onClick={(e) => e.stopPropagation()}>
             <div className={tableStyles.confirmIcon}>
               <AlertTriangle size={22} />
             </div>

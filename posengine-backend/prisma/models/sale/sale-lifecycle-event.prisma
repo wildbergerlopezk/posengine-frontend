@@ -1,0 +1,22 @@
+enum SaleLifecycleAction {
+  CANCEL
+  RESTORE
+}
+
+model SaleLifecycleEvent {
+  id        String              @id @default(uuid())
+  tenantId  String
+  saleId    String
+  actorId   String
+  action    SaleLifecycleAction
+  reason    String
+  createdAt DateTime            @default(now())
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+  sale   Sale   @relation(fields: [saleId], references: [id])
+  actor  User   @relation("SaleLifecycleEventActor", fields: [actorId], references: [id])
+
+  @@index([tenantId, saleId, createdAt])
+  @@index([actorId])
+  @@map("sale_lifecycle_events")
+}

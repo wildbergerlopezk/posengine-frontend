@@ -1,351 +1,292 @@
 "use client"
 
+import { useCallback, useEffect, useState } from "react"
+import Link from "next/link"
+import {
+  AlertTriangle,
+  ArrowRight,
+  Banknote,
+  CheckCircle2,
+  CircleDollarSign,
+  Clock3,
+  CreditCard,
+  Package,
+  ShoppingBag,
+  ShoppingCart,
+  Users,
+  Wallet,
+} from "lucide-react"
 import { Header } from "@/src/shared/components/Header"
-import { Skeleton } from "@/src/shared/components/Skeleton"
-import { DollarSign, ShoppingCart, AlertTriangle, TrendingUp, ArrowUpRight } from "lucide-react"
+import { ApiError } from "@/src/shared/api/apiClient"
 import { useAuthStore } from "@/src/features/auth/store/auth.store"
-import { formatCurrency } from "@/src/shared/hooks/useFormatCurrency"
-import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar } from "recharts"
+import { getDashboardData, type DashboardDataResponse } from "../api/dashboard.api"
 import styles from "./DashboardPage.module.css"
-import { useEffect, useState } from "react"
-import { getDashboardData } from "../api/dashboard.api"
-import type { DashboardDataResponse } from "../api/dashboard.api"
+
+const money = new Intl.NumberFormat("es-PY", {
+  style: "currency",
+  currency: "PYG",
+  maximumFractionDigits: 0,
+})
+
+const units: Record<DashboardDataResponse["stock"]["items"][number]["unitType"], string> = {
+  UNIT: "unid.",
+  KG: "kg",
+  G: "g",
+  L: "L",
+  ML: "ml",
+  MG: "mg",
+}
+
+function formatMoney(value: number) {
+  return money.format(value)
+}
+
+function formatBusinessDateTime(date: string, timeZone: string) {
+  return new Intl.DateTimeFormat("es-PY", {
+    timeZone,
+    day: "2-digit",
+    month: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(new Date(date))
+}
 
 export function DashboardPage() {
-  const { accessToken } = useAuthStore()
+  const accessToken = useAuthStore((state) => state.accessToken)
   const [dashboardData, setDashboardData] = useState<DashboardDataResponse | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [reloadKey, setReloadKey] = useState(0)
 
   useEffect(() => {
     if (!accessToken) return
+    let current = true
+    setLoading(true)
+    setError(null)
 
-    const fetchData = async () => {
-      try {
-        setLoading(true)
-        setError(null)
-        const data = await getDashboardData(accessToken)
-        setDashboardData(data)
-      } catch (err) {
-        console.error("Error loading dashboard data:", err)
-        setError("No se pudieron cargar los datos del dashboard")
-      } finally {
-        setLoading(false)
-      }
+    void getDashboardData(accessToken)
+      .then((data) => {
+        if (current) setDashboardData(data)
+      })
+      .catch((requestError) => {
+        const diagnostic = requestError instanceof ApiError
+          ? { status: requestError.status, code: requestError.code, requestId: requestError.requestId }
+          : { error: requestError instanceof Error ? requestError.message : "Unknown dashboard error" }
+        console.warn("No se pudieron cargar las estadísticas del Dashboard.", diagnostic)
+        if (current) {
+          const reference = requestError instanceof ApiError && requestError.requestId
+            ? ` Referencia: ${requestError.requestId}.`
+            : ""
+          setError(`No se pudieron cargar los datos del Dashboard.${reference}`)
+        }
+      })
+      .finally(() => {
+        if (current) setLoading(false)
+      })
+
+    return () => {
+      current = false
     }
+  }, [accessToken, reloadKey])
 
-    fetchData()
-  }, [accessToken])
+  const retry = useCallback(() => setReloadKey((key) => key + 1), [])
 
-  if (loading) {
+  if (loading && !dashboardData) {
     return (
       <div className={styles.page}>
         <Header title="Dashboard" />
-        <div className={styles.container}>
-          <div className={styles.statsGrid}>
-            {[1, 2, 3, 4].map((i) => (
-              <div key={i} className={styles.statCard}>
-                <div className={styles.statHeader}>
-                  <Skeleton width="70px" height="14px" />
-                  <Skeleton width="2rem" height="2rem" className={styles.statIcon} />
-                </div>
-                <Skeleton width="90px" height="28px" />
-                <div style={{ marginTop: "0.5rem" }}>
-                  <Skeleton width="120px" height="12px" />
-                </div>
-              </div>
-            ))}
+        <main className={styles.container} aria-label="Cargando Dashboard">
+          <div className={styles.loadingGrid}>
+            {[1, 2, 3, 4].map((item) => <div className={styles.loadingCard} key={item} />)}
           </div>
-
-          <div className={styles.chartsGrid}>
-            {[1, 2].map((i) => (
-              <div key={i} className={styles.card}>
-                <div className={styles.cardHeader}>
-                  <Skeleton width="160px" height="18px" />
-                </div>
-                <div className={styles.cardContent}>
-                  <Skeleton width="100%" height="280px" />
-                </div>
-              </div>
-            ))}
-          </div>
-
-          <div className={styles.bottomGrid}>
-            {[1, 2].map((i) => (
-              <div key={i} className={styles.card}>
-                <div className={styles.cardHeader}>
-                  <Skeleton width="180px" height="18px" />
-                </div>
-                <div className={styles.cardContent}>
-                  {[1, 2, 3].map((j) => (
-                    <div key={j} style={{ marginBottom: "0.75rem" }}>
-                      <Skeleton width="100%" height="48px" />
-                    </div>
-                  ))}
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
+          <div className={styles.loadingContent} />
+        </main>
       </div>
     )
   }
 
-  if (error) {
+  if (error && !dashboardData) {
     return (
       <div className={styles.page}>
         <Header title="Dashboard" />
-        <div className={styles.errorContainer}>
-          <AlertTriangle size={40} />
+        <main className={styles.errorState}>
+          <AlertTriangle size={32} aria-hidden="true" />
           <p>{error}</p>
-          <button
-            onClick={() => {
-              setLoading(true)
-              setError(null)
-              const fetchData = async () => {
-                try {
-                  const data = await getDashboardData(accessToken!)
-                  setDashboardData(data)
-                } catch (err) {
-                  console.error("Error loading dashboard data:", err)
-                  setError("No se pudieron cargar los datos del dashboard. Verifica que el servidor esté en línea.")
-                } finally {
-                  setLoading(false)
-                }
-              }
-              fetchData()
-            }}
-            className={styles.retryButton}
-          >
-            Reintentar
-          </button>
-        </div>
+          <button type="button" onClick={retry} className={styles.retryButton}>Reintentar</button>
+        </main>
       </div>
     )
   }
 
-  if (!dashboardData) {
-    return (
-      <div className={styles.page}>
-        <Header title="Dashboard" />
-        <div className={styles.errorContainer}>
-          <AlertTriangle size={40} />
-          <p>No se pudieron cargar los datos</p>
-        </div>
-      </div>
-    )
-  }
+  if (!dashboardData) return null
 
-  const stats = {
-    todaySales: dashboardData.todaySales,
-    todayRevenue: dashboardData.todayRevenue,
-    monthRevenue: dashboardData.monthRevenue,
-    lowStockProducts: dashboardData.lowStockProducts.length,
-  }
-  const lowStockProducts = dashboardData.lowStockProducts
-  const recentSales = dashboardData.recentSales
-  const salesData = dashboardData.weeklySalesData
-  const categoryData = dashboardData.categorySalesData
+  const { billing, collections, cash, receivables, stock, recentSales } = dashboardData
 
   return (
     <div className={styles.page}>
       <Header title="Dashboard" />
 
-      <div className={styles.container}>
-        <div className={styles.statsGrid}>
-          <div className={styles.statCard}>
-            <div className={styles.statHeader}>
-              <span className={styles.statLabel}>Ventas hoy</span>
-              <div className={`${styles.statIcon} ${styles.statIconBlue}`}>
-                <ShoppingCart size={16} />
-              </div>
-            </div>
-            <div className={styles.statValue}>{stats.todaySales}</div>
-            <div className={styles.statChange}>
-              <TrendingUp size={12} />
-              <span>Ventas registradas</span>
-            </div>
-          </div>
+      <main className={styles.container}>
+        {!dashboardData.returnTrackingAvailable && (
+          <p className={styles.schemaWarning} role="status">
+            Falta aplicar en esta base la migración de devoluciones de ventas. El Dashboard muestra la facturación sin descontar devoluciones; aplicá las migraciones pendientes antes de habilitar esa operación.
+          </p>
+        )}
+        <nav className={styles.quickActions} aria-label="Acciones rápidas">
+          <Link href="/dashboard/sales/pos" className={styles.actionLink}>
+            <ShoppingCart size={16} aria-hidden="true" /> Nueva venta
+          </Link>
+          <Link href="/dashboard/purchases/new" className={styles.actionLink}>
+            <ShoppingBag size={16} aria-hidden="true" /> Nueva compra
+          </Link>
+          <Link href="/dashboard/clients/payments" className={styles.actionLink}>
+            <CircleDollarSign size={16} aria-hidden="true" /> Cobrar deuda
+          </Link>
+          <Link href="/dashboard/cash" className={styles.actionLinkSecondary}>
+            <Wallet size={16} aria-hidden="true" /> Control de caja
+          </Link>
+        </nav>
 
-          <div className={styles.statCard}>
+        <section className={styles.statsGrid} aria-label="Indicadores del comercio">
+          <article className={styles.statCard}>
             <div className={styles.statHeader}>
-              <span className={styles.statLabel}>Ingresos hoy</span>
-              <div className={`${styles.statIcon} ${styles.statIconGreen}`}>
-                <DollarSign size={16} />
-              </div>
+              <span className={styles.statLabel}>Facturación bruta de hoy</span>
+              <span className={`${styles.statIcon} ${styles.iconBlue}`}><ShoppingCart size={17} /></span>
             </div>
-            <div className={styles.statValue}>{formatCurrency(stats.todayRevenue)}</div>
-            <div className={styles.statChange}>
-              <ArrowUpRight size={12} />
-              <span>Total recaudado</span>
-            </div>
-          </div>
+            <strong className={styles.statValue}>{formatMoney(billing.today)}</strong>
+            <span className={styles.statMeta}>{billing.todaySalesCount} ventas completadas</span>
+            {billing.todayReturns > 0 && <span className={styles.statMeta}>Devoluciones {formatMoney(billing.todayReturns)} · neta {formatMoney(billing.netToday)}</span>}
+            {billing.creditBalanceToday > 0 && (
+              <span className={styles.statMeta}>Saldo crédito de hoy: {formatMoney(billing.creditBalanceToday)}</span>
+            )}
+          </article>
 
-          <div className={styles.statCard}>
+          <article className={styles.statCard}>
             <div className={styles.statHeader}>
-              <span className={styles.statLabel}>Ingresos del mes</span>
-              <div className={`${styles.statIcon} ${styles.statIconBlue}`}>
-                <TrendingUp size={16} />
-              </div>
+              <span className={styles.statLabel}>Cobros de hoy</span>
+              <span className={`${styles.statIcon} ${styles.iconGreen}`}><Banknote size={17} /></span>
             </div>
-            <div className={styles.statValue}>{formatCurrency(stats.monthRevenue)}</div>
-            <div className={styles.statChange}>
-              <ArrowUpRight size={12} />
-              <span>Período actual</span>
-            </div>
-          </div>
+            <strong className={styles.statValue}>{formatMoney(collections.today)}</strong>
+            <span className={styles.statMeta}>
+              Efectivo {formatMoney(collections.cash)} · Electrónico {formatMoney(collections.electronic)}
+              {collections.unclassified > 0 ? ` · Pendiente ${formatMoney(collections.unclassified)}` : ""}
+            </span>
+          </article>
 
-          <div className={styles.statCard}>
+          <article className={styles.statCard}>
             <div className={styles.statHeader}>
-              <span className={styles.statLabel}>Stock bajo</span>
-              <div className={`${styles.statIcon} ${styles.statIconYellow}`}>
-                <AlertTriangle size={16} />
-              </div>
+              <span className={styles.statLabel}>Efectivo esperado</span>
+              <span className={`${styles.statIcon} ${cash.reconciliationPending ? styles.iconYellow : styles.iconBlue}`}>
+                <Wallet size={17} />
+              </span>
             </div>
-            <div className={styles.statValueWarning}>{stats.lowStockProducts}</div>
-            <div className={styles.statSubtext}>productos requieren atención</div>
-          </div>
+            <strong className={`${styles.statValue} ${cash.reconciliationPending ? styles.pendingValue : ""}`}>
+              {cash.status === "CLOSED"
+                ? "Caja cerrada"
+                : cash.expectedAmount === null
+                  ? "Pendiente de conciliación"
+                  : formatMoney(cash.expectedAmount)}
+            </strong>
+            <span className={styles.statMeta}>
+              {cash.status === "CLOSED" ? "Sin sesión abierta" : cash.reconciliationPending ? "Revisá los medios de pago" : "Sesión actual · conciliada"}
+            </span>
+          </article>
+
+          <article className={styles.statCard}>
+            <div className={styles.statHeader}>
+              <span className={styles.statLabel}>Cuentas por cobrar</span>
+              <span className={`${styles.statIcon} ${styles.iconViolet}`}><Users size={17} /></span>
+            </div>
+            <strong className={styles.statValue}>{formatMoney(receivables.balance)}</strong>
+            <span className={styles.statMeta}>{receivables.customersCount} clientes con saldo pendiente</span>
+          </article>
+        </section>
+
+        <div className={styles.monthSummary}>
+          <TrendingUpIcon />
+          <span>{dashboardData.returnTrackingAvailable ? "Facturación neta del mes" : "Facturación del mes"}</span>
+          <strong>{formatMoney(billing.netMonth)}</strong>
+          {billing.monthReturns > 0 && <small>Bruta {formatMoney(billing.month)} · devoluciones {formatMoney(billing.monthReturns)}</small>}
         </div>
 
-        <div className={styles.chartsGrid}>
-          <div className={styles.card}>
-            <div className={styles.cardHeader}>
-              <h3 className={styles.cardTitle}>Ventas de la semana</h3>
+        <section className={styles.contentGrid}>
+          <article className={styles.panel}>
+            <div className={styles.panelHeader}>
+              <h2><AlertTriangle size={17} aria-hidden="true" /> Requieren atención</h2>
             </div>
-            <div className={styles.cardContent}>
-              <div className={styles.chartContainer}>
-                <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart data={salesData}>
-                    <defs>
-                      <linearGradient id="colorVentas" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#2563eb" stopOpacity={0.3} />
-                        <stop offset="95%" stopColor="#2563eb" stopOpacity={0} />
-                      </linearGradient>
-                    </defs>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                    <XAxis dataKey="day" tick={{ fontSize: 12 }} />
-                    <YAxis tick={{ fontSize: 12 }} tickFormatter={(v) => `$${v / 1000}k`} />
-                    <Tooltip
-                      formatter={(value: number) => [formatCurrency(value), "Ventas"]}
-                      contentStyle={{
-                        backgroundColor: "#ffffff",
-                        border: "1px solid #e2e8f0",
-                        borderRadius: "8px",
-                      }}
-                    />
-                    <Area
-                      type="monotone"
-                      dataKey="ventas"
-                      stroke="#2563eb"
-                      strokeWidth={2}
-                      fillOpacity={1}
-                      fill="url(#colorVentas)"
-                    />
-                  </AreaChart>
-                </ResponsiveContainer>
-              </div>
-            </div>
-          </div>
-
-          <div className={styles.card}>
-            <div className={styles.cardHeader}>
-              <h3 className={styles.cardTitle}>Ventas por categoría</h3>
-            </div>
-            <div className={styles.cardContent}>
-              <div className={styles.chartContainer}>
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={categoryData} layout="vertical">
-                    <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                    <XAxis type="number" tick={{ fontSize: 12 }} />
-                    <YAxis dataKey="name" type="category" tick={{ fontSize: 12 }} width={80} />
-                    <Tooltip
-                      formatter={(value: number) => [`${value} ventas`, "Cantidad"]}
-                      contentStyle={{
-                        backgroundColor: "#ffffff",
-                        border: "1px solid #e2e8f0",
-                        borderRadius: "8px",
-                      }}
-                    />
-                    <Bar dataKey="ventas" fill="#2563eb" radius={[0, 4, 4, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div className={styles.bottomGrid}>
-          <div className={styles.card}>
-            <div className={styles.cardHeader}>
-              <h3 className={styles.cardTitleWithIcon}>
-                <AlertTriangle size={20} color="#f59e0b" />
-                Alertas de stock bajo
-              </h3>
-            </div>
-            <div className={styles.cardContent}>
-              {lowStockProducts.length > 0 ? (
-                <div className={styles.alertList}>
-                  {lowStockProducts.map((product) => (
-                    <div key={product.id} className={styles.alertItem}>
-                      <div className={styles.alertInfo}>
-                        <span className={styles.alertTitle}>{product.name}</span>
-                        <span className={styles.alertSubtitle}>Stock mínimo: {product.stockMinimum}</span>
-                      </div>
-                      <div className={styles.alertValue}>
-                        <span className={styles.alertNumber}>{product.stock}</span>
-                        <span className={styles.alertUnit}>unidades</span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
+            <div className={styles.panelBody}>
+              {stock.lowStockCount === 0 && stock.outOfStockCount === 0 && !cash.reconciliationPending && cash.status === "OPEN" ? (
+                <div className={styles.allClear}><CheckCircle2 size={17} /> Sin alertas operativas.</div>
               ) : (
-                <p className={styles.emptyState}>No hay productos con stock bajo</p>
+                <div className={styles.alertSummary}>
+                  {stock.lowStockCount > 0 && (
+                    <Link href="/dashboard/stock?stockStatus=LOW&isActive=true" className={styles.alertLink}>
+                      <span><Package size={16} /> Productos con stock bajo</span>
+                      <strong>{stock.lowStockCount}</strong>
+                    </Link>
+                  )}
+                  {stock.outOfStockCount > 0 && (
+                    <Link href="/dashboard/stock?stockStatus=LOW&isActive=true" className={`${styles.alertLink} ${styles.alertLinkDanger}`}>
+                      <span><AlertTriangle size={16} /> Sin existencias</span>
+                      <strong>{stock.outOfStockCount}</strong>
+                    </Link>
+                  )}
+                  {cash.status === "CLOSED" && (
+                    <Link href="/dashboard/cash" className={styles.alertLink}>
+                      <span><Wallet size={16} /> Caja cerrada</span><ArrowRight size={15} />
+                    </Link>
+                  )}
+                  {cash.reconciliationPending && (
+                    <Link href="/dashboard/cash" className={`${styles.alertLink} ${styles.alertLinkDanger}`}>
+                      <span><CreditCard size={16} /> Conciliación de caja pendiente</span><ArrowRight size={15} />
+                    </Link>
+                  )}
+                  {stock.items.length > 0 && (
+                    <ul className={styles.stockPreview}>
+                      {stock.items.slice(0, 4).map((product) => (
+                        <li key={product.id}>
+                          <span className={styles.stockName} title={product.name}>{product.name}</span>
+                          <span>{product.stock} {units[product.unitType] ?? product.unitType}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
               )}
             </div>
-          </div>
+          </article>
 
-          <div className={styles.card}>
-            <div className={styles.cardHeader}>
-              <h3 className={styles.cardTitle}>Últimas ventas</h3>
+          <article className={styles.panel}>
+            <div className={styles.panelHeader}>
+              <h2><Clock3 size={17} aria-hidden="true" /> Últimas ventas</h2>
+              <Link className={styles.panelLink} href="/dashboard/sales/history">Ver historial <ArrowRight size={14} /></Link>
             </div>
-            <div className={styles.cardContent}>
-              <div className={styles.salesList}>
-                {recentSales && recentSales.length > 0 ? (
-                  recentSales.map((sale) => (
-                    <div key={sale.id} className={styles.saleItem}>
-                      <div className={styles.saleInfo}>
-                        <span className={styles.saleTitle}>
-                          {sale.items?.length || 0} producto{(sale.items?.length || 0) > 1 ? "s" : ""}
-                        </span>
-                        <span className={styles.saleTime}>
-                          {new Date(sale.createdAt).toLocaleString("es-AR", {
-                            hour: "2-digit",
-                            minute: "2-digit",
-                          })}
+            <div className={styles.panelBody}>
+              {recentSales.length > 0 ? (
+                <ul className={styles.salesList}>
+                  {recentSales.map((sale) => (
+                    <li className={styles.saleRow} key={sale.id}>
+                      <div className={styles.saleDetails}>
+                        <strong title={sale.customerName}>{sale.customerName}</strong>
+                        <span>
+                          {formatBusinessDateTime(sale.saleDate, dashboardData.timezone)} · {sale.paymentType === "CREDIT" ? "Crédito" : "Contado"}
+                          {sale.itemCount > 0 ? ` · ${sale.itemCount} ítem${sale.itemCount === 1 ? "" : "s"}` : ""}
                         </span>
                       </div>
-                      <div className={styles.saleAmount}>
-                        <span className={styles.saleMethod}>
-                          {sale.paymentMethod === "CASH"
-                            ? "Efectivo"
-                            : sale.paymentMethod === "CARD"
-                              ? "Tarjeta"
-                              : sale.paymentMethod === "TRANSFER"
-                                ? "Transferencia"
-                                : sale.paymentMethod}
-                        </span>
-                        <span className={styles.saleTotal}>{formatCurrency(sale.total)}</span>
-                      </div>
-                    </div>
-                  ))
-                ) : (
-                  <p className={styles.emptyState}>No hay ventas registradas</p>
-                )}
-              </div>
+                      <strong className={styles.saleTotal}>{formatMoney(sale.total)}</strong>
+                    </li>
+                  ))}
+                </ul>
+              ) : <p className={styles.emptyState}>Todavía no hay ventas completadas.</p>}
             </div>
-          </div>
-        </div>
-      </div>
+          </article>
+
+        </section>
+      </main>
     </div>
   )
+}
+
+function TrendingUpIcon() {
+  return <Banknote size={15} aria-hidden="true" />
 }

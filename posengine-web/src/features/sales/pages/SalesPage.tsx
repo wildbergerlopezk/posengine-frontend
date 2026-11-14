@@ -90,7 +90,11 @@ export function SalesPage() {
   const [selectedCustomerId, setSelectedCustomerId] = useState<string>("")
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null)
   const [amountPaid, setAmountPaid] = useState<number>(0)
+  const [initialPaymentMethod, setInitialPaymentMethod] = useState<"" | "CASH" | "TRANSFER">("")
   const [customers, setCustomers] = useState<Customer[]>([])
+  const [customerTotal, setCustomerTotal] = useState(0)
+  const [customerPage, setCustomerPage] = useState(1)
+  const [loadingCustomers, setLoadingCustomers] = useState(false)
   const [showCustomerModal, setShowCustomerModal] = useState(false)
   const [customerSearch, setCustomerSearch] = useState("")
 
@@ -136,41 +140,83 @@ export function SalesPage() {
   const total = items.reduce((acc, i) => acc + i.quantity * i.unitPrice, 0)
 
   // ── Fetch productos para el modal ──────────────────────────────────────────
-  const fetchProducts = useCallback(async (search: string) => {
+  const fetchProducts = useCallback(async (search: string, signal: AbortSignal) => {
     setLoadingProducts(true)
     try {
       const params = new URLSearchParams({ limit: "30", isActive: "true" })
       if (search.trim()) params.set("search", search.trim())
-      const res = await fetch(`${API_BASE}/product?${params}`, { headers: authHeaders })
-      if (res.ok) {
+      const res = await fetch(`${API_BASE}/product/search?${params}`, { headers: authHeaders, signal })
+      if (res.ok && !signal.aborted) {
         const data = await res.json()
-        setProducts(data.items ?? data)
+        if (!signal.aborted) setProducts(data.items ?? data)
       }
     } catch { /* silent */ }
-    finally { setLoadingProducts(false) }
+    finally {
+      if (!signal.aborted) setLoadingProducts(false)
+    }
   }, [accessToken])
 
   useEffect(() => {
     if (!showProductModal) return
-    const t = setTimeout(() => fetchProducts(productSearch), 250)
-    return () => clearTimeout(t)
+    const controller = new AbortController()
+    setLoadingProducts(true)
+
+    let debounce: ReturnType<typeof setTimeout> | null = null
+    const loadProducts = () => { void fetchProducts(productSearch, controller.signal) }
+    if (productSearch.trim()) {
+      debounce = setTimeout(loadProducts, 250)
+    } else {
+      loadProducts()
+    }
+
+    return () => {
+      if (debounce) clearTimeout(debounce)
+      controller.abort()
+    }
   }, [productSearch, showProductModal, fetchProducts])
 
-  useEffect(() => {
-    if (showProductModal) {
-      fetchProducts("")
-    }
-  }, [showProductModal, fetchProducts])
+  const openProductModal = useCallback(() => {
+    setLoadingProducts(true)
+    setShowProductModal(true)
+  }, [])
 
-  // ── Fetch clientes para el punto de venta ───────────────────────────────────
+  // ── Search customers for the point of sale ─────────────────────────────────
   useEffect(() => {
-    if (accessToken) {
-      fetch(`${API_BASE}/customers?limit=150`, { headers: authHeaders })
-        .then(res => res.json())
-        .then(data => setCustomers(data.items ?? []))
-        .catch(err => console.error("Error loading customers", err))
+    if (!showCustomerModal || !accessToken) return
+
+    const controller = new AbortController()
+    let debounce: ReturnType<typeof setTimeout> | undefined
+    setLoadingCustomers(true)
+
+    const loadCustomers = async () => {
+      const params = new URLSearchParams({ page: String(customerPage), limit: "10" })
+      if (customerSearch.trim()) params.set("search", customerSearch.trim())
+      try {
+        const res = await fetch(`${API_BASE}/customers?${params}`, {
+          headers: authHeaders,
+          signal: controller.signal,
+        })
+        if (!res.ok) throw new Error("Error al cargar clientes")
+        const data = await res.json()
+        if (!controller.signal.aborted) {
+          setCustomers(data.items ?? [])
+          setCustomerTotal(data.total ?? 0)
+        }
+      } catch (err) {
+        if (!controller.signal.aborted) console.error("Error loading customers", err)
+      } finally {
+        if (!controller.signal.aborted) setLoadingCustomers(false)
+      }
     }
-  }, [accessToken])
+
+    if (customerSearch.trim()) debounce = setTimeout(() => void loadCustomers(), 250)
+    else void loadCustomers()
+
+    return () => {
+      if (debounce) clearTimeout(debounce)
+      controller.abort()
+    }
+  }, [accessToken, showCustomerModal, customerPage, customerSearch])
 
   // ── Agregar producto ───────────────────────────────────────────────────────
   const addProduct = useCallback((product: Product) => {
@@ -214,6 +260,10 @@ export function SalesPage() {
       setSubmitError("Debes seleccionar un cliente para ventas a crédito.")
       return
     }
+    if (paymentMethod === "CREDIT" && amountPaid > 0 && !initialPaymentMethod) {
+      setSubmitError("Seleccioná efectivo o transferencia para registrar la seña.")
+      return
+    }
 
     setSubmitting(true)
     setSubmitError(null)
@@ -229,6 +279,8 @@ export function SalesPage() {
         paymentMethod,
         customerId: selectedCustomerId || undefined,
         amountPaid: paymentMethod === "CREDIT" ? amountPaid : undefined,
+        initialPaymentMethod:
+          paymentMethod === "CREDIT" && amountPaid > 0 ? initialPaymentMethod : undefined,
       }
 
       const res = await fetch(`${API_BASE}/sales`, {
@@ -301,7 +353,7 @@ export function SalesPage() {
       }
       if (e.key === "F2" && !showProductModal) {
         e.preventDefault()
-        setShowProductModal(true)
+        openProductModal()
       }
       if (e.key === "F12" && !showProductModal && items.length > 0 && !showConfirmModal) {
         e.preventDefault()
@@ -315,7 +367,7 @@ export function SalesPage() {
     }
     window.addEventListener("keydown", handler)
     return () => window.removeEventListener("keydown", handler)
-  }, [showProductModal, showConfirmModal, barcodeBuffer, barcodeError, items, handleBarcodeAdd, paymentMethod, selectedCustomerId, priceSelectorIndex])
+  }, [showProductModal, showConfirmModal, barcodeBuffer, barcodeError, items, handleBarcodeAdd, paymentMethod, selectedCustomerId, priceSelectorIndex, openProductModal])
 
   // ── Confirm modal teclado ──────────────────────────────────────────────────
   useEffect(() => {
@@ -445,7 +497,7 @@ export function SalesPage() {
           onPaymentMethodChange={setPaymentMethod}
           selectedCustomer={selectedCustomer}
           onOpenCustomerModal={() => setShowCustomerModal(true)}
-          onOpenProductModal={() => setShowProductModal(true)}
+          onOpenProductModal={openProductModal}
           total={total}
           submitting={submitting}
           success={success}
@@ -471,8 +523,15 @@ export function SalesPage() {
       <CustomerSearchModal
         open={showCustomerModal}
         customers={customers}
+        totalItems={customerTotal}
+        page={customerPage}
+        loading={loadingCustomers}
         searchValue={customerSearch}
-        onSearchChange={setCustomerSearch}
+        onSearchChange={(value) => {
+          setCustomerSearch(value)
+          setCustomerPage(1)
+        }}
+        onPageChange={setCustomerPage}
         onSelect={(c) => {
           setSelectedCustomer(c)
           setSelectedCustomerId(c?.id || "")
@@ -493,6 +552,8 @@ export function SalesPage() {
           selectedCustomer={selectedCustomer}
           amountPaid={amountPaid}
           onAmountPaidChange={setAmountPaid}
+          initialPaymentMethod={initialPaymentMethod}
+          onInitialPaymentMethodChange={setInitialPaymentMethod}
           confirmSelectedBtn={confirmSelectedBtn}
           amountPaidInputRef={amountPaidInputRef}
           confirmAcceptRef={confirmAcceptRef}
@@ -508,7 +569,7 @@ export function SalesPage() {
       {/* ══ MODAL BARCODE ERROR ══════════════════════════════════════════════ */}
       {barcodeError && (
         <div className={styles.modalOverlay} onClick={() => setBarcodeError(null)}>
-          <div className={styles.confirmModal} onClick={e => e.stopPropagation()}>
+          <div data-pos-modal className={styles.confirmModal} onClick={e => e.stopPropagation()}>
             <div className={styles.confirmIcon} style={{ background: "rgba(239,68,68,0.1)", color: "#ef4444" }}>
               <AlertCircle size={40} />
             </div>

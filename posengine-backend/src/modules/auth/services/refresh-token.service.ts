@@ -55,7 +55,7 @@ export class RefreshTokenService {
     ]);
 
     return {
-      accessToken: this.tokenService.signAccessToken(user),
+      accessToken: this.tokenService.signAccessToken(user, rawRefreshToken),
       refreshToken: rawRefreshToken,
     };
   }

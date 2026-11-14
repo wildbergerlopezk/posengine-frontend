@@ -23,6 +23,7 @@ import { ProductService } from './product.service';
 import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
 import { ProductFilterDto } from './dto/product-filter.dto';
+import { ProductSearchDto } from './dto/product-search.dto';
 import { CurrentUser, type AuthenticatedUser } from '../../common/decorators/current-user.decorator';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { UserRole } from '../../generated/prisma/enums';
@@ -57,6 +58,24 @@ export class ProductController {
     @Query() query: ProductFilterDto,
   ) {
     return this.productService.findAll(tenantId, query);
+  }
+
+  @Get('search')
+  @Roles(UserRole.ADMIN, UserRole.SUPERADMIN)
+  @ApiOperation({ summary: 'Buscar productos para selectores de venta y compra' })
+  @ApiResponse({ status: 200, description: 'Productos encontrados y disponibilidad de más resultados' })
+  searchForSelector(
+    @CurrentUser('tenantId') tenantId: string,
+    @Query() query: ProductSearchDto,
+  ) {
+    return this.productService.searchForSelector(tenantId, query);
+  }
+
+  @Get('stock-summary')
+  @Roles(UserRole.ADMIN, UserRole.SUPERADMIN)
+  @ApiOperation({ summary: 'Obtener cantidades de productos por estado de stock' })
+  getStockSummary(@CurrentUser('tenantId') tenantId: string) {
+    return this.productService.getStockSummary(tenantId);
   }
 
   @Get('barcode/:barcode')

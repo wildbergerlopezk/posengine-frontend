@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from "react"
 import { Header } from "@/src/shared/components/Header"
 import {
   Coins, Search, User, CreditCard, Calendar, Check,
-  AlertCircle, Loader2, DollarSign, FileText, ArrowRight
+  AlertCircle, Loader2, DollarSign, FileText, ArrowRight, ChevronLeft, ChevronRight
 } from "lucide-react"
 import { useAuthStore } from "@/src/features/auth/store/auth.store"
 import { formatCurrency } from "@/src/shared/hooks/useFormatCurrency"
@@ -12,6 +12,7 @@ import { API_BASE_URL } from "@/src/shared/config/api"
 import styles from "./payments.module.css"
 
 const API_BASE = API_BASE_URL
+const CUSTOMER_PAGE_SIZE = 15
 
 interface Customer {
   id: string
@@ -62,7 +63,10 @@ export default function ClientsPaymentsPage() {
 
   // ── States ──────────────────────────────────────────────────────────────────
   const [customers, setCustomers] = useState<Customer[]>([])
+  const [customerTotal, setCustomerTotal] = useState(0)
+  const [customerPage, setCustomerPage] = useState(1)
   const [search, setSearch] = useState("")
+  const [debouncedSearch, setDebouncedSearch] = useState("")
   const [selectedCustomerId, setSelectedCustomerId] = useState("")
   const [selectedCustomer, setSelectedCustomer] = useState<CustomerAccountResponse | null>(null)
   
@@ -82,25 +86,37 @@ export default function ClientsPaymentsPage() {
   const [voiding, setVoiding] = useState(false)
 
   // ── Fetch Customers ────────────────────────────────────────────────────────
-  const fetchCustomers = useCallback(async () => {
+  const fetchCustomers = useCallback(async (signal?: AbortSignal) => {
     if (!accessToken) return
     setLoadingCustomers(true)
     try {
-      const res = await fetch(`${API_BASE}/customers?limit=100`, { headers: authHeaders })
+      const params = new URLSearchParams({ page: String(customerPage), limit: String(CUSTOMER_PAGE_SIZE), hasDebt: "true" })
+      if (debouncedSearch) params.set("search", debouncedSearch)
+      const res = await fetch(`${API_BASE}/customers?${params}`, { headers: authHeaders, signal })
       if (!res.ok) throw new Error("Error al cargar clientes")
       const data = await res.json()
-      // Filtramos solo clientes con deuda activa
-      setCustomers((data.items ?? []).filter((c: Customer) => c.currentDebt > 0))
+      if (!signal?.aborted) {
+        setCustomers(data.items ?? [])
+        setCustomerTotal(data.total ?? 0)
+      }
     } catch (err: any) {
-      console.error(err)
+      if (!signal?.aborted) console.error(err)
     } finally {
-      setLoadingCustomers(false)
+      if (!signal?.aborted) setLoadingCustomers(false)
     }
-  }, [accessToken])
+  }, [accessToken, customerPage, debouncedSearch])
 
   useEffect(() => {
-    void fetchCustomers()
-  }, [fetchCustomers])
+    const timer = setTimeout(() => setDebouncedSearch(search.trim()), 300)
+    return () => clearTimeout(timer)
+  }, [search])
+
+  useEffect(() => {
+    if (!accessToken || search.trim() !== debouncedSearch) return
+    const controller = new AbortController()
+    void fetchCustomers(controller.signal)
+    return () => controller.abort()
+  }, [accessToken, search, debouncedSearch, fetchCustomers])
 
   // ── Fetch Customer Account/Pending Sales ────────────────────────────────────
   const fetchCustomerAccount = useCallback(async (id: string) => {
@@ -226,14 +242,7 @@ export default function ClientsPaymentsPage() {
     setAmount(val ? val.replace(/\B(?=(\d{3})+(?!\d))/g, ".") : "")
   }
 
-  // Filter customers by search term
-  const filteredCustomers = customers.filter(c => 
-    c.name.toLowerCase().includes(search.toLowerCase()) ||
-    (c.documentNumber && c.documentNumber.includes(search)) ||
-    (c.taxId && c.taxId.includes(search))
-  )
-
-  const activeCustomerInfo = customers.find(c => c.id === selectedCustomerId)
+  const customerTotalPages = Math.max(1, Math.ceil(customerTotal / CUSTOMER_PAGE_SIZE))
 
   return (
     <div className={styles.pageContainer}>
@@ -263,12 +272,23 @@ export default function ClientsPaymentsPage() {
             {/* Selector de Cliente */}
             <div className={styles.formGroup}>
               <label className={styles.label}>Cliente deudor *</label>
+              <input
+                type="search"
+                className={styles.customerSearchInput}
+                placeholder="Buscar por nombre, CI o RUC..."
+                value={search}
+                onChange={(e) => {
+                  setSearch(e.target.value)
+                  setCustomerPage(1)
+                }}
+                disabled={submitting}
+              />
               <div className={styles.selectWrapper}>
                 <select
                   value={selectedCustomerId}
                   onChange={(e) => setSelectedCustomerId(e.target.value)}
                   className={styles.select}
-                  disabled={submitting}
+                  disabled={submitting || loadingCustomers}
                 >
                   <option value="">-- Seleccionar cliente con deuda --</option>
                   {customers.map((c) => (
@@ -277,6 +297,22 @@ export default function ClientsPaymentsPage() {
                     </option>
                   ))}
                 </select>
+              </div>
+              <div className={styles.customerPagination}>
+                <span>
+                  {loadingCustomers ? "Buscando clientes…" : `${customerTotal} cliente${customerTotal === 1 ? "" : "s"} con deuda`}
+                </span>
+                {customerTotalPages > 1 && (
+                  <div className={styles.customerPaginationControls}>
+                    <button type="button" onClick={() => setCustomerPage((current) => Math.max(1, current - 1))} disabled={customerPage === 1 || loadingCustomers} aria-label="Página anterior">
+                      <ChevronLeft size={15} />
+                    </button>
+                    <span>{customerPage}/{customerTotalPages}</span>
+                    <button type="button" onClick={() => setCustomerPage((current) => Math.min(customerTotalPages, current + 1))} disabled={customerPage === customerTotalPages || loadingCustomers} aria-label="Página siguiente">
+                      <ChevronRight size={15} />
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -533,7 +569,7 @@ export default function ClientsPaymentsPage() {
       {/* Modal de Confirmación de Pago Exitoso */}
       {successResult && (
         <div className={styles.modalOverlay} onClick={() => setSuccessResult(null)}>
-          <div className={styles.successModal} onClick={(e) => e.stopPropagation()}>
+          <div data-pos-modal className={styles.successModal} onClick={(e) => e.stopPropagation()}>
             <div className={styles.successHeader}>
               <div className={styles.successIconWrap}>
                 <Check size={28} />
@@ -597,25 +633,27 @@ export default function ClientsPaymentsPage() {
       {/* Modal para anular pago */}
       {voidingPaymentId && (
         <div className={styles.modalOverlay} onClick={() => setVoidingPaymentId(null)}>
-          <div className={styles.voidModal} onClick={(e) => e.stopPropagation()}>
+          <div data-pos-modal className={styles.voidModal} onClick={(e) => e.stopPropagation()}>
             <div className={styles.voidIconWrap}>
               <AlertCircle size={28} />
             </div>
             <h2 className={styles.voidTitle}>Anular Pago</h2>
-            <p className={styles.voidSubtitle}>
-              Esta acción revertirá la deuda asignada al cliente y restaurará los saldos en las ventas afectadas.
+            <p className={styles.voidSubtitle} role="note">
+              Usá esto solo para corregir una captura que no se cobró realmente. No entrega dinero al cliente ni revierte una devolución real. Si el dinero sí se recibió, no anules este pago; la devolución de venta es un flujo separado y puede estar deshabilitada en esta instalación.
             </p>
 
             <form onSubmit={handleVoidPayment} className={styles.voidForm}>
               <div className={styles.formGroup}>
-                <label className={styles.label}>Motivo de la anulación (opcional)</label>
+                <label className={styles.label} htmlFor="void-payment-reason">Motivo de la corrección (obligatorio)</label>
                 <input
+                  id="void-payment-reason"
                   type="text"
-                  placeholder="Ej: Monto incorrecto, error de digitación..."
+                  placeholder="Ej: Cobro duplicado; el segundo importe no se recibió"
                   className={styles.voidInput}
                   value={voidReason}
                   onChange={(e) => setVoidReason(e.target.value)}
                   maxLength={300}
+                  required
                   disabled={voiding}
                 />
               </div>
@@ -632,7 +670,7 @@ export default function ClientsPaymentsPage() {
                 <button
                   type="submit"
                   className={styles.voidSubmitBtn}
-                  disabled={voiding}
+                  disabled={voiding || !voidReason.trim()}
                 >
                   {voiding ? (
                     <>

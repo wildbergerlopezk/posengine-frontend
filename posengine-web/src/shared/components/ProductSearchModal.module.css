@@ -13,8 +13,11 @@
 }
 
 .modal {
-  width: 720px;
-  height: 500px;          /* ← fijo siempre */
+  box-sizing: border-box;
+  width: min(720px, 100%);
+  height: min(500px, calc(100vh - 2rem));
+  height: min(500px, calc(100dvh - 2rem));
+  min-height: 0;
   background: var(--card);
   color: var(--card-foreground);
   border-radius: var(--radius, 8px);
@@ -23,6 +26,14 @@
   flex-direction: column;
   overflow: hidden;
   border: 1px solid var(--border);
+}
+
+.modalWithoutStock .row {
+  grid-template-columns: 120px minmax(0, 1fr) 60px 100px;
+}
+
+.modalWithoutStock .colStock {
+  display: none;
 }
 
 .header {
@@ -89,7 +100,14 @@
   flex: 1;        /* ocupa el espacio restante */
   min-height: 0;
   overflow-y: auto;
+  overscroll-behavior: contain;
   background-color: var(--card);
+}
+
+.footerContent {
+  flex: 0 0 auto;
+  padding: 0.75rem 1.25rem;
+  border-top: 1px solid var(--border);
 }
 
 .emptyState {
@@ -199,4 +217,68 @@
   font-weight: 600;
   color: var(--foreground);
   margin-right: 4px;
+}
+
+@media (max-width: 700px) {
+  .overlay { padding: 0.5rem; }
+
+  .modal {
+    width: min(720px, calc(100vw - 2rem));
+    height: min(500px, calc(100vh - 2rem));
+    height: min(500px, calc(100dvh - 2rem));
+  }
+
+  .row,
+  .modalWithoutStock .row {
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 0.25rem 0.75rem;
+    padding: 0.65rem 0.85rem;
+  }
+
+  .colCode {
+    grid-column: 1;
+    grid-row: 1;
+  }
+
+  .colName {
+    grid-column: 1;
+    grid-row: 2;
+    white-space: normal;
+  }
+
+  .colUnit {
+    grid-column: 1;
+    grid-row: 3;
+    text-align: left;
+  }
+
+  .colStock {
+    grid-column: 1;
+    grid-row: 4;
+    text-align: left;
+  }
+
+  .colPrice {
+    grid-column: 2;
+    grid-row: 1 / span 2;
+  }
+
+  .footerContent {
+    padding: 0.65rem 0.85rem;
+  }
+
+  .hints {
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 0.5rem 0.75rem;
+    padding: 0.6rem 0.85rem;
+  }
+}
+
+@media (max-height: 700px) {
+  .header,
+  .searchBox { padding-top: 0.625rem; padding-bottom: 0.625rem; }
+  .row { padding-top: 0.5rem; padding-bottom: 0.5rem; }
+  .footerContent { padding-top: 0.5rem; padding-bottom: 0.5rem; }
+  .hints { padding-top: 0.45rem; padding-bottom: 0.45rem; }
 }

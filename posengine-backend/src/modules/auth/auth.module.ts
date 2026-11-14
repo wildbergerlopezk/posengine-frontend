@@ -20,6 +20,7 @@ import { LogoutService } from './services/logout.service';
 import { ForgotPasswordService } from './services/forgot-password.service';
 import { ResetPasswordService } from './services/reset-password.service';
 import { EmailVerificationService } from './services/email-verification.service';
+import { QuickPinService } from './services/quick-pin.service';
 
 @Module({
   imports: [
@@ -47,6 +48,7 @@ import { EmailVerificationService } from './services/email-verification.service'
     ForgotPasswordService,
     ResetPasswordService,
     EmailVerificationService,
+    QuickPinService,
     JwtStrategy,
     JwtAuthGuard,
     RolesGuard,

@@ -1,1 +1,128 @@
+enum SaleReturnStatus {
+  PENDING
+  CONFIRMED
+  CANCELLED
+}
 
+enum SaleReturnItemDisposition {
+  RESTOCKABLE
+  DAMAGED
+}
+
+enum SaleReturnSettlementStatus {
+  PENDING
+  PARTIALLY_SETTLED
+  SETTLED
+}
+
+model SaleReturn {
+  id              String  @id @default(uuid())
+  tenantId        String
+  saleId          String
+  createdByUserId String?
+
+  status           SaleReturnStatus @default(PENDING)
+  returnDate       DateTime
+  reason           String?
+  total            Decimal          @db.Decimal(12, 2)
+  debtOffsetAmount Decimal          @default(0) @db.Decimal(12, 2)
+  createdAt        DateTime         @default(now())
+  confirmedAt      DateTime?
+
+  tenant         Tenant                    @relation(fields: [tenantId], references: [id])
+  sale           Sale                      @relation(fields: [saleId], references: [id])
+  createdByUser  User?                     @relation("SaleReturnActor", fields: [createdByUserId], references: [id], onDelete: Restrict)
+  items          SaleReturnItem[]
+  debtAdjustment SaleReturnDebtAdjustment?
+  settlements    SaleReturnSettlement[]
+
+  @@index([tenantId])
+  @@index([saleId])
+  @@index([status])
+  @@index([createdByUserId])
+  @@map("sale_returns")
+}
+
+model SaleReturnItem {
+  id           String @id @default(uuid())
+  saleReturnId String
+  saleItemId   String
+  productId    String
+
+  quantity    Float
+  unitPrice   Decimal                   @db.Decimal(12, 2)
+  total       Decimal                   @db.Decimal(12, 2)
+  disposition SaleReturnItemDisposition
+
+  saleReturn SaleReturn @relation(fields: [saleReturnId], references: [id])
+  saleItem   SaleItem   @relation(fields: [saleItemId], references: [id])
+  product    Product    @relation(fields: [productId], references: [id])
+
+  @@index([saleReturnId])
+  @@index([saleItemId])
+  @@index([productId])
+  @@map("sale_return_items")
+}
+
+model SaleReturnDebtAdjustment {
+  id           String @id @default(uuid())
+  tenantId     String
+  saleId       String
+  saleReturnId String @unique
+
+  amount    Decimal  @db.Decimal(12, 2)
+  createdAt DateTime @default(now())
+
+  tenant     Tenant     @relation(fields: [tenantId], references: [id])
+  sale       Sale       @relation(fields: [saleId], references: [id])
+  saleReturn SaleReturn @relation(fields: [saleReturnId], references: [id])
+
+  @@index([tenantId])
+  @@index([saleId])
+  @@map("sale_return_debt_adjustments")
+}
+
+model SaleReturnSettlement {
+  id           String @id @default(uuid())
+  tenantId     String
+  saleReturnId String
+
+  status    SaleReturnSettlementStatus @default(PENDING)
+  amount    Decimal                    @db.Decimal(12, 2)
+  settledAt DateTime?
+  createdAt DateTime                   @default(now())
+
+  tenant     Tenant                    @relation(fields: [tenantId], references: [id])
+  saleReturn SaleReturn                @relation(fields: [saleReturnId], references: [id])
+  receipts   SaleReturnRefundReceipt[]
+
+  @@index([tenantId])
+  @@index([saleReturnId])
+  @@map("sale_return_settlements")
+}
+
+model SaleReturnRefundReceipt {
+  id              String  @id @default(uuid())
+  tenantId        String
+  settlementId    String
+  cashSessionId   String?
+  createdByUserId String?
+
+  amount        Decimal       @db.Decimal(12, 2)
+  paymentMethod PaymentMethod
+  effectiveAt   DateTime
+  reference     String?
+  notes         String?
+  createdAt     DateTime      @default(now())
+
+  tenant        Tenant               @relation(fields: [tenantId], references: [id])
+  settlement    SaleReturnSettlement @relation(fields: [settlementId], references: [id])
+  cashSession   CashSession?         @relation(fields: [cashSessionId], references: [id], onDelete: Restrict)
+  createdByUser User?                @relation("SaleReturnRefundReceiptActor", fields: [createdByUserId], references: [id], onDelete: Restrict)
+
+  @@index([tenantId])
+  @@index([settlementId])
+  @@index([cashSessionId])
+  @@index([createdByUserId])
+  @@map("sale_return_refund_receipts")
+}

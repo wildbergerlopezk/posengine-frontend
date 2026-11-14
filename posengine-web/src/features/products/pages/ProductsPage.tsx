@@ -4,6 +4,7 @@ import type React from "react"
 import { useState, useRef, useEffect, useCallback } from "react"
 import { createPortal } from "react-dom"
 import { Header } from "@/src/shared/components/Header"
+import { ImageDropPasteArea } from "@/src/shared/components/ImageDropPasteArea"
 import {
   Plus, Search, MoreHorizontal, Pencil, Trash2, Package,
   AlertTriangle, UploadCloud, Loader2, AlertCircle, Tag, EyeOff, Eye
@@ -12,6 +13,7 @@ import { useAuthStore } from "@/src/features/auth/store/auth.store"
 import { API_BASE_URL } from "@/src/shared/config/api"
 import { formatCurrency } from "@/src/shared/hooks/useFormatCurrency"
 import type { Product, Category, UnitType } from "@/src/shared/types"
+import dataTableStyles from "@/src/shared/components/DataTable/DataTable.module.css"
 import styles from "./ProductsPage.module.css"
 
 const API_BASE = API_BASE_URL
@@ -62,25 +64,50 @@ interface ConfirmState {
   onConfirm: () => void
 }
 
+type ProductFormErrorField = "name" | "barcode" | "categoryId" | "cost" | "price" | "stock" | "stockMinimum"
+type ProductFormErrors = Partial<Record<ProductFormErrorField, string>>
+
+const PRODUCTS_PAGE_SIZE = 20
+
+interface ProductListResponse {
+  items: ProductWithRelations[]
+  total: number
+}
+
+interface ProductListRequest {
+  page: number
+  search: string
+  accessToken: string
+  controller: AbortController
+  promise: Promise<ProductListResponse>
+}
+
 export function ProductsPage() {
   const { accessToken } = useAuthStore()
   const [products, setProducts] = useState<ProductWithRelations[]>([])
   const [categories, setCategories] = useState<Category[]>([])
   const [suppliers, setSuppliers] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
+  const [hasCompletedProductLoad, setHasCompletedProductLoad] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [searchQuery, setSearchQuery] = useState("")
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState("")
   const [currentPage, setCurrentPage] = useState(1)
   const [total, setTotal] = useState(0)
-  const LIMIT = 20
-  const totalPages = Math.ceil(total / LIMIT)
+  const [reloadVersion, setReloadVersion] = useState(0)
+  const totalPages = Math.ceil(total / PRODUCTS_PAGE_SIZE)
+  const isSearchPending = searchQuery.trim() !== debouncedSearchQuery
+  const productRequestRef = useRef<ProductListRequest | null>(null)
+  const productRequestGenerationRef = useRef(0)
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [editingProduct, setEditingProduct] = useState<ProductWithRelations | null>(null)
   const [openDropdown, setOpenDropdown] = useState<string | null>(null)
   const [dropdownPos, setDropdownPos] = useState<{ top: number; left: number } | null>(null)
+  const [focusedDetails, setFocusedDetails] = useState<{ productId: string; top: number; left: number } | null>(null)
   const dropdownRef = useRef<HTMLDivElement>(null)
 
   const toggleDropdown = (productId: string, e: React.MouseEvent<HTMLButtonElement>) => {
+    setFocusedDetails(null)
     if (openDropdown === productId) {
       setOpenDropdown(null)
       setDropdownPos(null)
@@ -93,6 +120,7 @@ export function ProductsPage() {
 
   const [submitting, setSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
+  const [fieldErrors, setFieldErrors] = useState<ProductFormErrors>({})
   const [uploadingImage, setUploadingImage] = useState(false)
 
   const [confirm, setConfirm] = useState<ConfirmState>({
@@ -127,6 +155,7 @@ export function ProductsPage() {
   const unitTypeRef = useRef<HTMLSelectElement>(null)
   const stockRef = useRef<HTMLInputElement>(null)
   const stockMinRef = useRef<HTMLInputElement>(null)
+  const stockNotesRef = useRef<HTMLInputElement>(null)
   const submitRef = useRef<HTMLButtonElement>(null)
 
   const handleEnterKey = (
@@ -152,27 +181,27 @@ export function ProductsPage() {
     Authorization: `Bearer ${accessToken}`,
   }
 
-  const fetchProducts = useCallback(async (page = 1, search = searchQuery) => {
-    setLoading(true)
-    setError(null)
-    try {
-      const params = new URLSearchParams({
-        limit: String(LIMIT),
-        page: String(page),
-        ...(search.trim() && { search: search.trim() }),
-      })
-      const res = await fetch(`${API_BASE}/product?${params}`, { headers: authHeaders })
-      if (!res.ok) throw new Error("Error al cargar productos")
-      const data = await res.json()
-      setProducts(data.items ?? data)
-      setTotal(data.total ?? 0)
-      setCurrentPage(page)
-    } catch (err: any) {
-      setError(err.message)
-    } finally {
-      setLoading(false)
-    }
-  }, [accessToken, searchQuery])
+  const fetchProducts = useCallback(async (
+    page: number,
+    search: string,
+    signal: AbortSignal,
+  ): Promise<ProductListResponse> => {
+    const params = new URLSearchParams({
+      limit: String(PRODUCTS_PAGE_SIZE),
+      page: String(page),
+      ...(search && { search }),
+    })
+    const res = await fetch(`${API_BASE}/product?${params}`, {
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${accessToken}`,
+      },
+      signal,
+    })
+    if (!res.ok) throw new Error("Error al cargar productos")
+    const data = await res.json()
+    return { items: data.items ?? data, total: data.total ?? 0 }
+  }, [accessToken])
 
   const fetchCategories = useCallback(async () => {
     try {
@@ -199,18 +228,80 @@ export function ProductsPage() {
   }, [accessToken])
 
   useEffect(() => {
-    fetchProducts(1, searchQuery)
     fetchCategories()
     fetchSuppliers()
-  }, [fetchCategories, fetchSuppliers]) // solo al montar
+  }, [fetchCategories, fetchSuppliers])
 
-  // ── Búsqueda con debounce — agregá este useEffect ─────────────────────────
   useEffect(() => {
+    const normalizedSearch = searchQuery.trim()
     const timer = setTimeout(() => {
-      fetchProducts(1, searchQuery)
-    }, 350) // espera 350ms después de que el usuario deja de escribir
+      if (normalizedSearch === debouncedSearchQuery) return
+      setDebouncedSearchQuery(normalizedSearch)
+      setCurrentPage(1)
+    }, 350)
     return () => clearTimeout(timer)
-  }, [searchQuery])
+  }, [debouncedSearchQuery, searchQuery])
+
+  useEffect(() => {
+    if (!accessToken) return
+
+    const generation = ++productRequestGenerationRef.current
+    const search = debouncedSearchQuery.trim()
+    const previousRequest = productRequestRef.current
+    let request = previousRequest
+
+    if (
+      !request
+      || request.page !== currentPage
+      || request.search !== search
+      || request.accessToken !== accessToken
+      || request.controller.signal.aborted
+    ) {
+      previousRequest?.controller.abort()
+      const controller = new AbortController()
+      request = {
+        page: currentPage,
+        search,
+        accessToken,
+        controller,
+        promise: fetchProducts(currentPage, search, controller.signal),
+      }
+      productRequestRef.current = request
+    }
+
+    let isCurrent = true
+    setLoading(true)
+    setError(null)
+
+    void request.promise
+      .then(({ items, total: nextTotal }) => {
+        if (!isCurrent || generation !== productRequestGenerationRef.current || request.controller.signal.aborted) return
+        setProducts(items)
+        setTotal(nextTotal)
+      })
+      .catch((err: unknown) => {
+        if (!isCurrent || generation !== productRequestGenerationRef.current || request.controller.signal.aborted) return
+        setError(err instanceof Error ? err.message : "Error al cargar productos")
+      })
+      .finally(() => {
+        if (productRequestRef.current === request) productRequestRef.current = null
+        if (!isCurrent || generation !== productRequestGenerationRef.current || request.controller.signal.aborted) return
+        setLoading(false)
+        setHasCompletedProductLoad(true)
+      })
+
+    return () => {
+      isCurrent = false
+      // Strict Mode replays effects synchronously in development. The next
+      // setup reuses this request; abort only if no setup has reclaimed it.
+      queueMicrotask(() => {
+        if (generation !== productRequestGenerationRef.current) return
+        if (productRequestRef.current !== request) return
+        request.controller.abort()
+        productRequestRef.current = null
+      })
+    }
+  }, [accessToken, currentPage, debouncedSearchQuery, fetchProducts, reloadVersion])
 
   // Focus primer campo al abrir modal
   useEffect(() => {
@@ -238,7 +329,9 @@ export function ProductsPage() {
     const c = parseFloat(formData.cost)
     const m = parseFloat(val)
     if (!isNaN(c) && !isNaN(m)) {
-      setFormData(prev => ({ ...prev, price: String(Math.round(c * (1 + m / 100))) }))
+      const calculatedPrice = Math.round(c * (1 + m / 100))
+      setFormData(prev => ({ ...prev, price: String(calculatedPrice) }))
+      if (Number.isFinite(calculatedPrice) && calculatedPrice >= 0) clearFieldError("price")
     }
   }
 
@@ -280,6 +373,17 @@ export function ProductsPage() {
     setWholesaleMargin("")
     setEditingProduct(null)
     setSubmitError(null)
+    setFieldErrors({})
+  }
+
+  const clearFieldError = (field: ProductFormErrorField) => {
+    setFieldErrors((previous) => {
+      if (!previous[field]) return previous
+      const next = { ...previous }
+      delete next[field]
+      return next
+    })
+    setSubmitError(null)
   }
 
   const handleEdit = (product: ProductWithRelations) => {
@@ -306,6 +410,8 @@ export function ProductsPage() {
       imageUrl: product.imageUrl || "",
       stockNotes: "",
     })
+    setFieldErrors({})
+    setSubmitError(null)
     setIsDialogOpen(true)
     setOpenDropdown(null)
   }
@@ -375,53 +481,50 @@ export function ProductsPage() {
   }
 
   const validateForm = () => {
+    const errors: ProductFormErrors = {}
     const name = formData.name.trim()
     if (name.length < 2) {
-      nameRef.current?.focus()
-      return "El nombre debe tener al menos 2 caracteres"
+      errors.name = "El nombre debe tener al menos 2 caracteres"
     }
 
     if (!formData.categoryId) {
-      categoryRef.current?.focus()
-      return "Seleccioná una categoría"
+      errors.categoryId = "Seleccioná una categoría"
     }
 
     const price = parseFormNumber(formData.price, Number.NaN)
     if (!Number.isFinite(price) || price < 0) {
-      priceRef.current?.focus()
-      return "El precio de venta debe ser un número válido"
+      errors.price = "El precio de venta debe ser un número válido"
     }
 
     const cost = parseFormNumber(formData.cost)
     if (!Number.isFinite(cost) || cost < 0) {
-      costRef.current?.focus()
-      return "El precio de costo debe ser un número válido"
+      errors.cost = "El precio de costo debe ser un número válido"
     }
 
     const stock = parseFormNumber(formData.stock, Number.NaN)
     const stockError = validateStockField(stock, "El stock actual", formData.unitType)
-    if (stockError) {
-      stockRef.current?.focus()
-      return stockError
-    }
+    if (stockError) errors.stock = stockError
 
     const stockMinimum = parseFormNumber(formData.stockMinimum)
     const stockMinimumError = validateStockField(stockMinimum, "El stock mínimo", formData.unitType)
-    if (stockMinimumError) {
-      stockMinRef.current?.focus()
-      return stockMinimumError
-    }
+    if (stockMinimumError) errors.stockMinimum = stockMinimumError
 
-    return null
+    if (errors.name) nameRef.current?.focus()
+    else if (errors.categoryId) categoryRef.current?.focus()
+    else if (errors.price) priceRef.current?.focus()
+    else if (errors.cost) costRef.current?.focus()
+    else if (errors.stock) stockRef.current?.focus()
+    else if (errors.stockMinimum) stockMinRef.current?.focus()
+
+    return errors
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    const formError = validateForm()
-    if (formError) {
-      setSubmitError(formError)
-      return
-    }
+    const errors = validateForm()
+    setFieldErrors(errors)
+    setSubmitError(null)
+    if (Object.keys(errors).length > 0) return
 
     setSubmitting(true)
     setSubmitError(null)
@@ -467,16 +570,21 @@ export function ProductsPage() {
       setIsDialogOpen(false)
       resetForm()
     } catch (err: any) {
-      setSubmitError(err.message)
+      const message = err instanceof Error ? err.message : "Error al guardar el producto"
+      if (/barcode|c[oó]digo de barras/i.test(message)) {
+        setFieldErrors((previous) => ({ ...previous, barcode: message }))
+        barcodeRef.current?.focus()
+      } else {
+        setSubmitError(message)
+      }
     } finally {
       setSubmitting(false)
     }
   }
 
-  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (!file) return
+  const handleImageUpload = async (file: File) => {
     setUploadingImage(true)
+    setSubmitError(null)
     const uploadData = new FormData()
     uploadData.append("file", file)
     try {
@@ -487,7 +595,7 @@ export function ProductsPage() {
       const data = await res.json()
       setFormData((prev) => ({ ...prev, imageUrl: data.url }))
     } catch (err: any) {
-      openConfirm("Error al subir imagen", err.message, closeConfirm)
+      setSubmitError(err instanceof Error ? err.message : "Error al subir la imagen")
     } finally {
       setUploadingImage(false)
     }
@@ -508,36 +616,57 @@ export function ProductsPage() {
   }
 
   const isLowStock = (p: ProductWithRelations) => p.stock <= p.stockMinimum
+  const stockAdjustmentNoteVisible = Boolean(
+    editingProduct && parseFormNumber(formData.stock) !== editingProduct.stock
+  )
+  const focusedProduct = focusedDetails
+    ? products.find((product) => product.id === focusedDetails.productId) ?? null
+    : null
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as Node
+      const detailsTooltip = focusedDetails
+        ? document.getElementById(`product-details-${focusedDetails.productId}`)
+        : null
+      if (detailsTooltip?.contains(target)) return
+
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
         setOpenDropdown(null)
         setDropdownPos(null)
       }
+      if (focusedDetails) setFocusedDetails(null)
     }
     document.addEventListener("mousedown", handleClickOutside)
     return () => document.removeEventListener("mousedown", handleClickOutside)
-  }, [])
+  }, [focusedDetails])
 
   useEffect(() => {
-    if (!openDropdown) return
-    const close = () => {
+    if (!openDropdown && !focusedDetails) return
+    const close = (event: Event) => {
+      const detailsTooltip = focusedDetails
+        ? document.getElementById(`product-details-${focusedDetails.productId}`)
+        : null
+      if (event.target instanceof Node && detailsTooltip?.contains(event.target)) return
+
       setOpenDropdown(null)
       setDropdownPos(null)
+      setFocusedDetails(null)
     }
     window.addEventListener("scroll", close, true)
     return () => window.removeEventListener("scroll", close, true)
-  }, [openDropdown])
+  }, [openDropdown, focusedDetails])
 
   return (
     <div className={styles.page}>
       <Header title="Productos" />
 
       <div className={styles.container}>
-        <div className={styles.actionsBar}>
+        <div className={`${styles.actionsBar} ${dataTableStyles.fixedRegion}`}>
           <div className={styles.searchWrapper}>
-            <Search size={16} className={styles.searchIcon} />
+            {hasCompletedProductLoad && (loading || isSearchPending)
+              ? <Loader2 size={16} className={`${styles.searchIcon} ${styles.spinner}`} aria-hidden="true" />
+              : <Search size={16} className={styles.searchIcon} />}
             <input
               placeholder="Buscar por nombre, código o SKU..."
               value={searchQuery}
@@ -550,21 +679,9 @@ export function ProductsPage() {
           </button>
         </div>
 
-        <div className={styles.tableCard}>
-          {loading ? (
-            <div className={styles.loadingState}>
-              <Loader2 size={32} className={styles.spinner} />
-              <p>Cargando productos…</p>
-            </div>
-          ) : error ? (
-            <div className={styles.emptyState}>
-              <AlertCircle size={48} className={styles.emptyStateIcon} />
-              <p className={styles.emptyStateTitle}>{error}</p>
-              <button className={styles.newButton} onClick={() => fetchProducts()}>Reintentar</button>
-            </div>
-          ) : (
-            <div className={styles.tableScroll}>
-            <table className={styles.table}>
+        <div className={`${styles.tableCard} ${styles.productsCard} ${dataTableStyles.flexColumn}`}>
+          <div className={dataTableStyles.viewport} aria-busy={loading || isSearchPending}>
+            <table className={`${styles.table} ${styles.productsTable} ${dataTableStyles.naturalRows} ${dataTableStyles.compactCells}`}>
               <thead className={styles.tableHeader}>
                 <tr>
                   <th className={styles.tableHeaderCell}>Producto</th>
@@ -579,7 +696,32 @@ export function ProductsPage() {
                 </tr>
               </thead>
               <tbody>
-                {products.length === 0 ? (
+                {(loading || isSearchPending) && products.length === 0 ? (
+                  <tr>
+                    <td colSpan={9}>
+                      <div className={styles.loadingState} role="status" aria-live="polite">
+                        <Loader2 size={24} className={styles.spinner} />
+                        <p>
+                          {isSearchPending
+                            ? "Buscando productos…"
+                            : hasCompletedProductLoad ? "Actualizando productos…" : "Cargando productos…"}
+                        </p>
+                      </div>
+                    </td>
+                  </tr>
+                ) : error && products.length === 0 ? (
+                  <tr>
+                    <td colSpan={9}>
+                      <div className={styles.emptyState}>
+                        <AlertCircle size={32} className={styles.emptyStateIcon} />
+                        <p className={styles.emptyStateTitle}>{error}</p>
+                        <button className={styles.newButton} onClick={() => setReloadVersion((version) => version + 1)}>
+                          Reintentar
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ) : products.length === 0 ? (
                   <tr>
                     <td colSpan={9}>
                       <div className={styles.emptyState}>
@@ -589,7 +731,21 @@ export function ProductsPage() {
                     </td>
                   </tr>
                 ) : (
-                  products.map((product) => (
+                  <>
+                    {error && (
+                      <tr>
+                        <td colSpan={9}>
+                          <div className={styles.emptyState} role="alert">
+                            <AlertCircle size={18} className={styles.emptyStateIcon} />
+                            <span>{error}</span>
+                            <button className={styles.newButton} onClick={() => setReloadVersion((version) => version + 1)}>
+                              Reintentar
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                    {products.map((product) => (
                     <tr key={product.id} className={`${styles.tableRow} ${!product.isActive ? styles.tableRowInactive : ""}`}>
                       <td className={styles.tableCell}>
                         <div className={styles.productCell}>
@@ -605,7 +761,7 @@ export function ProductsPage() {
                             )}
                           </div>
                           <div className={styles.productInfo}>
-                            <span className={styles.productName}>{product.name}</span>
+                            <span className={styles.productName} title={product.name}>{product.name}</span>
                             <div className={styles.productMeta}>
                               {!product.isActive && (
                                 <span className={`${styles.badge} ${styles.badgeInactive}`}>
@@ -623,16 +779,16 @@ export function ProductsPage() {
                       </td>
                       <td className={styles.tableCell}>
                         <div className={styles.codeStack}>
-                          {product.sku && <span className={styles.skuChip}><Tag size={10} />{product.sku}</span>}
-                          {product.barcode && <span className={styles.monoText}>{product.barcode}</span>}
+                          {product.sku && <span className={styles.skuChip} title={product.sku}><Tag size={10} />{product.sku}</span>}
+                          {product.barcode && <span className={styles.monoText} title={product.barcode}>{product.barcode}</span>}
                           {!product.sku && !product.barcode && <span className={styles.mutedText}>—</span>}
                         </div>
                       </td>
                       <td className={styles.tableCell}>
                         <div className={styles.categoryStack}>
-                          <span>{product.category?.name ?? "—"}</span>
-                          {product.subcategory && <span className={styles.subcategoryText}>{product.subcategory.name}</span>}
-                          {product.supplier && <span className={styles.supplierText}>{product.supplier.name}</span>}
+                          <span title={product.category?.name ?? "—"}>{product.category?.name ?? "—"}</span>
+                          {product.subcategory && <span className={styles.subcategoryText} title={product.subcategory.name}>{product.subcategory.name}</span>}
+                          {product.supplier && <span className={styles.supplierText} title={product.supplier.name}>{product.supplier.name}</span>}
                         </div>
                       </td>
                       <td className={styles.tableCell}>
@@ -650,7 +806,10 @@ export function ProductsPage() {
                         {product.wholesalePrice != null ? formatCurrency(product.wholesalePrice) : "—"}
                       </td>
                       <td className={`${styles.tableCell} ${styles.tableCellRight}`}>
-                        <div className={styles.stockCell}>
+                        <div
+                          className={styles.stockCell}
+                          title={`Stock actual: ${formatStock(product.stock, product.unitType ?? "UNIT")}${product.stockMinimum > 0 ? ` · Stock mínimo: ${formatStock(product.stockMinimum, product.unitType ?? "UNIT")}` : ""}`}
+                        >
                           <span className={isLowStock(product) ? styles.stockWarning : styles.stockOk}>
                             {formatStock(product.stock, product.unitType ?? "UNIT")}
                           </span>
@@ -666,6 +825,17 @@ export function ProductsPage() {
                           <button
                             className={styles.actionButton}
                             onClick={(e) => toggleDropdown(product.id, e)}
+                            onFocus={(e) => {
+                              const rect = e.currentTarget.getBoundingClientRect()
+                              setFocusedDetails({
+                                productId: product.id,
+                                top: Math.max(16, Math.min(rect.top, window.innerHeight - 480)),
+                                left: Math.max(16, Math.min(rect.left, window.innerWidth - 400)),
+                              })
+                            }}
+                            onBlur={() => setFocusedDetails(null)}
+                            aria-label={`Más acciones para ${product.name}`}
+                            aria-describedby={focusedDetails?.productId === product.id ? `product-details-${product.id}` : undefined}
                           >
                             <MoreHorizontal size={16} />
                           </button>
@@ -700,264 +870,370 @@ export function ProductsPage() {
                         )}
                       </td>
                     </tr>
-                  ))
+                    ))}
+                  </>
                 )}
               </tbody>
             </table>
-            </div>
-          )}
-          {total > LIMIT && (
-            <div className={styles.pagination}>
+          </div>
+          {total > PRODUCTS_PAGE_SIZE && (
+            <div className={`${styles.pagination} ${dataTableStyles.fixedRegion}`}>
               <button
                 className={styles.pageBtn}
-                disabled={currentPage === 1}
-                onClick={() => fetchProducts(currentPage - 1)}
+                disabled={loading || isSearchPending || currentPage === 1}
+                onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}
               >
                 ← Anterior
               </button>
-              <span className={styles.pageInfo}>
+              <span className={styles.pageInfo} role="status" aria-live="polite">
+                {(loading || isSearchPending) && <Loader2 size={14} className={styles.spinner} aria-hidden="true" />}
                 Página {currentPage} de {totalPages} · {total} productos
+                {(loading || isSearchPending) && " · Actualizando…"}
               </span>
               <button
                 className={styles.pageBtn}
-                disabled={currentPage >= totalPages}
-                onClick={() => fetchProducts(currentPage + 1)}
+                disabled={loading || isSearchPending || currentPage >= totalPages}
+                onClick={() => setCurrentPage((page) => Math.min(totalPages, page + 1))}
               >
                 Siguiente →
               </button>
             </div>
           )}
         </div>
+        {focusedDetails && focusedProduct && createPortal(
+            <div
+              id={`product-details-${focusedProduct.id}`}
+              className={styles.productDetailsTooltip}
+              role="tooltip"
+              style={{ top: focusedDetails.top, left: focusedDetails.left }}
+            >
+              <strong className={styles.productDetailsName}>{focusedProduct.name}</strong>
+              <dl className={styles.productDetailsList}>
+                <div><dt>SKU</dt><dd>{focusedProduct.sku || "—"}</dd></div>
+                <div><dt>Código de barras</dt><dd>{focusedProduct.barcode || "—"}</dd></div>
+                <div><dt>Categoría</dt><dd>{focusedProduct.category?.name ?? "—"}</dd></div>
+                {focusedProduct.subcategory && <div><dt>Subcategoría</dt><dd>{focusedProduct.subcategory.name}</dd></div>}
+                {focusedProduct.supplier && <div><dt>Proveedor</dt><dd>{focusedProduct.supplier.name}</dd></div>}
+                <div><dt>Unidad</dt><dd>{UNIT_LABELS[focusedProduct.unitType ?? "UNIT"]}</dd></div>
+                <div><dt>Costo</dt><dd>{focusedProduct.cost != null ? formatCurrency(focusedProduct.cost) : "—"}</dd></div>
+                <div><dt>Precio público</dt><dd>{formatCurrency(focusedProduct.price)}</dd></div>
+                <div><dt>Precio mayorista</dt><dd>{focusedProduct.wholesalePrice != null ? formatCurrency(focusedProduct.wholesalePrice) : "—"}</dd></div>
+                <div><dt>Stock actual</dt><dd>{formatStock(focusedProduct.stock, focusedProduct.unitType ?? "UNIT")}</dd></div>
+                <div><dt>Stock mínimo</dt><dd>{formatStock(focusedProduct.stockMinimum, focusedProduct.unitType ?? "UNIT")}</dd></div>
+              </dl>
+            </div>,
+            document.body
+          )}
       </div>
 
       {/* ── Modal producto ───────────────────────────────────────────────────── */}
       {isDialogOpen && (
         <div className={styles.modalOverlay} onClick={() => { setIsDialogOpen(false); resetForm() }}>
-          <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
-            <div className={styles.modalHeader}>
+          <div data-pos-modal className={styles.productModal} onClick={(e) => e.stopPropagation()}>
+            <div className={styles.productModalHeader}>
               <h2 className={styles.modalTitle}>{editingProduct ? "Editar producto" : "Nuevo producto"}</h2>
               <p className={styles.modalDescription}>
                 {editingProduct ? "Modificá los datos del producto" : "Completá los datos — usá Enter para avanzar entre campos"}
               </p>
             </div>
-            <form onSubmit={handleSubmit} noValidate>
-              <div className={styles.modalContent}>
-                {submitError && (
-                  <div className={styles.errorBanner}>
-                    <AlertCircle size={16} />{submitError}
-                  </div>
-                )}
-                <div className={styles.formGroup}>
-                  <label className={styles.label}>Imagen del producto</label>
-                  <div className={styles.imageUploadContainer}>
-                    {formData.imageUrl ? (
-                      <div className={styles.imagePreviewWrapper}>
-                        <img src={formData.imageUrl} alt="Preview" className={styles.imagePreview} />
-                        <button type="button" className={styles.removeImageBtn} onClick={() => setFormData({ ...formData, imageUrl: "" })}>
-                          <Trash2 size={14} />
-                        </button>
+            <form className={styles.productModalForm} onSubmit={handleSubmit} noValidate>
+              <div className={styles.productModalContent}>
+                <div
+                  className={`${styles.productErrorNotice} ${submitError ? styles.productErrorNoticeVisible : ""}`}
+                  role={submitError ? "alert" : undefined}
+                  aria-live={submitError ? "assertive" : undefined}
+                  title={submitError ?? undefined}
+                >
+                  {submitError && <><AlertCircle size={14} /><span>{submitError}</span></>}
+                </div>
+                <div className={styles.productFormLayout}>
+                  <section className={styles.productFormSection} aria-labelledby="product-data-title">
+                    <h3 id="product-data-title" className={styles.productSectionTitle}>Datos del producto</h3>
+                    <p className={styles.imageUploadHint}>Podés subir, arrastrar o pegar una imagen (Ctrl+V). JPG, PNG o WebP · Máx. 5 MB.</p>
+
+                    <div className={styles.productIdentity}>
+                      <div className={styles.productImageField}>
+                        <span className={styles.label}>Imagen</span>
+                        <ImageDropPasteArea
+                          className={styles.compactImageDropArea}
+                          onImage={handleImageUpload}
+                          onValidationError={setSubmitError}
+                          disabled={uploadingImage}
+                        >
+                          {formData.imageUrl ? (
+                            <div className={`${styles.imagePreviewWrapper} ${styles.compactImagePreview}`}>
+                              <img src={formData.imageUrl} alt="Vista previa del producto" className={styles.imagePreview} />
+                              <button type="button" className={styles.removeImageBtn} onClick={() => setFormData({ ...formData, imageUrl: "" })} aria-label="Quitar imagen">
+                                <Trash2 size={14} />
+                              </button>
+                            </div>
+                          ) : (
+                            <label className={`${styles.uploadArea} ${styles.compactUploadArea}`}>
+                              <input type="file" accept="image/png, image/jpeg, image/webp" className={styles.hiddenInput} disabled={uploadingImage} />
+                              <div className={`${styles.uploadContent} ${styles.compactUploadContent}`}>
+                                {uploadingImage
+                                  ? <><Loader2 size={20} className={styles.spinner} /><span>Subiendo…</span></>
+                                  : <><UploadCloud size={20} /><span>Elegir</span></>
+                                }
+                              </div>
+                            </label>
+                          )}
+                        </ImageDropPasteArea>
                       </div>
-                    ) : (
-                      <label className={styles.uploadArea}>
-                        <input type="file" accept="image/png, image/jpeg, image/webp" className={styles.hiddenInput} onChange={handleImageUpload} disabled={uploadingImage} />
-                        <div className={styles.uploadContent}>
-                          {uploadingImage
-                            ? <><Loader2 size={24} className={styles.spinner} /><span>Subiendo...</span></>
-                            : <><UploadCloud size={24} /><span>Clic para subir imagen</span></>
-                          }
+
+                      <div className={styles.productIdentityFields}>
+                        <div className={`${styles.formGroup} ${styles.productCompactGroup}`}>
+                          <label className={styles.label} htmlFor="product-name-input">Nombre *</label>
+                          <input id="product-name-input" ref={nameRef} className={`${styles.input} ${fieldErrors.name ? styles.fieldInvalid : ""}`} value={formData.name}
+                            aria-invalid={Boolean(fieldErrors.name)}
+                            aria-describedby={fieldErrors.name ? "product-name-error" : undefined}
+                            onChange={(e) => { setFormData({ ...formData, name: e.target.value }); clearFieldError("name") }}
+                            onKeyDown={(e) => handleEnterKey(e, barcodeRef)}
+                            placeholder="Ej: Cadena 428H x 120 eslabones" required />
+                          <span id="product-name-error" className={`${styles.fieldErrorSlot} ${fieldErrors.name ? styles.fieldErrorVisible : ""}`} role={fieldErrors.name ? "alert" : undefined} title={fieldErrors.name ?? undefined}>
+                            {fieldErrors.name ?? " "}
+                          </span>
                         </div>
-                      </label>
+                        <div className={`${styles.formGroup} ${styles.productCompactGroup}`}>
+                          <label className={styles.label} htmlFor="product-barcode-input">Código de barras</label>
+                          <input id="product-barcode-input" ref={barcodeRef} className={`${styles.input} ${fieldErrors.barcode ? styles.fieldInvalid : ""}`} value={formData.barcode}
+                            aria-invalid={Boolean(fieldErrors.barcode)}
+                            aria-describedby={fieldErrors.barcode ? "product-barcode-error" : undefined}
+                            onChange={(e) => { setFormData({ ...formData, barcode: e.target.value }); clearFieldError("barcode") }}
+                            onKeyDown={(e) => handleEnterKey(e, categoryRef)}
+                            placeholder="7790000000000" />
+                          <span className={styles.fieldHint}>El SKU se genera automáticamente</span>
+                          <span id="product-barcode-error" className={`${styles.fieldErrorSlot} ${fieldErrors.barcode ? styles.fieldErrorVisible : ""}`} role={fieldErrors.barcode ? "alert" : undefined} title={fieldErrors.barcode ?? undefined}>
+                            {fieldErrors.barcode ?? " "}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className={`${styles.productFormRow} ${styles.productCategoryRow}`}>
+                      <div className={`${styles.formGroup} ${styles.productCompactGroup}`}>
+                        <label className={styles.label} htmlFor="product-category-input">Categoría *</label>
+                        <select id="product-category-input" ref={categoryRef} className={`${styles.select} ${fieldErrors.categoryId ? styles.fieldInvalid : ""}`} value={formData.categoryId}
+                          aria-invalid={Boolean(fieldErrors.categoryId)}
+                          aria-describedby={fieldErrors.categoryId ? "product-category-error" : undefined}
+                          onChange={(e) => { setFormData({ ...formData, categoryId: e.target.value, subcategoryId: "" }); clearFieldError("categoryId") }}
+                          onKeyDown={(e) => handleEnterKey(e, subcategoryRef, supplierRef)} required>
+                          <option value="">Seleccionar</option>
+                          {categories.map((cat) => <option key={cat.id} value={cat.id}>{cat.name}</option>)}
+                        </select>
+                        <span id="product-category-error" className={`${styles.fieldErrorSlot} ${fieldErrors.categoryId ? styles.fieldErrorVisible : ""}`} role={fieldErrors.categoryId ? "alert" : undefined} title={fieldErrors.categoryId ?? undefined}>
+                          {fieldErrors.categoryId ?? " "}
+                        </span>
+                      </div>
+                      <div className={`${styles.formGroup} ${styles.productCompactGroup}`}>
+                        <label className={styles.label}>Subcategoría</label>
+                        <select ref={subcategoryRef} className={styles.select} value={formData.subcategoryId}
+                          onChange={(e) => setFormData({ ...formData, subcategoryId: e.target.value })}
+                          onKeyDown={(e) => handleEnterKey(e, supplierRef)}
+                          disabled={!formData.categoryId || subcategories.length === 0}>
+                          <option value="">Seleccionar</option>
+                          {subcategories.map((sub: any) => <option key={sub.id} value={sub.id}>{sub.name}</option>)}
+                        </select>
+                      </div>
+                    </div>
+
+                    <div className={`${styles.formGroup} ${styles.productCompactGroup}`}>
+                      <label className={styles.label}>Proveedor</label>
+                      <select ref={supplierRef} className={styles.select} value={formData.supplierId}
+                        onChange={(e) => setFormData({ ...formData, supplierId: e.target.value })}
+                        onKeyDown={(e) => handleEnterKey(e, costRef)}>
+                        <option value="">Ninguno (opcional)</option>
+                        {suppliers.map((sup: any) => <option key={sup.id} value={sup.id}>{sup.name}</option>)}
+                      </select>
+                    </div>
+                  </section>
+
+                  <section className={styles.productFormSection} aria-labelledby="product-pricing-title">
+                    <h3 id="product-pricing-title" className={styles.productSectionTitle}>Precios e inventario</h3>
+                    <div className={`${styles.formGroup} ${styles.productCompactGroup}`}>
+                      <label className={styles.label}>Precio de costo</label>
+                      <input
+                        ref={costRef}
+                        className={`${styles.input} ${fieldErrors.cost ? styles.fieldInvalid : ""}`}
+                        aria-invalid={Boolean(fieldErrors.cost)}
+                        aria-describedby={fieldErrors.cost ? "product-cost-error" : undefined}
+                        type="text"
+                        inputMode="numeric"
+                        value={formData.cost}
+                        onChange={(e) => {
+                          const val = e.target.value.replace(/[^0-9]/g, "")
+                          handleCostChange(val)
+                          clearFieldError("cost")
+                          clearFieldError("price")
+                        }}
+                        onKeyDown={(e) => handleEnterKey(e, publicMarginRef)}
+                        placeholder="0"
+                      />
+                      <span id="product-cost-error" className={`${styles.fieldErrorSlot} ${fieldErrors.cost ? styles.fieldErrorVisible : ""}`} role={fieldErrors.cost ? "alert" : undefined} title={fieldErrors.cost ?? undefined}>
+                        {fieldErrors.cost ?? " "}
+                      </span>
+                    </div>
+
+                    <div className={styles.pricingCard}>
+                      <div className={styles.pricingCardTitle}>Precios de venta</div>
+                      <div className={styles.pricingRow}>
+                        <div className={styles.pricingControl}>
+                          <label className={styles.pricingSubLabel} htmlFor="publicMargin">Ganancia público (%)</label>
+                          <div className={styles.pricingField}>
+                            <span className={styles.pricingFieldHint}>%</span>
+                            <input
+                              id="publicMargin"
+                              ref={publicMarginRef}
+                              className={`${styles.pricingInput} ${fieldErrors.price ? styles.fieldInvalid : ""}`}
+                              aria-invalid={Boolean(fieldErrors.price)}
+                              aria-describedby={fieldErrors.price ? "product-price-error" : undefined}
+                              type="number"
+                              step="any"
+                              placeholder="0.00"
+                              value={publicMargin}
+                              onChange={(e) => handlePublicMarginChange(e.target.value)}
+                              onKeyDown={(e) => handleEnterKey(e, priceRef)}
+                            />
+                          </div>
+                        </div>
+                        <div className={styles.pricingControl}>
+                          <label className={styles.pricingSubLabel} htmlFor="publicPrice">Precio público *</label>
+                          <div className={styles.pricingField}>
+                            <span className={styles.pricingFieldHint}>Gs.</span>
+                            <input
+                              id="publicPrice"
+                              ref={priceRef}
+                              className={styles.pricingInput}
+                              type="text"
+                              inputMode="numeric"
+                              placeholder="0"
+                              value={formData.price}
+                              onChange={(e) => { handlePublicPriceChange(e.target.value.replace(/[^0-9]/g, "")); clearFieldError("price") }}
+                              onKeyDown={(e) => handleEnterKey(e, wholesaleMarginRef)}
+                              required
+                            />
+                          </div>
+                          <span id="product-price-error" className={`${styles.fieldErrorSlot} ${fieldErrors.price ? styles.fieldErrorVisible : ""}`} role={fieldErrors.price ? "alert" : undefined} title={fieldErrors.price ?? undefined}>
+                            {fieldErrors.price ?? " "}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className={styles.pricingRow}>
+                        <div className={styles.pricingControl}>
+                          <label className={styles.pricingSubLabel} htmlFor="wholesaleMargin">Ganancia mayorista (%)</label>
+                          <div className={styles.pricingField}>
+                            <span className={styles.pricingFieldHint}>%</span>
+                            <input
+                              id="wholesaleMargin"
+                              ref={wholesaleMarginRef}
+                              className={styles.pricingInput}
+                              type="number"
+                              step="any"
+                              placeholder="0.00"
+                              value={wholesaleMargin}
+                              onChange={(e) => handleWholesaleMarginChange(e.target.value)}
+                              onKeyDown={(e) => handleEnterKey(e, wholesalePriceRef)}
+                            />
+                          </div>
+                        </div>
+                        <div className={styles.pricingControl}>
+                          <label className={styles.pricingSubLabel} htmlFor="wholesalePrice">Precio mayorista</label>
+                          <div className={styles.pricingField}>
+                            <span className={styles.pricingFieldHint}>Gs.</span>
+                            <input
+                              id="wholesalePrice"
+                              ref={wholesalePriceRef}
+                              className={styles.pricingInput}
+                              type="text"
+                              inputMode="numeric"
+                              placeholder="0"
+                              value={formData.wholesalePrice}
+                              onChange={(e) => handleWholesalePriceChange(e.target.value.replace(/[^0-9]/g, ""))}
+                              onKeyDown={(e) => handleEnterKey(e, unitTypeRef)}
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className={`${styles.formGroup} ${styles.productCompactGroup}`}>
+                      <label className={styles.label}>Unidad de medida *</label>
+                      <select
+                        ref={unitTypeRef}
+                        className={styles.select}
+                        value={formData.unitType}
+                        onChange={(e) => {
+                          setFormData({ ...formData, unitType: e.target.value as UnitType })
+                          clearFieldError("stock")
+                          clearFieldError("stockMinimum")
+                        }}
+                        onKeyDown={(e) => handleEnterKey(e, stockRef)}
+                      >
+                        {UNIT_OPTIONS.map((unit) => (
+                          <option key={unit.value} value={unit.value}>{unit.label}</option>
+                        ))}
+                      </select>
+                      <span className={styles.fieldHint}>
+                        {UNIT_OPTIONS.find((unit) => unit.value === formData.unitType)?.hint}
+                      </span>
+                    </div>
+
+                    <div className={styles.productFormRow}>
+                      <div className={`${styles.formGroup} ${styles.productCompactGroup}`}>
+                        <label className={styles.label} htmlFor="product-stock-input">Stock actual *</label>
+                        <input id="product-stock-input" ref={stockRef} className={`${styles.input} ${fieldErrors.stock ? styles.fieldInvalid : ""}`} type="number" value={formData.stock}
+                          aria-invalid={Boolean(fieldErrors.stock)}
+                          aria-describedby={fieldErrors.stock ? "product-stock-error" : undefined}
+                          onChange={(e) => { setFormData({ ...formData, stock: e.target.value }); clearFieldError("stock") }}
+                          onKeyDown={(e) => handleEnterKey(e, stockMinRef)}
+                          placeholder={isUnitType(formData.unitType) ? "0" : "0.000"}
+                          min="0"
+                          step={isUnitType(formData.unitType) ? "1" : "0.001"}
+                          required />
+                        <span id="product-stock-error" className={`${styles.fieldErrorSlot} ${fieldErrors.stock ? styles.fieldErrorVisible : ""}`} role={fieldErrors.stock ? "alert" : undefined} title={fieldErrors.stock ?? undefined}>
+                          {fieldErrors.stock ?? " "}
+                        </span>
+                      </div>
+                      <div className={`${styles.formGroup} ${styles.productCompactGroup}`}>
+                        <label className={styles.label} htmlFor="product-stock-minimum-input">Stock mínimo</label>
+                        <input id="product-stock-minimum-input" ref={stockMinRef} className={`${styles.input} ${fieldErrors.stockMinimum ? styles.fieldInvalid : ""}`} type="number" value={formData.stockMinimum}
+                          aria-invalid={Boolean(fieldErrors.stockMinimum)}
+                          aria-describedby={fieldErrors.stockMinimum ? "product-stock-minimum-error" : undefined}
+                          onChange={(e) => { setFormData({ ...formData, stockMinimum: e.target.value }); clearFieldError("stockMinimum") }}
+                          onKeyDown={(e) => handleEnterKey(e, stockAdjustmentNoteVisible ? stockNotesRef : submitRef)}
+                          placeholder={isUnitType(formData.unitType) ? "0" : "0.000"}
+                          min="0"
+                          step={isUnitType(formData.unitType) ? "1" : "0.001"} />
+                        <span className={styles.fieldHint}>Alerta de reposición</span>
+                        <span id="product-stock-minimum-error" className={`${styles.fieldErrorSlot} ${fieldErrors.stockMinimum ? styles.fieldErrorVisible : ""}`} role={fieldErrors.stockMinimum ? "alert" : undefined} title={fieldErrors.stockMinimum ?? undefined}>
+                          {fieldErrors.stockMinimum ?? " "}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* El motivo aparece únicamente al cambiar el stock durante la edición. */}
+                    {stockAdjustmentNoteVisible && editingProduct && (
+                      <div className={`${styles.formGroup} ${styles.productCompactGroup}`}>
+                        <label className={styles.label}>Motivo del ajuste de stock</label>
+                        <input
+                          ref={stockNotesRef}
+                          className={styles.input}
+                          value={formData.stockNotes}
+                          onChange={(e) => setFormData({ ...formData, stockNotes: e.target.value })}
+                          onKeyDown={(e) => handleEnterKey(e, submitRef)}
+                          placeholder="Ej: Conteo físico, merma, corrección de error…"
+                          maxLength={300}
+                        />
+                        <span className={styles.fieldHint}>
+                          Stock actual: {formatStock(editingProduct.stock, editingProduct.unitType ?? "UNIT")} → nuevo: {formatStock(parseFormNumber(formData.stock), formData.unitType)}
+                        </span>
+                      </div>
                     )}
-                  </div>
+                  </section>
                 </div>
-                <div className={styles.formGroup}>
-                  <label className={styles.label}>Nombre *</label>
-                  <input ref={nameRef} className={styles.input} value={formData.name}
-                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                    onKeyDown={(e) => handleEnterKey(e, barcodeRef)}
-                    placeholder="Ej: Cadena 428H x 120 eslabones" required />
-                </div>
-                <div className={styles.formGroup}>
-                  <label className={styles.label}>Código de barras</label>
-                  <input ref={barcodeRef} className={styles.input} value={formData.barcode}
-                    onChange={(e) => setFormData({ ...formData, barcode: e.target.value })}
-                    onKeyDown={(e) => handleEnterKey(e, categoryRef)}
-                    placeholder="7790000000000" />
-                  <span className={styles.fieldHint}>El SKU se genera automáticamente</span>
-                </div>
-                <div className={styles.formRow}>
-                  <div className={styles.formGroup}>
-                    <label className={styles.label}>Categoría *</label>
-                    <select ref={categoryRef} className={styles.select} value={formData.categoryId}
-                      onChange={(e) => setFormData({ ...formData, categoryId: e.target.value, subcategoryId: "" })}
-                      onKeyDown={(e) => handleEnterKey(e, subcategoryRef, supplierRef)} required>
-                      <option value="">Seleccionar</option>
-                      {categories.map((cat) => <option key={cat.id} value={cat.id}>{cat.name}</option>)}
-                    </select>
-                  </div>
-                  <div className={styles.formGroup}>
-                    <label className={styles.label}>Subcategoría</label>
-                    <select ref={subcategoryRef} className={styles.select} value={formData.subcategoryId}
-                      onChange={(e) => setFormData({ ...formData, subcategoryId: e.target.value })}
-                      onKeyDown={(e) => handleEnterKey(e, supplierRef)}
-                      disabled={!formData.categoryId || subcategories.length === 0}>
-                      <option value="">Seleccionar</option>
-                      {subcategories.map((sub: any) => <option key={sub.id} value={sub.id}>{sub.name}</option>)}
-                    </select>
-                  </div>
-                </div>
-                <div className={styles.formGroup}>
-                  <label className={styles.label}>Proveedor</label>
-                  <select ref={supplierRef} className={styles.select} value={formData.supplierId}
-                    onChange={(e) => setFormData({ ...formData, supplierId: e.target.value })}
-                    onKeyDown={(e) => handleEnterKey(e, costRef)}>
-                    <option value="">Ninguno (Opcional)</option>
-                    {suppliers.map((sup: any) => <option key={sup.id} value={sup.id}>{sup.name}</option>)}
-                  </select>
-                </div>
-                <div className={styles.formGroup}>
-                  <label className={styles.label}>Precio de costo</label>
-                  <input
-                    ref={costRef}
-                    className={styles.input}
-                    type="text"
-                    inputMode="numeric"
-                    value={formData.cost}
-                    onChange={(e) => {
-                      const val = e.target.value.replace(/[^0-9]/g, "")
-                      handleCostChange(val)
-                    }}
-                    onKeyDown={(e) => handleEnterKey(e, publicMarginRef)}
-                    placeholder="0"
-                  />
-                </div>
-
-                <div className={styles.pricingCard}>
-                  <div className={styles.pricingCardTitle}>Precios de venta</div>
-
-                  <div className={styles.pricingRow}>
-                    <span className={styles.pricingLabel}>Precio público</span>
-                    <div className={styles.pricingInputGroup}>
-                      <div className={styles.pricingField}>
-                        <span className={styles.pricingFieldHint}>%</span>
-                        <input
-                          ref={publicMarginRef}
-                          className={styles.pricingInput}
-                          type="number"
-                          step="any"
-                          placeholder="0.00"
-                          value={publicMargin}
-                          onChange={(e) => handlePublicMarginChange(e.target.value)}
-                          onKeyDown={(e) => handleEnterKey(e, priceRef)}
-                        />
-                      </div>
-                      <div className={styles.pricingField}>
-                        <span className={styles.pricingFieldHint}>Gs.</span>
-                        <input
-                          ref={priceRef}
-                          className={styles.pricingInput}
-                          type="text"
-                          inputMode="numeric"
-                          placeholder="0"
-                          value={formData.price}
-                          onChange={(e) => handlePublicPriceChange(e.target.value.replace(/[^0-9]/g, ""))}
-                          onKeyDown={(e) => handleEnterKey(e, wholesaleMarginRef)}
-                          required
-                        />
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className={styles.pricingRow}>
-                    <span className={styles.pricingLabel}>Precio mayorista</span>
-                    <div className={styles.pricingInputGroup}>
-                      <div className={styles.pricingField}>
-                        <span className={styles.pricingFieldHint}>%</span>
-                        <input
-                          ref={wholesaleMarginRef}
-                          className={styles.pricingInput}
-                          type="number"
-                          step="any"
-                          placeholder="0.00"
-                          value={wholesaleMargin}
-                          onChange={(e) => handleWholesaleMarginChange(e.target.value)}
-                          onKeyDown={(e) => handleEnterKey(e, wholesalePriceRef)}
-                        />
-                      </div>
-                      <div className={styles.pricingField}>
-                        <span className={styles.pricingFieldHint}>Gs.</span>
-                        <input
-                          ref={wholesalePriceRef}
-                          className={styles.pricingInput}
-                          type="text"
-                          inputMode="numeric"
-                          placeholder="0"
-                          value={formData.wholesalePrice}
-                          onChange={(e) => handleWholesalePriceChange(e.target.value.replace(/[^0-9]/g, ""))}
-                          onKeyDown={(e) => handleEnterKey(e, unitTypeRef)}
-                        />
-                      </div>
-                    </div>
-                  </div>
-                </div>
-                <div className={styles.formGroup}>
-                  <label className={styles.label}>Unidad de medida *</label>
-                  <select
-                    ref={unitTypeRef}
-                    className={styles.select}
-                    value={formData.unitType}
-                    onChange={(e) => setFormData({ ...formData, unitType: e.target.value as UnitType })}
-                    onKeyDown={(e) => handleEnterKey(e, stockRef)}
-                  >
-                    {UNIT_OPTIONS.map((unit) => (
-                      <option key={unit.value} value={unit.value}>{unit.label}</option>
-                    ))}
-                  </select>
-                  <span className={styles.fieldHint}>
-                    {UNIT_OPTIONS.find((unit) => unit.value === formData.unitType)?.hint}
-                  </span>
-                </div>
-                <div className={styles.formRow}>
-                  <div className={styles.formGroup}>
-                    <label className={styles.label}>Stock actual *</label>
-                    <input ref={stockRef} className={styles.input} type="number" value={formData.stock}
-                      onChange={(e) => setFormData({ ...formData, stock: e.target.value })}
-                      onKeyDown={(e) => handleEnterKey(e, stockMinRef)}
-                      placeholder={isUnitType(formData.unitType) ? "0" : "0.000"}
-                      min="0"
-                      step={isUnitType(formData.unitType) ? "1" : "0.001"}
-                      required />
-                  </div>
-                  <div className={styles.formGroup}>
-                    <label className={styles.label}>Stock mínimo</label>
-                    <input ref={stockMinRef} className={styles.input} type="number" value={formData.stockMinimum}
-                      onChange={(e) => setFormData({ ...formData, stockMinimum: e.target.value })}
-                      onKeyDown={(e) => handleEnterKey(e, submitRef)}
-                      placeholder={isUnitType(formData.unitType) ? "0" : "0.000"}
-                      min="0"
-                      step={isUnitType(formData.unitType) ? "1" : "0.001"} />
-                    <span className={styles.fieldHint}>Alerta de reposición</span>
-                  </div>
-                </div>
-
-                {/* ── Nota de ajuste — solo visible al editar si el stock cambió ── */}
-                {editingProduct && parseFormNumber(formData.stock) !== editingProduct.stock && (
-                  <div className={styles.formGroup}>
-                    <label className={styles.label}>Motivo del ajuste de stock</label>
-                    <input
-                      className={styles.input}
-                      value={formData.stockNotes}
-                      onChange={(e) => setFormData({ ...formData, stockNotes: e.target.value })}
-                      placeholder="Ej: Conteo físico, merma, corrección de error…"
-                      maxLength={300}
-                    />
-                    <span className={styles.fieldHint}>
-                      Stock actual: {formatStock(editingProduct.stock, editingProduct.unitType ?? "UNIT")} → nuevo: {formatStock(parseFormNumber(formData.stock), formData.unitType)}
-                    </span>
-                  </div>
-                )}
               </div>
-              <div className={styles.modalFooter}>
+              <div className={styles.productModalFooter}>
                 <button type="button" className={styles.cancelButton} onClick={() => { setIsDialogOpen(false); resetForm() }} disabled={submitting}>
                   Cancelar
                 </button>
@@ -974,7 +1250,7 @@ export function ProductsPage() {
       {/* ── Confirm dialog ───────────────────────────────────────────────────── */}
       {confirm.open && (
         <div className={styles.confirmOverlay} onClick={closeConfirm}>
-          <div className={styles.confirmDialog} onClick={(e) => e.stopPropagation()}>
+          <div data-pos-modal className={styles.confirmDialog} onClick={(e) => e.stopPropagation()}>
             <div className={styles.confirmIcon}>
               <AlertTriangle size={22} />
             </div>

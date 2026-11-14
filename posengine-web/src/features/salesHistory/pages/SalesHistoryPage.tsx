@@ -6,6 +6,7 @@ import { AlertCircle, X, ChevronLeft, ChevronRight } from "lucide-react"
 import { useAuthStore } from "@/src/features/auth/store/auth.store"
 import { API_BASE_URL } from "@/src/shared/config/api"
 import tableStyles from "@/src/features/products/pages/ProductsPage.module.css"
+import dataTableStyles from "@/src/shared/components/DataTable/DataTable.module.css"
 import styles from "./SalesHistoryPage.module.css"
 import { SalesFilterBar } from "../components/SalesFilterBar"
 import { SalesHistoryTable } from "../components/SalesHistoryTable"
@@ -68,6 +69,7 @@ export function SalesHistoryPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [search, setSearch] = useState("")
+  const [debouncedSearch, setDebouncedSearch] = useState("")
   const [statusFilter, setStatusFilter] = useState<SaleStatus | "ALL">("ALL")
   const [dateFrom, setDateFrom] = useState("")
   const [dateTo, setDateTo] = useState("")
@@ -92,29 +94,45 @@ export function SalesHistoryPage() {
   const [printingReceipt, setPrintingReceipt] = useState(false)
 
   // ── Fetch list ─────────────────────────────────────────────────────────────
-  const fetchSales = useCallback(async () => {
+  const fetchSales = useCallback(async (signal?: AbortSignal) => {
     setLoading(true)
     setError(null)
     try {
       const params = new URLSearchParams({ page: String(page), limit: String(LIMIT) })
+      if (debouncedSearch.trim()) params.set("search", debouncedSearch.trim())
       if (statusFilter !== "ALL") params.set("status", statusFilter)
       if (dateFrom) params.set("dateFrom", dateFrom)
       if (dateTo)   params.set("dateTo", dateTo)
 
-      const res = await fetch(`${API_BASE}/sales?${params}`, { headers: authHeaders })
+      const res = await fetch(`${API_BASE}/sales?${params}`, { headers: authHeaders, signal })
       if (!res.ok) throw new Error("Error al cargar ventas")
       const data: PaginatedResponse = await res.json()
-      setSales(data.items ?? [])
-      setTotalItems(data.total ?? 0)
+      if (!signal?.aborted) {
+        setSales(data.items ?? [])
+        setTotalItems(data.total ?? 0)
+      }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Error desconocido")
+      if (!signal?.aborted) setError(err instanceof Error ? err.message : "Error desconocido")
     } finally {
-      setLoading(false)
+      if (!signal?.aborted) setLoading(false)
     }
-  }, [page, statusFilter, dateFrom, dateTo, accessToken])
+  }, [page, debouncedSearch, statusFilter, dateFrom, dateTo, accessToken])
 
-  useEffect(() => { void fetchSales() }, [fetchSales])
-  useEffect(() => { setPage(1) }, [statusFilter, dateFrom, dateTo, search])
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(search.trim()), 300)
+    return () => clearTimeout(timer)
+  }, [search])
+
+  useEffect(() => {
+    setPage(1)
+  }, [statusFilter, dateFrom, dateTo, debouncedSearch])
+
+  useEffect(() => {
+    if (search.trim() !== debouncedSearch) return
+    const controller = new AbortController()
+    void fetchSales(controller.signal)
+    return () => controller.abort()
+  }, [fetchSales, search, debouncedSearch])
 
   // ── Fetch companies for receipt emission ────────────────────────────────────
   useEffect(() => {
@@ -238,6 +256,17 @@ export function SalesHistoryPage() {
     }
   }
 
+  const refreshSelectedSale = async () => {
+    if (!selectedSale) return
+    try {
+      const response = await fetch(`${API_BASE}/sales/${selectedSale.id}`, { headers: authHeaders })
+      if (!response.ok) throw new Error("No se pudo actualizar el saldo de la venta.")
+      setSelectedSale(await response.json())
+    } catch (cause) {
+      setDetailError(cause instanceof Error ? cause.message : "No se pudo actualizar el saldo de la venta.")
+    }
+  }
+
   const closeDetail = () => {
     setSelectedSale(null)
     setDetailError(null)
@@ -246,7 +275,7 @@ export function SalesHistoryPage() {
   }
 
   // ── Actions ────────────────────────────────────────────────────────────────
-  const handleCancel = async () => {
+  const handleCancel = async (reason: string) => {
     if (!selectedSale) return
     setCancelling(true)
     setCancelError(null)
@@ -254,6 +283,7 @@ export function SalesHistoryPage() {
       const res = await fetch(`${API_BASE}/sales/${selectedSale.id}/cancel`, {
         method: "PATCH",
         headers: authHeaders,
+        body: JSON.stringify({ reason }),
       })
       if (!res.ok) {
         const data = await res.json()
@@ -268,7 +298,7 @@ export function SalesHistoryPage() {
     }
   }
 
-  const handleRestore = async () => {
+  const handleRestore = async (reason: string) => {
     if (!selectedSale) return
     setRestoring(true)
     setCancelError(null)
@@ -276,6 +306,7 @@ export function SalesHistoryPage() {
       const res = await fetch(`${API_BASE}/sales/${selectedSale.id}/uncancel`, {
         method: "PATCH",
         headers: authHeaders,
+        body: JSON.stringify({ reason }),
       })
       if (!res.ok) {
         const data = await res.json()
@@ -289,13 +320,6 @@ export function SalesHistoryPage() {
       setRestoring(false)
     }
   }
-
-  const filteredSales = search.trim()
-    ? sales.filter(s => 
-        s.id.toLowerCase().includes(search.toLowerCase()) ||
-        s.customer?.name.toLowerCase().includes(search.toLowerCase())
-      )
-    : sales
 
   const totalPages = Math.ceil(totalItems / LIMIT)
   const hasActiveFilters = !!(statusFilter !== "ALL" || dateFrom || dateTo)
@@ -334,67 +358,72 @@ export function SalesHistoryPage() {
           hasActiveFilters={hasActiveFilters}
         />
 
-        <SalesHistoryTable
-          sales={filteredSales}
-          loading={loading}
-          error={error}
-          totalItems={totalItems}
-          onOpenDetail={openDetail}
-        />
+        <div className={`${dataTableStyles.historyResults} ${styles.historyPanel}`}>
+          <SalesHistoryTable
+            sales={sales}
+            loading={loading}
+            error={error}
+            totalItems={totalItems}
+            onOpenDetail={openDetail}
+          />
 
-        {/* ── Paginación ── */}
-        {!loading && totalPages > 1 && (
-          <div className={styles.paginationCard}>
-            <div className={styles.paginationInfo}>
-              Mostrando página <strong>{page}</strong> de <strong>{totalPages}</strong> ({totalItems} ventas en total)
+          {/* ── Paginación ── */}
+          {!loading && totalPages > 1 && (
+            <div className={`${styles.pagination} ${dataTableStyles.fixedRegion}`}>
+              <div className={styles.paginationInfo}>
+                Mostrando página <strong>{page}</strong> de <strong>{totalPages}</strong> ({totalItems} ventas en total)
+              </div>
+              <div className={styles.paginationControls}>
+                <button
+                  type="button"
+                  className={styles.pageBtn}
+                  onClick={() => setPage(p => Math.max(1, p - 1))}
+                  disabled={page === 1}
+                >
+                  <ChevronLeft size={15} />
+                </button>
+                {Array.from({ length: totalPages }, (_, i) => i + 1)
+                  .filter(p => p === 1 || p === totalPages || Math.abs(p - page) <= 1)
+                  .reduce((acc: (number | string)[], p, i, arr) => {
+                    if (i > 0 && p - (arr[i - 1] as number) > 1) acc.push("...")
+                    acc.push(p)
+                    return acc
+                  }, [])
+                  .map((p, i) =>
+                    p === "..." ? (
+                      <span key={`dots-${i}`} className={styles.pageDots}>…</span>
+                    ) : (
+                      <button
+                        key={p}
+                        type="button"
+                        className={`${styles.pageBtn} ${page === p ? styles.pageBtnActive : ""}`}
+                        onClick={() => setPage(p as number)}
+                      >
+                        {p}
+                      </button>
+                    )
+                  )}
+                <button
+                  type="button"
+                  className={styles.pageBtn}
+                  onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                  disabled={page === totalPages}
+                >
+                  <ChevronRight size={15} />
+                </button>
+              </div>
             </div>
-            <div className={styles.paginationControls}>
-              <button
-                type="button"
-                className={styles.pageBtn}
-                onClick={() => setPage(p => Math.max(1, p - 1))}
-                disabled={page === 1}
-              >
-                <ChevronLeft size={15} />
-              </button>
-              {Array.from({ length: totalPages }, (_, i) => i + 1)
-                .filter(p => p === 1 || p === totalPages || Math.abs(p - page) <= 1)
-                .reduce((acc: (number | string)[], p, i, arr) => {
-                  if (i > 0 && p - (arr[i - 1] as number) > 1) acc.push("...")
-                  acc.push(p)
-                  return acc
-                }, [])
-                .map((p, i) =>
-                  p === "..." ? (
-                    <span key={`dots-${i}`} className={styles.pageDots}>…</span>
-                  ) : (
-                    <button
-                      key={p}
-                      type="button"
-                      className={`${styles.pageBtn} ${page === p ? styles.pageBtnActive : ""}`}
-                      onClick={() => setPage(p as number)}
-                    >
-                      {p}
-                    </button>
-                  )
-                )}
-              <button
-                type="button"
-                className={styles.pageBtn}
-                onClick={() => setPage(p => Math.min(totalPages, p + 1))}
-                disabled={page === totalPages}
-              >
-                <ChevronRight size={15} />
-              </button>
-            </div>
-          </div>
-        )}
+          )}
+        </div>
       </div>
 
       {/* ── Detail modal ── */}
       {selectedSale && (
         <SaleDetailModal
+          key={selectedSale.id}
           selectedSale={selectedSale}
+          accessToken={accessToken || ""}
+          onSaleUpdated={refreshSelectedSale}
           onClose={closeDetail}
           loadingDetail={loadingDetail}
           detailError={detailError}

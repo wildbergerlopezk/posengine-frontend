@@ -52,7 +52,7 @@ export function PriceHistoryModal({
       onClick={onClose}
       onKeyDown={(e) => e.stopPropagation()} // bloquea bubbling desde el DOM también
     > 
-      <div className={styles.modal} onClick={(e) => e.stopPropagation()}> 
+      <div data-pos-modal className={styles.modal} onClick={(e) => e.stopPropagation()}>
  
         <div className={styles.header}> 
           <div className={styles.headerLeft}> 

@@ -1,7 +1,11 @@
-import React, { useState, useEffect } from "react"
-import { X, RotateCcw, AlertTriangle, Package, Loader2, Info } from "lucide-react"
+"use client"
+
+import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react"
+import { AlertTriangle, Info, Loader2, Package, RotateCcw } from "lucide-react"
 import { formatCurrency } from "@/src/shared/hooks/useFormatCurrency"
 import { API_BASE_URL } from "@/src/shared/config/api"
+import { useCommercialCapabilities } from "@/src/shared/hooks/useCommercialCapabilities"
+import controls from "@/src/shared/styles/detailFormControls.module.css"
 import styles from "./PurchaseReturnModal.module.css"
 
 interface Product {
@@ -10,6 +14,7 @@ interface Product {
   barcode?: string
   sku?: string
   stock: number
+  unitType?: string
 }
 
 interface PurchaseItem {
@@ -25,239 +30,246 @@ interface Purchase {
   id: string
   invoiceNumber: string
   supplier: { name: string }
+  paymentType?: "CASH" | "CREDIT"
+  debtBalance?: number
   total: number
   items?: PurchaseItem[]
 }
 
+interface ExistingReturn {
+  status: string
+  items: Array<{ purchaseItemId: string; quantity: number }>
+}
+
 interface Props {
   open: boolean
+  inline?: boolean
   purchase: Purchase
   loading: boolean
-  onClose: () => void
+  accessToken?: string
+  cashSessionId?: string
+  cashSessionLoading?: boolean
+  onClose?: () => void
   onSuccess: () => void
 }
 
-export function PurchaseReturnModal({ open, purchase, loading, onClose, onSuccess }: Props) {
+export function PurchaseReturnModal({ open, inline = false, purchase, loading, accessToken = "", cashSessionId, cashSessionLoading = false, onClose, onSuccess }: Props) {
   const [reason, setReason] = useState("")
   const [creditNote, setCreditNote] = useState("")
+  const [settlementDisposition, setSettlementDisposition] = useState<"REFUND_PENDING" | "REFUND_CASH" | "REFUND_TRANSFER" | "SUPPLIER_CREDIT">("REFUND_PENDING")
+  const [quantities, setQuantities] = useState<Record<string, string>>({})
+  const [existingReturns, setExistingReturns] = useState<ExistingReturn[]>([])
+  const [returnsLoading, setReturnsLoading] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const { capabilities, loading: capabilitiesLoading, error: capabilitiesError, refresh: refreshCapabilities } = useCommercialCapabilities(accessToken)
 
-  const API_BASE = API_BASE_URL
+  const returnCapability = capabilities?.purchaseReturns
+  const settlementCapability = capabilities?.purchaseReturnSettlements
+  const supplierCreditCapability = capabilities?.supplierCreditApplications
+  const canCreateReturn = returnCapability?.enabled === true
+  const canCreateSettlement = settlementCapability?.enabled === true
+  const canSettleCash = canCreateSettlement && Boolean(cashSessionId) && !cashSessionLoading
+  const returnBlockMessage = capabilitiesLoading
+    ? "Verificando la disponibilidad de devoluciones…"
+    : capabilitiesError || returnCapability?.reason || null
+
+  const headers = useMemo(() => ({
+    "Content-Type": "application/json",
+    Authorization: `Bearer ${accessToken}`,
+  }), [accessToken])
+
+  const loadReturns = useCallback(async () => {
+    setReturnsLoading(true)
+    try {
+      const params = new URLSearchParams({ purchaseId: purchase.id })
+      const response = await fetch(`${API_BASE_URL}/purchase-returns?${params}`, { headers })
+      const data = await response.json().catch(() => null)
+      if (!response.ok) throw new Error(data?.message || "No se pudo cargar el historial de devoluciones.")
+      setExistingReturns(Array.isArray(data) ? data : [])
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "No se pudo cargar el historial.")
+    } finally {
+      setReturnsLoading(false)
+    }
+  }, [headers, purchase.id])
 
   useEffect(() => {
-    if (open) {
-      setReason("")
-      setCreditNote("")
-      setError(null)
+    if (!open) return
+    setReason("")
+    setCreditNote("")
+    setQuantities({})
+    setSettlementDisposition("REFUND_PENDING")
+    setError(null)
+    void loadReturns()
+  }, [open, loadReturns])
+
+  const lines = (purchase.items ?? []).map((item) => {
+    const returned = existingReturns
+      .filter((entry) => entry.status === "CONFIRMED")
+      .flatMap((entry) => entry.items)
+      .filter((row) => row.purchaseItemId === item.id)
+      .reduce((sum, row) => sum + Number(row.quantity), 0)
+    const remaining = Math.max(0, item.quantity - returned)
+    const quantity = Number(quantities[item.id] || 0)
+    const amount = Math.round(quantity * item.unitCost * 100) / 100
+    return { item, returned, remaining, available: Math.min(remaining, item.product.stock), quantity, amount }
+  })
+  const selected = lines.filter((line) => line.quantity > 0)
+  const returnTotal = Math.round(selected.reduce((sum, line) => sum + line.amount, 0) * 100) / 100
+  const debtOffset = Math.min(returnTotal, Math.max(0, Number(purchase.debtBalance ?? 0)))
+  const excess = Math.round((returnTotal - debtOffset) * 100) / 100
+  const safeDisposition = settlementDisposition === "REFUND_PENDING"
+    ? "REFUND_PENDING"
+    : !canCreateSettlement || (settlementDisposition === "REFUND_CASH" && !canSettleCash)
+      ? "REFUND_PENDING"
+      : settlementDisposition
+
+  const handleSubmit = async (event: FormEvent) => {
+    event.preventDefault()
+    if (!selected.length) {
+      setError("Indicá la cantidad de al menos un producto.")
+      return
     }
-  }, [open])
-
-  if (!open) return null
-
-  // Verificar si hay stock suficiente para una devolución total
-  const insufficientStockItems = purchase.items?.filter(item => item.product.stock < item.quantity) || []
-  const canReturnTotal = insufficientStockItems.length === 0
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    
-    if (!canReturnTotal) {
-      setError("No se puede realizar la devolución total porque algunos productos ya fueron vendidos.")
+    if (!canCreateReturn) {
+      setError(returnBlockMessage || "La devolución no está disponible temporalmente.")
       return
     }
 
-    const itemsToReturn = purchase.items?.map(item => ({ 
-      purchaseItemId: item.id, 
-      quantity: item.quantity 
-    })) || []
-
     setSubmitting(true)
     setError(null)
-
     try {
-      const token = localStorage.getItem("auth-storage") 
-        ? JSON.parse(localStorage.getItem("auth-storage")!).state.accessToken 
-        : ""
-
-      const res = await fetch(`${API_BASE}/purchase-returns`, {
+      const response = await fetch(`${API_BASE_URL}/purchase-returns`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`
-        },
+        headers,
         body: JSON.stringify({
           purchaseId: purchase.id,
           returnDate: new Date().toISOString(),
           reason,
           creditNoteNumber: creditNote,
-          items: itemsToReturn
-        })
+          items: selected.map(({ item, quantity }) => ({ purchaseItemId: item.id, quantity })),
+        }),
       })
+      const created = await response.json().catch(() => null)
+      if (!response.ok) throw new Error(created?.message || "Error al crear la devolución.")
 
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.message || "Error al procesar devolución")
-
-      const confirmRes = await fetch(`${API_BASE}/purchase-returns/${data.id}/confirm`, {
+      const confirmResponse = await fetch(`${API_BASE_URL}/purchase-returns/${created.id}/confirm`, {
         method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`
-        }
+        headers,
+        body: JSON.stringify(excess > 0.01 ? { settlementDisposition: safeDisposition } : {}),
       })
-
-      if (!confirmRes.ok) {
-        const confirmData = await confirmRes.json()
-        throw new Error(confirmData.message || "Devolución creada pero no se pudo confirmar")
-      }
+      const confirmation = await confirmResponse.json().catch(() => null)
+      if (!confirmResponse.ok) throw new Error(confirmation?.message || "Devolución creada, pero no se pudo confirmar.")
 
       onSuccess()
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Error desconocido")
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "No se pudo completar la devolución.")
+      refreshCapabilities()
     } finally {
       setSubmitting(false)
     }
   }
 
+  if (!open) return null
+
   return (
-    <div className={styles.overlay} onClick={onClose}>
-      <div className={styles.modal} onClick={e => e.stopPropagation()}>
-        <div className={styles.header}>
-          <div className={styles.headerTitle}>
-            <RotateCcw className={styles.headerIcon} size={20} />
-            <div>
-              <h3>Devolución Total de Factura</h3>
-              <p>Factura {purchase.invoiceNumber} — {purchase.supplier.name}</p>
-            </div>
+    <section className={styles.inlinePanel} aria-label="Nueva devolución de compra">
+      <header className={styles.inlineHeader}>
+        <div className={styles.headerTitle}>
+          <RotateCcw className={styles.headerIcon} size={18} aria-hidden="true" />
+          <div>
+            <h3>Nueva devolución</h3>
+            <p>Factura {purchase.invoiceNumber} · {purchase.supplier.name}</p>
           </div>
-          <button className={styles.closeBtn} onClick={onClose} disabled={submitting}>
-            <X size={20} />
-          </button>
         </div>
+      </header>
 
-        <form onSubmit={handleSubmit} className={styles.body}>
-          {error && (
-            <div className={styles.errorBanner}>
-              <AlertTriangle size={16} />
-              {error}
-            </div>
-          )}
-
-          {!canReturnTotal && (
-            <div className={styles.errorBanner}>
-              <AlertTriangle size={16} />
-              <div>
-                <p><strong>Stock insuficiente para devolución total:</strong></p>
-                <ul className={styles.errorList}>
-                  {insufficientStockItems.map(item => (
-                    <li key={item.id}>
-                      {item.product.name}: Necesitas {item.quantity}, pero solo hay {item.product.stock} en stock.
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            </div>
-          )}
-
-          <div className={styles.infoBox}>
-            <Info size={16} />
-            <p>Se devolverán todos los productos de esta factura al proveedor y se descontarán del stock.</p>
-          </div>
-
+      <form onSubmit={handleSubmit} className={styles.inlineBody}>
+        {!canCreateReturn && <div className={styles.notice} role="status"><Info size={15} aria-hidden="true" />{returnBlockMessage || "La devolución no está disponible temporalmente."} El historial sigue disponible.</div>}
+        {error && <div className={styles.errorBanner} role="alert"><AlertTriangle size={15} aria-hidden="true" />{error}</div>}
+        {loading || returnsLoading ? <p className={styles.empty}><Loader2 size={15} className={styles.spinner} /> Cargando cantidades devueltas…</p> : (
           <div className={styles.tableWrapper}>
             <table className={styles.table}>
-              <thead>
-                <tr>
-                  <th>Producto</th>
-                  <th className={styles.center}>Cantidad</th>
-                  <th className={styles.center}>Stock Actual</th>
-                  <th className={styles.right}>Costo</th>
-                  <th className={styles.right}>Subtotal</th>
-                </tr>
-              </thead>
+              <thead><tr><th>Producto</th><th className={styles.numeric}>Original</th><th className={styles.numeric}>Devuelta</th><th className={styles.numeric}>Restante</th><th className={styles.numeric}>A devolver</th><th className={styles.numeric}>Importe</th></tr></thead>
               <tbody>
-                {purchase.items?.map(item => {
-                  const hasStock = item.product.stock >= item.quantity
-                  return (
-                    <tr key={item.id} className={!hasStock ? styles.rowError : ""}>
-                      <td>
-                        <div className={styles.productInfo}>
-                          <span className={styles.productName}>{item.product.name}</span>
-                          <span className={styles.productSku}>{item.product.sku || item.product.barcode || "—"}</span>
-                        </div>
-                      </td>
-                      <td className={styles.center}>
-                        <span className={styles.qtyMain}>{item.quantity}</span>
-                      </td>
-                      <td className={styles.center}>
-                        <span className={`${styles.stockValue} ${!hasStock ? styles.stockWarning : ""}`}>
-                          {item.product.stock}
-                        </span>
-                      </td>
-                      <td className={styles.right}>{formatCurrency(item.unitCost)}</td>
-                      <td className={styles.right}>
-                        <span className={styles.itemTotal}>
-                          {formatCurrency(item.total)}
-                        </span>
-                      </td>
-                    </tr>
-                  )
-                })}
+                {lines.map(({ item, returned, remaining, available, quantity, amount }) => (
+                  <tr key={item.id}>
+                    <td className={styles.productCell}>
+                      <span className={styles.productName} title={item.product.name}>{item.product.name}</span>
+                      <small>{item.product.sku || item.product.barcode || "Sin código"} · Stock {item.product.stock}</small>
+                    </td>
+                    <td className={styles.numeric}>{item.quantity}</td>
+                    <td className={styles.numeric}>{returned}</td>
+                    <td className={styles.numeric}>{remaining}</td>
+                    <td>
+                      <input
+                        className={`${controls.control} ${styles.quantityInput}`}
+                        aria-label={`Cantidad a devolver: ${item.product.name}`}
+                        type="number"
+                        min="0"
+                        max={available}
+                        step={item.product.unitType === "UNIT" ? "1" : "0.001"}
+                        value={quantities[item.id] ?? ""}
+                        onChange={(event) => setQuantities((current) => ({ ...current, [item.id]: event.target.value }))}
+                      />
+                    </td>
+                    <td className={styles.numeric}>{formatCurrency(amount || quantity * item.unitCost)}</td>
+                  </tr>
+                ))}
               </tbody>
             </table>
           </div>
+        )}
 
-          <div className={styles.formFooter}>
-            <div className={styles.inputsRow}>
-              <div className={styles.inputGroup}>
-                <label>Nro. Nota de Crédito (opcional)</label>
-                <input
-                  type="text"
-                  value={creditNote}
-                  onChange={e => setCreditNote(e.target.value)}
-                  placeholder="Ej: 001-001-0000123"
-                  disabled={submitting}
-                />
-              </div>
-              <div className={styles.inputGroup}>
-                <label>Motivo de la devolución</label>
-                <input
-                  type="text"
-                  value={reason}
-                  onChange={e => setReason(e.target.value)}
-                  placeholder="Ej: Devolución total por mercadería dañada..."
-                  disabled={submitting}
-                  required
-                />
-              </div>
-            </div>
-
-            <div className={styles.summaryBox}>
-              <div className={styles.summaryRow}>
-                <span>Monto Total a Devolver</span>
-                <span className={styles.summaryTotal}>{formatCurrency(purchase.total)}</span>
-              </div>
-              <button 
-                type="submit" 
-                className={styles.submitBtn}
-                disabled={submitting || !canReturnTotal}
-              >
-                {submitting ? (
-                  <>
-                    <Loader2 className={styles.spinner} size={18} />
-                    Procesando...
-                  </>
-                ) : (
-                  <>
-                    <Package size={18} />
-                    Confirmar Devolución Total
-                  </>
-                )}
-              </button>
-            </div>
+        <section className={styles.formBlock} aria-labelledby="purchase-return-reason-heading">
+          <h4 className={styles.blockTitle} id="purchase-return-reason-heading">Motivo de devolución</h4>
+          <div className={styles.inputGrid}>
+            <label className={controls.label}>Motivo
+              <input className={controls.control} value={reason} onChange={(event) => setReason(event.target.value)} maxLength={500} placeholder="Describí brevemente el motivo" disabled={submitting} required />
+            </label>
+            <label className={controls.label}>Nota de crédito (opcional)
+              <input className={controls.control} value={creditNote} onChange={(event) => setCreditNote(event.target.value)} maxLength={120} placeholder="Número de nota de crédito" disabled={submitting} />
+            </label>
           </div>
-        </form>
-      </div>
-    </div>
+        </section>
+
+        <section className={`${styles.formBlock} ${styles.financeBlock}`} aria-labelledby="purchase-return-finance-heading">
+          <h4 className={styles.blockTitle} id="purchase-return-finance-heading">Resumen financiero</h4>
+          <div className={styles.summaryBox} aria-live="polite">
+          <div className={styles.summaryValues}>
+            <div><span>Importe a devolver</span><strong>{formatCurrency(returnTotal)}</strong></div>
+            <div><span>Reducción de deuda</span><strong>{formatCurrency(debtOffset)}</strong></div>
+            <div><span>Excedente</span><strong>{formatCurrency(excess)}</strong></div>
+          </div>
+          </div>
+        </section>
+
+        {excess > 0.01 && <section className={`${styles.formBlock} ${styles.liquidationBlock}`} aria-labelledby="purchase-return-settlement-heading">
+          <h4 className={styles.blockTitle} id="purchase-return-settlement-heading">Liquidación del excedente</h4>
+          <label className={controls.label}>Destino
+            <select className={controls.control} value={safeDisposition} onChange={(event) => setSettlementDisposition(event.target.value as typeof settlementDisposition)}>
+              <option value="REFUND_PENDING">Registrar como reembolso pendiente</option>
+              <option value="REFUND_CASH" disabled={!canSettleCash}>Efectivo ya recibido en caja abierta</option>
+              <option value="REFUND_TRANSFER" disabled={!canCreateSettlement}>Transferencia ya recibida</option>
+              <option value="SUPPLIER_CREDIT" disabled={!canCreateSettlement}>Crédito del proveedor</option>
+            </select>
+          </label>
+          <p className={styles.infoText}>La deuda y las cuotas se reducen primero; el destino define cómo se registra el excedente.</p>
+          {!canCreateSettlement && settlementCapability?.reason && <p className={styles.helperText} role="status">{settlementCapability.reason} Podés registrar la devolución y dejar el reembolso pendiente.</p>}
+          {canCreateSettlement && !cashSessionId && !cashSessionLoading && <p className={styles.helperText} role="status">Abrí una sesión de caja para registrar un reembolso en efectivo.</p>}
+          {safeDisposition === "SUPPLIER_CREDIT" && supplierCreditCapability && !supplierCreditCapability.enabled && supplierCreditCapability.reason && <p className={styles.helperText} role="status">{supplierCreditCapability.reason} El crédito puede registrarse, pero no aplicarse a otra compra hasta habilitar esa operación.</p>}
+        </section>}
+
+        <div className={styles.confirmation}>
+          {!canCreateReturn && <p className={styles.blockedNotice} role="status">{returnBlockMessage || "La devolución no está disponible temporalmente."}</p>}
+          {capabilitiesError && <button type="button" className={styles.retryButton} onClick={refreshCapabilities}>Volver a verificar</button>}
+          <button type="submit" className={styles.submitBtn} disabled={submitting || loading || returnsLoading || !selected.length || !canCreateReturn || capabilitiesLoading || !capabilities} aria-describedby={!canCreateReturn ? "purchase-return-blocked-reason" : undefined}>
+            {submitting ? <><Loader2 className={styles.spinner} size={16} /> Procesando…</> : <><Package size={16} /> Confirmar devolución</>}
+          </button>
+          {!canCreateReturn && <span id="purchase-return-blocked-reason" className={styles.srOnly}>{returnBlockMessage}</span>}
+        </div>
+      </form>
+      {onClose && !inline && <button type="button" className={styles.closeInline} onClick={onClose}>Cerrar</button>}
+    </section>
   )
 }

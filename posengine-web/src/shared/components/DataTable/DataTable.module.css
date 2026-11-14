@@ -1,0 +1,135 @@
+.flexColumn {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+
+.viewport {
+  box-sizing: border-box;
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+  background: var(--color-muted);
+}
+
+:where(.viewport tbody tr) { background: var(--color-card); }
+
+.viewport thead th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: var(--color-muted);
+}
+
+.naturalRows tbody tr { height: auto; }
+
+.compactCells th,
+.compactCells td {
+  padding-left: 0.5rem !important;
+  padding-right: 0.5rem !important;
+}
+
+.historyResults {
+  display: flex;
+  flex: 0 1 auto;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+
+.historyCard {
+  display: flex;
+  flex: 0 1 auto;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+
+.fixedRegion { flex: 0 0 auto; }
+
+/* Shared base styles for compact administrative tables. Feature modules own columns and cell content. */
+.adminTableCard {
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+  flex: 1 1 0;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid var(--color-border);
+  border-radius: 0.75rem;
+  background: var(--color-card);
+}
+
+.adminTableViewport {
+  min-width: 0;
+  min-height: 0;
+  flex: 1 1 auto;
+  overflow: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+  background: var(--color-muted);
+}
+
+:where(.adminTableViewport tbody tr) { background: var(--color-card); }
+
+.adminTable {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+
+.adminTable thead th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: var(--color-muted);
+}
+
+.adminTableHead {
+  padding: 0.625rem 0.75rem;
+  color: var(--color-muted-foreground);
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.045em;
+  text-align: left;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.adminTableRow { border-bottom: 1px solid var(--color-border); }
+.adminTableRow:last-child { border-bottom: 0; }
+.adminTableRow:hover { background: color-mix(in srgb, var(--color-muted) 65%, transparent); }
+
+.adminTableCell {
+  padding: 0.625rem 0.75rem;
+  color: var(--color-foreground);
+  font-size: 0.84rem;
+  vertical-align: middle;
+}
+
+.adminTableEmpty {
+  padding: 2.5rem 1rem;
+  color: var(--color-muted-foreground);
+  font-size: 0.875rem;
+  text-align: center;
+}
+
+.adminTableFooter {
+  display: flex;
+  min-width: 0;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.625rem 0.875rem;
+  border-top: 1px solid var(--color-border);
+  background: var(--color-card);
+}
+
+@media (max-height: 600px) {
+  .historyResults,
+  .historyCard { flex-shrink: 0; }
+}

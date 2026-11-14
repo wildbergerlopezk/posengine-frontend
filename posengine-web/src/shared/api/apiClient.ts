@@ -5,6 +5,33 @@ interface RequestOptions extends RequestInit {
   skipAuth?: boolean
 }
 
+export class ApiError extends Error {
+  constructor(
+    message: string,
+    public readonly status: number,
+    public readonly code: string,
+    public readonly details?: unknown,
+    public readonly requestId?: string,
+  ) {
+    super(message)
+    this.name = "ApiError"
+  }
+}
+
+function toApiError(status: number, data: any): ApiError {
+  const message = typeof data?.message === "string"
+    ? data.message
+    : "No se pudo completar la solicitud."
+
+  return new ApiError(
+    message,
+    status,
+    typeof data?.code === "string" ? data.code : `HTTP_${status}`,
+    data?.details,
+    typeof data?.requestId === "string" ? data.requestId : undefined,
+  )
+}
+
 let isRefreshing = false
 let refreshQueue: Array<(token: string) => void> = []
 
@@ -22,7 +49,8 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
   const url = `${API_BASE_URL}${path}`
 
   const headers = new Headers(init.headers)
-  if (!headers.has("Content-Type")) {
+  const isMultipartBody = typeof FormData !== "undefined" && init.body instanceof FormData
+  if (!headers.has("Content-Type") && !isMultipartBody) {
     headers.set("Content-Type", "application/json")
   }
 
@@ -37,7 +65,19 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
 
   init.headers = headers
 
-  let response = await fetch(url, init)
+  let response: Response
+  try {
+    response = await fetch(url, init)
+  } catch (error) {
+    if (error instanceof TypeError) {
+      throw new ApiError(
+        "No pudimos conectar con el servidor. Intentá nuevamente.",
+        0,
+        "NETWORK_ERROR",
+      )
+    }
+    throw error
+  }
 
   if (response.status === 401 && !skipAuth) {
     if (!refreshToken) {
@@ -58,7 +98,7 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
             .then(async (res) => {
               const data = await res.json().catch(() => null)
               if (!res.ok) {
-                reject(new Error(data?.message || "Error en la solicitud reintentada"))
+                reject(toApiError(res.status, data))
               } else {
                 resolve(data)
               }
@@ -98,7 +138,7 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
         const finalRes = await fetch(url, retryInit)
         const finalData = await finalRes.json().catch(() => null)
         if (!finalRes.ok) {
-          throw new Error(finalData?.message || "Error en la solicitud tras refrescar token")
+          throw toApiError(finalRes.status, finalData)
         }
         return finalData
       } else {
@@ -124,7 +164,7 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
   const contentType = response.headers.get("Content-Type") || ""
   if (!contentType.includes("application/json")) {
     if (!response.ok) {
-      throw new Error("Error en la solicitud")
+      throw new ApiError("No se pudo completar la solicitud.", response.status, `HTTP_${response.status}`)
     }
     return response as unknown as T
   }
@@ -132,7 +172,7 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
   const data = await response.json().catch(() => null)
 
   if (!response.ok) {
-    throw new Error(data?.message || "Error en la solicitud")
+    throw toApiError(response.status, data)
   }
 
   return data
@@ -193,11 +233,26 @@ if (typeof window !== "undefined") {
         status: 200,
         headers: new Headers({ "Content-Type": "application/json" }),
       })
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const apiError = error instanceof ApiError
+        ? error
+        : new ApiError(
+          "Ocurrió un error inesperado. Intentá nuevamente más tarde.",
+          500,
+          "INTERNAL_ERROR",
+        )
+      const status = apiError.status || 503
       return new Response(
-        JSON.stringify({ message: error.message || "Error de red" }),
+        JSON.stringify({
+          success: false,
+          statusCode: status,
+          code: apiError.code,
+          message: apiError.message,
+          details: apiError.details,
+          requestId: apiError.requestId,
+        }),
         {
-          status: 400,
+          status,
           headers: new Headers({ "Content-Type": "application/json" }),
         },
       )

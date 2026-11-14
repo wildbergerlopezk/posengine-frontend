@@ -1,6 +1,6 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common'
+import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common'
 import { PrismaService } from '../../prisma/prisma.service'
-import { PaymentStatus, PaymentMethod } from '../../generated/prisma/enums'
+import { CashSessionStatus, PaymentStatus, PaymentMethod } from '../../generated/prisma/enums'
 import { Prisma } from '../../generated/prisma/client'
 import { CreateCustomerPaymentDto } from './dto/create-customer-payment.dto'
 import { CustomerPaymentFilterDto } from './dto/customer-payment-filter.dto'
@@ -10,6 +10,34 @@ import { VoidPaymentDto } from './dto/void-payment.dto'
 @Injectable()
 export class CustomerPaymentService {
   constructor(private readonly prisma: PrismaService) {}
+
+  private async lockOpenCashSession(
+    tx: Prisma.TransactionClient,
+    tenantId: string,
+    required: boolean,
+  ): Promise<string | null> {
+    const sessions = await tx.cashSession.findMany({
+      where: { tenantId, status: CashSessionStatus.OPEN },
+      select: { id: true },
+      take: 2,
+    })
+    if (sessions.length > 1) {
+      throw new ConflictException('Hay más de una caja abierta; no se puede atribuir el cobro con seguridad.')
+    }
+    if (required && sessions.length === 0) {
+      throw new BadRequestException('Abrí una caja antes de registrar un cobro en efectivo.')
+    }
+    if (sessions.length === 0) return null
+    const sessionId = sessions[0].id
+    const locked = await tx.cashSession.updateMany({
+      where: { id: sessionId, tenantId, status: CashSessionStatus.OPEN },
+      data: { totalSales: { increment: 0 } },
+    })
+    if (locked.count !== 1) {
+      throw new ConflictException('La sesión de caja se cerró antes de registrar el pago.')
+    }
+    return sessionId
+  }
 
   // ── Create ──────────────────────────────────────────────────────────────────
   async create(tenantId: string, dto: CreateCustomerPaymentDto) {
@@ -50,14 +78,38 @@ export class CustomerPaymentService {
       }
     }
 
+    const paymentMethod = dto.paymentMethod ?? PaymentMethod.CASH
     return this.prisma.$transaction(async (tx) => {
+      const customerLock = await tx.customer.updateMany({
+        where: { id: dto.customerId, tenantId }, data: { currentDebt: { increment: 0 } },
+      })
+      if (customerLock.count !== 1) throw new NotFoundException(`Cliente con id "${dto.customerId}" no encontrado`)
+      const lockedCustomer = await tx.customer.findFirst({ where: { id: dto.customerId, tenantId } })
+      if (!lockedCustomer || dto.amount > Number(lockedCustomer.currentDebt) + 0.001) {
+        throw new ConflictException('La deuda del cliente cambió antes de registrar el pago.')
+      }
+
+      if (dto.saleId) {
+        await tx.$queryRaw<Array<{ id: string }>>`
+          SELECT "id" FROM "sales" WHERE "id" = ${dto.saleId} AND "tenantId" = ${tenantId} FOR UPDATE
+        `
+        sale = await tx.sale.findFirst({ where: { id: dto.saleId, tenantId, customerId: dto.customerId, status: 'COMPLETED' } })
+        if (!sale || Number(sale.remainingBalance) <= 0 || dto.amount > Number(sale.remainingBalance) + 0.001) {
+          throw new ConflictException('El saldo de la venta cambió antes de registrar el pago.')
+        }
+      }
+
+      const cashSessionId = await this.lockOpenCashSession(tx, tenantId, paymentMethod === PaymentMethod.CASH)
+      const paymentDate = new Date()
       const payment = await tx.customerPayment.create({
         data: {
           tenantId,
           customerId: dto.customerId,
           saleId: dto.saleId,
           amount: dto.amount,
-          paymentMethod: dto.paymentMethod ?? PaymentMethod.CASH,
+          paymentMethod,
+          cashSessionId,
+          paymentDate,
           notes: dto.notes,
         },
       })
@@ -195,10 +247,33 @@ export class CustomerPaymentService {
     })
 
     return this.prisma.$transaction(async (tx) => {
+      const customerLock = await tx.customer.updateMany({
+        where: { id: dto.customerId, tenantId }, data: { currentDebt: { increment: 0 } },
+      })
+      if (customerLock.count !== 1) throw new NotFoundException(`Cliente con id "${dto.customerId}" no encontrado`)
+      const lockedCustomer = await tx.customer.findFirst({ where: { id: dto.customerId, tenantId } })
+      if (!lockedCustomer || dto.amount > Number(lockedCustomer.currentDebt) + 0.001) {
+        throw new ConflictException('La deuda del cliente cambió antes de registrar el pago.')
+      }
+      const pendingSales = await tx.sale.findMany({
+        where: { tenantId, customerId: dto.customerId, status: 'COMPLETED', remainingBalance: { gt: 0 } },
+        orderBy: { saleDate: 'asc' },
+      })
+      for (const saleId of pendingSales.map((sale) => sale.id).sort()) {
+        await tx.$queryRaw<Array<{ id: string }>>`
+          SELECT "id" FROM "sales" WHERE "id" = ${saleId} AND "tenantId" = ${tenantId} FOR UPDATE
+        `
+      }
+      const currentPendingSales = await tx.sale.findMany({
+        where: { tenantId, customerId: dto.customerId, status: 'COMPLETED', remainingBalance: { gt: 0 } },
+        orderBy: [{ saleDate: 'asc' }, { id: 'asc' }],
+      })
+      const cashSessionId = await this.lockOpenCashSession(tx, tenantId, dto.paymentMethod === PaymentMethod.CASH)
+      const paymentDate = new Date()
       let remainingToDistribute = dto.amount
       const paymentsCreated: any[] = []
 
-      for (const sale of pendingSales) {
+      for (const sale of currentPendingSales) {
         if (remainingToDistribute <= 0) break
 
         const appliedAmount = Math.min(Number(sale.remainingBalance), remainingToDistribute)
@@ -210,6 +285,8 @@ export class CustomerPaymentService {
             saleId: sale.id,
             amount: appliedAmount,
             paymentMethod: dto.paymentMethod,
+            cashSessionId,
+            paymentDate,
             notes: dto.notes,
           },
         })
@@ -236,6 +313,8 @@ export class CustomerPaymentService {
             saleId: null,
             amount: remainingToDistribute,
             paymentMethod: dto.paymentMethod,
+            cashSessionId,
+            paymentDate,
             notes: dto.notes ? `${dto.notes} (excedente sin venta asociada)` : 'Excedente sin venta asociada',
           },
         })
@@ -268,6 +347,71 @@ export class CustomerPaymentService {
         throw new BadRequestException('Este pago ya fue anulado.')
       }
 
+      const customerLock = await tx.customer.updateMany({
+        where: { id: payment.customerId, tenantId }, data: { currentDebt: { increment: 0 } },
+      })
+      if (customerLock.count !== 1) throw new NotFoundException('Cliente asociado al pago no encontrado')
+      let sale: Awaited<ReturnType<typeof tx.sale.findFirst>> | null = null
+      if (payment.saleId) {
+        await tx.$queryRaw<Array<{ id: string }>>`
+          SELECT "id" FROM "sales" WHERE "id" = ${payment.saleId} AND "tenantId" = ${tenantId} FOR UPDATE
+        `
+        sale = await tx.sale.findFirst({ where: { id: payment.saleId, tenantId } })
+        if (!sale) throw new NotFoundException('Venta asociada al pago no encontrada')
+        const priorReturns = await tx.saleReturn.count({ where: { tenantId, saleId: payment.saleId, status: 'CONFIRMED' } })
+        if (priorReturns > 0) {
+          throw new ConflictException('No se puede anular un pago de una venta devuelta; registrá una corrección financiera vinculada.')
+        }
+      }
+
+      const paymentSessions = await tx.cashSession.findMany({
+        where: payment.cashSessionId
+          ? { id: payment.cashSessionId, tenantId }
+          : {
+              tenantId,
+              openedAt: { lte: payment.paymentDate },
+              OR: [
+                { closedAt: { gt: payment.paymentDate } },
+                { closedAt: null, status: CashSessionStatus.OPEN },
+              ],
+            },
+        select: { id: true, status: true },
+        take: 2,
+      })
+      if (paymentSessions.length > 1) {
+        throw new ConflictException(
+          'No se puede anular este pago porque no se puede asociar a una única sesión de caja.',
+        )
+      }
+      if (paymentSessions[0]?.status === CashSessionStatus.CLOSED) {
+        throw new ConflictException(
+          'No se puede anular este pago porque pertenece a una caja cerrada. Usá el procedimiento de corrección o devolución correspondiente.',
+        )
+      }
+      if (
+        paymentSessions.length === 0 &&
+        (payment.paymentMethod === PaymentMethod.CASH || payment.paymentMethod === PaymentMethod.CREDIT)
+      ) {
+        throw new ConflictException(
+          'No se puede determinar la sesión de caja de este cobro; conciliá el registro antes de anularlo.',
+        )
+      }
+      if (paymentSessions[0]?.status === CashSessionStatus.OPEN) {
+        const lockedSession = await tx.cashSession.updateMany({
+          where: {
+            id: paymentSessions[0].id,
+            tenantId,
+            status: CashSessionStatus.OPEN,
+          },
+          data: { totalSales: { increment: 0 } },
+        })
+        if (lockedSession.count !== 1) {
+          throw new ConflictException(
+            'No se puede anular el pago porque la sesión de caja se cerró durante la operación.',
+          )
+        }
+      }
+
       // Revertir la deuda del cliente
       await tx.customer.update({
         where: { id: payment.customerId },
@@ -275,21 +419,15 @@ export class CustomerPaymentService {
       })
 
       // Revertir el saldo de la venta puntual, si el pago estaba asociado a una
-      if (payment.saleId) {
-        const sale = await tx.sale.findUnique({ where: { id: payment.saleId } })
-        if (sale) {
-          const newRemaining = Number(sale.remainingBalance) + Number(payment.amount)
-          await tx.sale.update({
-            where: { id: sale.id },
-            data: {
-              remainingBalance: newRemaining,
-              paymentStatus:
-                newRemaining >= Number(sale.total)
-                  ? PaymentStatus.PENDING
-                  : PaymentStatus.PARTIAL,
-            },
-          })
-        }
+      if (sale) {
+        const newRemaining = Number(sale.remainingBalance) + Number(payment.amount)
+        await tx.sale.update({
+          where: { id: sale.id },
+          data: {
+            remainingBalance: newRemaining,
+            paymentStatus: newRemaining >= Number(sale.total) ? PaymentStatus.PENDING : PaymentStatus.PARTIAL,
+          },
+        })
       }
 
       return tx.customerPayment.update({

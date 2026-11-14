@@ -1,0 +1,32 @@
+.area {
+  position: relative;
+  min-width: 0;
+}
+
+.dragging {
+  outline: 2px dashed var(--color-primary);
+  outline-offset: 3px;
+  border-radius: 0.6rem;
+}
+
+.dropHint {
+  position: absolute;
+  z-index: 5;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+  color: var(--color-primary-foreground);
+  font-weight: 700;
+  text-align: center;
+  background: color-mix(in srgb, var(--color-primary) 88%, transparent);
+  border-radius: inherit;
+  pointer-events: none;
+}
+
+.error {
+  margin: 0.5rem 0 0;
+  color: var(--color-destructive);
+  font-size: 0.78rem;
+  line-height: 1.4;
+}

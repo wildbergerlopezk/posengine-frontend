@@ -1,5 +1,7 @@
 .layout {
   min-height: 100vh;
+  min-height: 100dvh;
+  min-width: 0;
   background-color: var(--color-background);
 }
 
@@ -7,14 +9,23 @@
 .main {
   margin-left: 4rem;
   min-height: 100vh;
+  min-height: 100dvh;
+  min-width: 0;
 }
 
 .loadingContainer {
   display: flex;
   min-height: 100vh;
+  min-height: 100dvh;
   align-items: center;
   justify-content: center;
   background-color: var(--color-background);
+}
+
+@media (max-width: 768px) {
+  .main {
+    margin-left: 4rem;
+  }
 }
 
 .spinner {

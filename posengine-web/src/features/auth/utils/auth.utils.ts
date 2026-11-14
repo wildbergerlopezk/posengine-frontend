@@ -36,3 +36,31 @@ export function isAccessTokenValid(
 ): boolean {
   return !!token && !isAccessTokenExpired(token)
 }
+
+export function validateLoginCredentials(email: string, password: string): string | null {
+  const normalizedEmail = email.trim();
+  if (!normalizedEmail) return 'Ingresá tu correo electrónico.';
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
+    return 'Ingresá un correo electrónico válido.';
+  }
+  if (password.length === 0) return 'Ingresá tu contraseña.';
+  return null;
+}
+
+export function getLoginErrorMessage(error: unknown): string {
+  if (!error || typeof error !== 'object') {
+    return 'Ocurrió un error inesperado. Intentá nuevamente más tarde.';
+  }
+
+  const apiError = error as { status?: unknown; code?: unknown };
+  if (apiError.code === 'NETWORK_ERROR' || apiError.status === 0) {
+    return 'No pudimos conectar con el servidor. Intentá nuevamente.';
+  }
+  if (apiError.status === 401) return 'Correo o contraseña incorrectos.';
+  if (apiError.status === 403) return 'No tenés permisos para iniciar sesión.';
+  if (apiError.status === 429) return 'Demasiados intentos. Esperá un momento e intentá nuevamente.';
+  if (apiError.status === 503) return 'No pudimos conectar con el servidor. Intentá nuevamente.';
+  if (apiError.status === 400) return 'Revisá los datos ingresados.';
+
+  return 'Ocurrió un error inesperado. Intentá nuevamente más tarde.';
+}

@@ -11,9 +11,9 @@ model Product {
   barcode     String?
   imageUrl    String?
 
-  price Decimal @db.Decimal(12, 2)
-  wholesalePrice Decimal @db.Decimal(12, 2) @default(0)
-  cost  Decimal @db.Decimal(12, 2)
+  price          Decimal @db.Decimal(12, 2)
+  wholesalePrice Decimal @default(0) @db.Decimal(12, 2)
+  cost           Decimal @db.Decimal(12, 2)
 
   stock        Float    @default(0)
   unitType     UnitType @default(UNIT)
@@ -33,6 +33,7 @@ model Product {
   saleItems           SaleItem[]
   purchaseItems       PurchaseItem[]
   purchaseReturnItems PurchaseReturnItem[]
+  saleReturnItems     SaleReturnItem[]
   stockMovements      StockMovement[]
 
   @@unique([name, tenantId])

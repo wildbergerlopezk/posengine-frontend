@@ -8,6 +8,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
 import { ProductFilterDto } from './dto/product-filter.dto';
+import { ProductSearchDto } from './dto/product-search.dto';
 import { Prisma } from '../../generated/prisma/client';
 import { StockMovementService } from '../stock-movement/stock-movement.service';
 import { StockMovementType, UnitType } from '../../generated/prisma/enums';
@@ -183,13 +184,18 @@ export class ProductService {
 
   // ── FindAll ──────────────────────────────────────────────────────────────
   async findAll(tenantId: string, query: ProductFilterDto) {
-    const { search, categoryId, subcategoryId, isActive, lowStock, limit, skip, page } = query;
+    const { search, categoryId, subcategoryId, isActive, lowStock, stockStatus, limit, skip, page } = query;
+
+    const lowStockFilter = lowStock || stockStatus === 'LOW';
+    const normalStockFilter = stockStatus === 'NORMAL';
 
     const where: Prisma.ProductWhereInput = {
       tenantId,
       ...(isActive !== undefined && { isActive }),
       ...(categoryId && { categoryId }),
       ...(subcategoryId && { subcategoryId }),
+      ...(lowStockFilter && { stock: { lte: this.prisma.product.fields.stockMinimum } }),
+      ...(normalStockFilter && { stock: { gt: this.prisma.product.fields.stockMinimum } }),
       ...(search && {
         OR: [
           { name: { contains: search, mode: Prisma.QueryMode.insensitive } },
@@ -215,16 +221,67 @@ export class ProductService {
       this.prisma.product.count({ where }),
     ]);
 
-    // lowStock: stock <= stockMinimum — filtrado en memoria porque Prisma no soporta
-    // comparación entre dos columnas del mismo modelo sin raw queries
-    const data = lowStock ? items.filter((p) => p.stock <= p.stockMinimum) : items;
-
     return {
-      items: data,
-      total: lowStock ? data.length : total,
+      items,
+      total,
       page,
       limit,
     };
+  }
+
+  async searchForSelector(tenantId: string, query: ProductSearchDto) {
+    const { search, isActive, limit } = query
+    const where: Prisma.ProductWhereInput = {
+      tenantId,
+      ...(isActive !== undefined && { isActive }),
+      ...(search && {
+        OR: [
+          { name: { contains: search, mode: Prisma.QueryMode.insensitive } },
+          { sku: { contains: search, mode: Prisma.QueryMode.insensitive } },
+          { barcode: { contains: search, mode: Prisma.QueryMode.insensitive } },
+          { description: { contains: search, mode: Prisma.QueryMode.insensitive } },
+        ],
+      }),
+    }
+
+    const results = await this.prisma.product.findMany({
+      where,
+      select: {
+        id: true,
+        name: true,
+        description: true,
+        barcode: true,
+        sku: true,
+        price: true,
+        wholesalePrice: true,
+        cost: true,
+        stock: true,
+        unitType: true,
+      },
+      orderBy: { createdAt: 'desc' },
+      take: limit + 1,
+    })
+
+    return {
+      items: results.slice(0, limit),
+      hasMore: results.length > limit,
+    }
+  }
+
+  async getStockSummary(tenantId: string) {
+    const tenantFilter: Prisma.ProductWhereInput = { tenantId }
+
+    const [total, lowStock, normalStock] = await Promise.all([
+      this.prisma.product.count({ where: tenantFilter }),
+      this.prisma.product.count({
+        where: { ...tenantFilter, stock: { lte: this.prisma.product.fields.stockMinimum } },
+      }),
+      this.prisma.product.count({
+        where: { ...tenantFilter, stock: { gt: this.prisma.product.fields.stockMinimum } },
+      }),
+    ])
+
+    return { total, lowStock, normalStock }
   }
 
   // ── FindOne ──────────────────────────────────────────────────────────────

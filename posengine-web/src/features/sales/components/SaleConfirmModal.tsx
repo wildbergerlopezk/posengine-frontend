@@ -20,6 +20,8 @@ interface SaleConfirmModalProps {
   selectedCustomer: Customer | null
   amountPaid: number
   onAmountPaidChange: (amount: number) => void
+  initialPaymentMethod: "" | "CASH" | "TRANSFER"
+  onInitialPaymentMethodChange: (method: "" | "CASH" | "TRANSFER") => void
   confirmSelectedBtn: "accept" | "cancel"
   amountPaidInputRef: React.RefObject<HTMLInputElement | null>
   confirmAcceptRef: React.RefObject<HTMLButtonElement | null>
@@ -34,6 +36,8 @@ export function SaleConfirmModal({
   selectedCustomer,
   amountPaid,
   onAmountPaidChange,
+  initialPaymentMethod,
+  onInitialPaymentMethodChange,
   confirmSelectedBtn,
   amountPaidInputRef,
   confirmAcceptRef,
@@ -48,7 +52,7 @@ export function SaleConfirmModal({
 
   return (
     <div className={styles.modalOverlay}>
-      <div className={styles.confirmModal}>
+      <div data-pos-modal className={styles.confirmModal}>
         <div className={styles.confirmIcon}>
           <AlertCircle size={40} />
         </div>
@@ -92,6 +96,36 @@ export function SaleConfirmModal({
                 }}
               />
             </div>
+            {amountPaid > 0 && (
+              <div>
+                <label
+                  htmlFor="initial-payment-method"
+                  style={{ fontSize: "0.825rem", color: "var(--color-muted-foreground)", fontWeight: 600, display: "block", marginBottom: "0.25rem" }}
+                >
+                  Medio de cobro de la seña
+                </label>
+                <select
+                  id="initial-payment-method"
+                  value={initialPaymentMethod}
+                  onChange={e => onInitialPaymentMethodChange(e.target.value as "" | "CASH" | "TRANSFER")}
+                  required
+                  style={{
+                    width: "100%",
+                    height: "2.5rem",
+                    borderRadius: "0.375rem",
+                    border: "1px solid var(--color-border)",
+                    background: "var(--color-background)",
+                    color: "var(--color-foreground)",
+                    padding: "0 0.5rem",
+                    fontSize: "0.875rem",
+                  }}
+                >
+                  <option value="">Seleccioná un medio</option>
+                  <option value="CASH">Efectivo</option>
+                  <option value="TRANSFER">Transferencia</option>
+                </select>
+              </div>
+            )}
           </div>
         )}
 

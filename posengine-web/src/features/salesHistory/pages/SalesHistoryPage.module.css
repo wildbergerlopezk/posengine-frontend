@@ -1,12 +1,99 @@
 /* SaleHistoryPage.module.css */
 
-.page { min-height: 100vh; }
+.page {
+  display: flex;
+  width: 100%;
+  height: 100vh;
+  height: 100dvh;
+  min-width: 0;
+  flex-direction: column;
+}
+
+.page > :global(header) { flex: 0 0 64px; }
 
 .container {
-  padding: 1.5rem;
+  box-sizing: border-box;
   display: flex;
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 0;
   flex-direction: column;
-  gap: 1.25rem;
+  gap: 0.75rem;
+  padding: 1rem;
+}
+
+.filtersBar {
+  display: flex;
+  flex: 0 0 auto;
+  min-width: 0;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.filtersRow {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.historyTable {
+  min-width: 1000px;
+  table-layout: fixed;
+}
+
+.historyPanel {
+  border: 1px solid var(--color-border);
+  border-radius: 0.75rem;
+  background: var(--color-card);
+}
+
+.tableToolbar {
+  display: flex;
+  flex: 0 0 auto;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.625rem 0.875rem;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.historyTable td { overflow-wrap: anywhere; }
+
+.pagination {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.625rem 0.875rem;
+  border-top: 1px solid var(--color-border);
+  border-radius: 0 0 0.75rem 0.75rem;
+  background: var(--color-muted);
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+@media (max-width: 1200px) {
+  .container { padding: 0.75rem; gap: 0.625rem; }
+}
+
+@media (max-width: 640px) {
+  .container { padding: 0.625rem; }
+  .searchWrapper { min-width: min(260px, 100%); max-width: 100%; }
+  .statusTabs { max-width: 100%; flex-wrap: wrap; }
+  .statusTab { padding: 0.3rem 0.55rem; font-size: 0.75rem; }
+  .dateRange { max-width: 100%; flex-wrap: wrap; }
+}
+
+@media (max-height: 760px) {
+  .container { gap: 0.5rem; padding-top: 0.625rem; padding-bottom: 0.625rem; }
+}
+
+@media (max-height: 600px) {
+  .page { height: auto; min-height: 100dvh; }
+  .container { flex: 0 0 auto; }
 }
 
 .bannerClose {
@@ -23,19 +110,6 @@
 .bannerClose:hover { opacity: 1; }
 
 /* ── Filters ─────────────────────────────────────────────────────────────── */
-.filtersBar {
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-}
-
-.filtersRow {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  flex-wrap: wrap;
-}
-
 .clearFiltersBtn {
   display: inline-flex;
   align-items: center;
@@ -71,7 +145,7 @@
 
 .searchInput {
   width: 100%;
-  height: 2.5rem;
+  height: 2.25rem;
   padding: 0 2.25rem 0 2.25rem;
   border: 1.5px solid var(--color-border);
   border-radius: 0.5rem;
@@ -157,14 +231,6 @@
 }
 
 /* ── Table toolbar ───────────────────────────────────────────────────────── */
-.tableToolbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0.875rem 1rem;
-  border-bottom: 1px solid var(--color-border);
-}
-
 .tableTitle {
   font-size: 0.875rem;
   font-weight: 600;
@@ -265,18 +331,6 @@
 }
 
 /* ── Pagination ──────────────────────────────────────────────────────────── */
-.pagination {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0.875rem 1.25rem;
-  border-top: 1px solid var(--color-border);
-  background: var(--color-muted);
-  border-radius: 0 0 0.75rem 0.75rem;
-  flex-wrap: wrap;
-  gap: 0.75rem;
-}
-
 .paginationInfo {
   font-size: 0.8rem;
   color: var(--color-muted-foreground);
@@ -313,9 +367,11 @@
 .detailModal {
   background: var(--color-card);
   border-radius: 0.875rem;
-  width: 100%;
-  max-width: 780px;
-  max-height: 88vh;
+  width: min(860px, 94vw);
+  max-width: 860px;
+  max-height: min(90vh, 90dvh);
+  min-height: min(34rem, 82vh);
+  border: 1px solid var(--color-primary);
   display: flex;
   flex-direction: column;
   box-shadow: 0 25px 50px -12px rgba(0,0,0,0.28);
@@ -372,13 +428,34 @@
 .detailModalBody {
   overflow-y: auto;
   flex: 1;
+  min-height: 0;
+  min-width: 0;
   display: flex;
   flex-direction: column;
 }
 
+.summaryPanel { display: flex; min-width: 0; flex-direction: column; }
+.returnsPanel { min-width: 0; }
+.infoText { min-width: 0; overflow-wrap: anywhere; }
+.returnBlockedNotice { margin: 1rem; color: var(--color-muted-foreground); font-size: 0.8rem; }
+
+.detailTableWrap { min-width: 0; overflow-x: auto; }
+.receiptItemsTable { width: 100%; min-width: 680px; table-layout: fixed; font-size: 0.74rem; }
+.receiptItemsTable thead th { padding: 0.45rem 0.5rem; font-size: 0.65rem; }
+.receiptItemsTable thead th:nth-child(1) { width: 34px; }
+.receiptItemsTable thead th:nth-child(2) { width: 90px; }
+.receiptItemsTable thead th:nth-child(3) { width: 36%; }
+.receiptItemsTable thead th:nth-child(4) { width: 58px; text-align: right; }
+.receiptItemsTable thead th:nth-child(5) { width: 112px; text-align: right; }
+.receiptItemsTable thead th:nth-child(6) { width: 112px; text-align: right; }
+.receiptItemsTable tbody td { overflow: hidden; padding: 0.5rem; text-overflow: ellipsis; }
+.productNameCell > span { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.productNameCell small { display: block; margin-top: 0.12rem; }
+.numericCell { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+
 /* ── Receipt header ──────────────────────────────────────────────────────── */
 .receiptHeader {
-  padding: 0.875rem 1.25rem;
+  padding: 0.75rem 1rem;
   border-bottom: 1px solid var(--color-border);
   background: color-mix(in srgb, var(--color-muted) 50%, transparent);
 }
@@ -386,8 +463,8 @@
 .receiptHeaderGrid {
   display: flex;
   flex-wrap: wrap;
-  gap: 1.25rem;
-  justify-content: space-between;
+  gap: 0.75rem 1.1rem;
+  justify-content: flex-start;
 }
 
 .receiptInfoBlock { display: flex; flex-direction: column; }
@@ -638,3 +715,8 @@
 }
 .restoreBtn:hover:not(:disabled) { background: #10b981; color: white; }
 .restoreBtn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+@media (max-width: 640px) {
+  .filtersBar .searchWrapper { min-width: min(260px, 100%); max-width: 100%; }
+  .filtersBar .statusTab { padding: 0.3rem 0.55rem; font-size: 0.75rem; }
+}

@@ -154,6 +154,7 @@
   display: flex;
   flex-direction: column;
   gap: 1.25rem;
+  min-width: 0;
 }
 
 .errorMessage {
@@ -243,6 +244,15 @@
 
 .passwordToggle:hover { color: var(--color-foreground); }
 
+.passwordToggle:focus-visible,
+.backButton:focus-visible,
+.submitButton:focus-visible,
+.registerLink a:focus-visible,
+.forgotLink:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 3px;
+}
+
 /* ── Field hints ── */
 .fieldHint {
   font-size: 0.75rem;
@@ -254,14 +264,11 @@
   color: var(--color-destructive);
 }
 
-:root {
+.strengthWrap {
   --strength-weak: #ef4444;
   --strength-fair: #f59e0b;
   --strength-good: #22c55e;
   --strength-strong: #2563eb;
-}
-
-.strengthWrap {
   display: flex;
   align-items: center;
   gap: 0.5rem;
@@ -422,11 +429,13 @@
    ============================================ */
 .supabaseFormContainer {
   width: 100%;
+  min-width: 0;
+  max-width: 440px;
   animation: cardEnter 0.4s cubic-bezier(0.16, 1, 0.3, 1);
   background-color: var(--color-card);
   border: 1px solid var(--color-border);
   border-radius: 1rem;
-  padding: 2.5rem 2rem;
+  padding: clamp(1.25rem, 4vw, 2.5rem) clamp(1.125rem, 4vw, 2rem);
   box-shadow:
     0 0 0 1px rgba(255,255,255,0.02) inset,
     0 12px 32px -8px rgba(0, 0, 0, 0.25);
@@ -449,6 +458,45 @@
   font-size: 0.95rem;
   color: var(--muted-foreground);
   margin: 0;
+}
+
+.deviceCheck {
+  margin: 0;
+  text-align: center;
+  color: var(--color-muted-foreground);
+  font-size: 0.9rem;
+}
+
+.pinPrompt {
+  margin: 0;
+  color: var(--color-muted-foreground);
+  text-align: center;
+  font-size: 0.95rem;
+}
+
+.modeLink {
+  min-height: 44px;
+  padding: 0.5rem;
+  border: 0;
+  background: transparent;
+  color: var(--color-primary);
+  font: inherit;
+  font-size: 0.875rem;
+  font-weight: 600;
+  text-align: center;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.modeLink:hover {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.modeLink:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+  border-radius: 0.35rem;
 }
 
 .labelRow {
@@ -493,4 +541,48 @@
   border: 1px solid var(--border);
   accent-color: var(--primary);
   cursor: pointer;
+}
+
+@media (max-height: 800px) {
+  .supabaseHeader {
+    margin-bottom: 1.25rem;
+  }
+
+  .form {
+    gap: 1rem;
+  }
+
+  .progressWrap {
+    padding-bottom: 0.875rem;
+  }
+}
+
+@media (max-width: 360px) {
+  .supabaseTitle {
+    font-size: 1.5rem;
+  }
+
+  .labelRow {
+    align-items: flex-start;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+  }
+
+  .strengthLabel {
+    min-width: 4.25rem;
+  }
+}
+
+@media (max-height: 640px) {
+  .supabaseFormContainer {
+    padding-block: 0.75rem;
+  }
+
+  .supabaseHeader {
+    margin-bottom: 0.75rem;
+  }
+
+  .supabaseFormContainer .form {
+    gap: 0.75rem;
+  }
 }

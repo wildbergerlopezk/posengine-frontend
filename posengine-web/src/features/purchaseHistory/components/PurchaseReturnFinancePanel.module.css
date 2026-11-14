@@ -1,0 +1,23 @@
+.panel { display: grid; gap: 1rem; padding: 1rem; color: var(--color-foreground); }
+.header, .returnHeading, .summary { display: flex; align-items: center; justify-content: space-between; gap: .75rem; }
+.header h3 { margin: 0; font-size: 1rem; }
+.header p, .returnHeading span, .history, .empty { margin: .25rem 0 0; color: var(--color-muted-foreground); font-size: .82rem; }
+.header button, .form button { display: inline-flex; align-items: center; justify-content: center; gap: .4rem; border: 0; border-radius: .5rem; padding: .6rem .8rem; background: var(--color-primary); color: var(--color-primary-foreground); cursor: pointer; }
+.header button:disabled, .form button:disabled { opacity: .6; cursor: wait; }
+.returnCard { display: grid; gap: .75rem; padding: 1rem; border: 1px solid var(--color-border); border-radius: .75rem; background: var(--color-card); }
+.returnHeading > div { display: grid; gap: .15rem; }
+.settlement { display: grid; gap: .5rem; padding-top: .75rem; border-top: 1px solid var(--color-border); }
+.summary { font-size: .85rem; }
+.history { padding-left: .5rem; }
+.form { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .65rem; align-items: end; }
+.form label { display: grid; gap: .3rem; font-size: .8rem; }
+.form input, .form select { width: 100%; min-width: 0; min-height: 2.35rem; border: 1px solid var(--color-border); border-radius: .45rem; padding: .45rem .55rem; background: var(--color-background); color: var(--color-foreground); }
+.form .wide { grid-column: 1 / -1; }
+.form > span { color: var(--color-muted-foreground); font-size: .8rem; }
+.helperText { grid-column: 1 / -1; margin: 0; color: var(--color-muted-foreground); font-size: .72rem; line-height: 1.4; }
+.error, .notice { display: flex; align-items: flex-start; gap: .5rem; padding: .7rem; border-radius: .5rem; font-size: .85rem; }
+.error { background: color-mix(in srgb, var(--color-destructive) 12%, transparent); color: var(--color-destructive); }
+.notice { background: color-mix(in srgb, var(--color-primary) 12%, transparent); color: var(--color-foreground); }
+.spin { animation: spin .8s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+@media (max-width: 640px) { .panel { padding: .7rem; } .form { grid-template-columns: 1fr; } .form .wide { grid-column: auto; } .returnHeading { align-items: flex-start; } }

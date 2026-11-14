@@ -2,6 +2,7 @@ import {
   Controller,
   Get,
   Post,
+  Patch,
   Param,
   Body,
   Query,
@@ -21,6 +22,7 @@ import { OpenCashSessionDto } from './dto/open-cash-session.dto'
 import { CloseCashSessionDto } from './dto/close-cash-session.dto'
 import { CashSessionFilterDto } from './dto/cash-session-filter.dto'
 import { CreateCashMovementDto } from './dto/create-cash-movement.dto'
+import { ClassifyCashPaymentDto } from './dto/classify-cash-payment.dto'
 import {
   CurrentUser,
   type AuthenticatedUser,
@@ -68,6 +70,25 @@ export class CashSessionController {
   @ApiResponse({ status: 200, description: 'Sesión actual (o null si no hay)' })
   getCurrent(@CurrentUser('tenantId') tenantId: string) {
     return this.cashSessionService.getCurrent(tenantId)
+  }
+
+  @Get('current/reconciliation')
+  @Roles(UserRole.ADMIN, UserRole.SUPERADMIN)
+  @ApiOperation({ summary: 'Listar pagos pendientes de conciliación de la caja abierta' })
+  getReconciliationItems(@CurrentUser('tenantId') tenantId: string) {
+    return this.cashSessionService.getReconciliationItems(tenantId)
+  }
+
+  @Patch('current/reconciliation/:type/:paymentId')
+  @Roles(UserRole.ADMIN, UserRole.SUPERADMIN)
+  @ApiOperation({ summary: 'Clasificar el medio de un pago existente en la caja abierta' })
+  classifyPayment(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('type') type: string,
+    @Param('paymentId') paymentId: string,
+    @Body() dto: ClassifyCashPaymentDto,
+  ) {
+    return this.cashSessionService.classifyPayment(user.tenantId, user.id, type, paymentId, dto)
   }
 
   @Post(':id/close')

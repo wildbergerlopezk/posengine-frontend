@@ -1,0 +1,29 @@
+enum CashPaymentClassificationType {
+  CUSTOMER
+  SUPPLIER
+}
+
+model CashPaymentClassificationAudit {
+  id                String                        @id @default(uuid())
+  tenantId          String
+  cashSessionId     String
+  actorId           String
+  type              CashPaymentClassificationType
+  customerPaymentId String?
+  supplierPaymentId String?
+  previousMethod    PaymentMethod?
+  newMethod         PaymentMethod
+  reason            String
+  createdAt         DateTime                      @default(now())
+
+  tenant          Tenant               @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  cashSession     CashSession          @relation(fields: [cashSessionId], references: [id], onDelete: Restrict)
+  actor           User                 @relation(fields: [actorId], references: [id], onDelete: Restrict)
+  customerPayment CustomerPayment?     @relation(fields: [customerPaymentId], references: [id], onDelete: Restrict)
+  supplierPayment PurchaseDebtPayment? @relation(fields: [supplierPaymentId], references: [id], onDelete: Restrict)
+
+  @@index([tenantId, cashSessionId, createdAt])
+  @@index([customerPaymentId])
+  @@index([supplierPaymentId])
+  @@map("cash_payment_classification_audits")
+}

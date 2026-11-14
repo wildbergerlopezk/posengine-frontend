@@ -1,0 +1,21 @@
+enum PurchaseLifecycleAction {
+  CANCEL
+}
+
+model PurchaseLifecycleEvent {
+  id         String                  @id @default(uuid())
+  tenantId   String
+  purchaseId String
+  actorId    String
+  action     PurchaseLifecycleAction
+  reason     String
+  createdAt  DateTime                @default(now())
+
+  tenant   Tenant   @relation(fields: [tenantId], references: [id])
+  purchase Purchase @relation(fields: [purchaseId], references: [id])
+  actor    User     @relation("PurchaseLifecycleEventActor", fields: [actorId], references: [id])
+
+  @@index([tenantId, purchaseId, createdAt])
+  @@index([actorId])
+  @@map("purchase_lifecycle_events")
+}

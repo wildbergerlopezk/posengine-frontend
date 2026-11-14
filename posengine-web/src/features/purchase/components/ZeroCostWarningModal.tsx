@@ -12,7 +12,7 @@ interface ZeroCostWarningModalProps {
 export function ZeroCostWarningModal({ productNames, onClose }: ZeroCostWarningModalProps) {
   return (
     <div className={styles.overlay} onClick={onClose}>
-      <div className={styles.modal} onClick={e => e.stopPropagation()}>
+      <div data-pos-modal className={styles.modal} onClick={e => e.stopPropagation()}>
 
         <header className={styles.header}>
           <div className={styles.title}>

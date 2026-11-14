@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from "react"
 import { Building2, Save, Undo, MapPin, Globe, Phone, Mail, FileText, Upload, Calendar, Hash, FileCode, Loader2, CheckCircle } from "lucide-react"
 import { toast } from "sonner"
 import { Header } from "@/src/shared/components/Header"
+import { ImageDropPasteArea } from "@/src/shared/components/ImageDropPasteArea"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -16,6 +17,7 @@ import {
 import { useAuthStore } from "@/src/features/auth/store/auth.store"
 import { API_BASE_URL } from "@/src/shared/config/api"
 import styles from "./BusinessConfigPage.module.css"  
+import { QuickPinSettings } from "@/src/features/auth/components/QuickPinSettings"
 
 export default function BusinessConfigPage() {
   const { accessToken } = useAuthStore()
@@ -187,9 +189,7 @@ export default function BusinessConfigPage() {
     toast.info("Formulario restablecido a los valores guardados")
   }
 
-  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (!file) return
+  const handleLogoUpload = async (file: File) => {
     setUploadingLogo(true)
     const uploadData = new FormData()
     uploadData.append("file", file)
@@ -442,7 +442,7 @@ export default function BusinessConfigPage() {
                   <CardDescription className={styles.cardDescription}>Aparecerá en los recibos.</CardDescription>
                 </CardHeader>
                 <CardContent className={styles.cardContent}>
-                  <div className={styles.logoWrapper}>
+                  <ImageDropPasteArea className={styles.logoWrapper} onImage={handleLogoUpload} disabled={uploadingLogo}>
                     <div className={styles.logoBox}>
                       {uploadingLogo ? (
                         <div className={styles.uploadPlaceholder}>
@@ -461,13 +461,13 @@ export default function BusinessConfigPage() {
                       <label className={styles.uploadOverlay} style={{ pointerEvents: uploadingLogo ? "none" : "auto" }}>
                         <Upload className="w-4 h-4" />
                         {uploadingLogo ? "Subiendo..." : "Cambiar"}
-                        <input type="file" accept="image/*" className={styles.fileInput} onChange={handleLogoUpload} disabled={uploadingLogo} />
+                        <input type="file" accept="image/png, image/jpeg, image/webp" className={styles.fileInput} disabled={uploadingLogo} />
                       </label>
                     </div>
                     <p className={styles.logoHint}>
-                      Formatos recomendados: PNG o JPG. Tamaño máximo: 2MB.
+                      Formatos: JPG, PNG o WebP. Máximo 5 MB. Arrastrá una imagen o pegala aquí con Ctrl+V.
                     </p>
-                  </div>
+                  </ImageDropPasteArea>
                 </CardContent>
               </Card>
 
@@ -565,6 +565,7 @@ export default function BusinessConfigPage() {
           </div>
         </div>
       </form>
+      <QuickPinSettings />
       </div>
     </div>
   )

@@ -1,10 +1,16 @@
 // src/sales/dto/sale-filter.dto.ts
-import { IsEnum, IsInt, IsISO8601, IsOptional, Max, Min } from 'class-validator'
-import { Type } from 'class-transformer'
+import { IsEnum, IsInt, IsISO8601, IsOptional, IsString, Max, Min } from 'class-validator'
+import { Transform, Type } from 'class-transformer'
 import { ApiPropertyOptional } from '@nestjs/swagger'
 import { SaleStatus } from '../../../generated/prisma/enums'
 
 export class SaleFilterDto {
+  @ApiPropertyOptional({ description: 'Busca por identificador de venta o nombre de cliente' })
+  @IsOptional()
+  @IsString()
+  @Transform(({ value }) => value?.trim())
+  search?: string
+
   @ApiPropertyOptional({ enum: SaleStatus })
   @IsOptional()
   @IsEnum(SaleStatus, { message: 'estado inválido' })

@@ -13,18 +13,24 @@ model CashSession {
   openingAmount  Decimal  @db.Decimal(12, 2)
   closingAmount  Decimal? @db.Decimal(12, 2)
   expectedAmount Decimal? @db.Decimal(12, 2)
-  totalSales     Decimal  @db.Decimal(12, 2) @default(0)
-  totalPurchases Decimal  @db.Decimal(12, 2) @default(0)
+  totalSales     Decimal  @default(0) @db.Decimal(12, 2)
+  totalPurchases Decimal  @default(0) @db.Decimal(12, 2)
   difference     Decimal? @db.Decimal(12, 2)
 
-  status      CashSessionStatus @default(OPEN)
+  status CashSessionStatus @default(OPEN)
 
-  openedBy String 
+  openedBy String
 
-  tenant    Tenant     @relation(fields: [tenantId], references: [id])
-  sales     Sale[]
-  purchases Purchase[]
-  movements CashMovement[]
+  tenant                       Tenant                           @relation(fields: [tenantId], references: [id])
+  sales                        Sale[]
+  purchases                    Purchase[]
+  movements                    CashMovement[]
+  customerPayments             CustomerPayment[]
+  supplierDebtPayments         PurchaseDebtPayment[]
+  paymentClassificationAudits  CashPaymentClassificationAudit[]
+  purchaseReturnSettlements    PurchaseReturnSettlement[]
+  purchaseReturnRefundReceipts PurchaseReturnRefundReceipt[]
+  saleReturnRefundReceipts     SaleReturnRefundReceipt[]
 
   @@index([tenantId])
   @@map("cash_sessions")

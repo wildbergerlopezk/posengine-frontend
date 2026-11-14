@@ -11,7 +11,7 @@ model SaleItem {
   sale    Sale    @relation(fields: [saleId], references: [id])
   product Product @relation(fields: [productId], references: [id])
 
-  //returns SaleReturnItem[]
+  returnItems SaleReturnItem[]
 
   @@index([saleId])
   @@index([productId])

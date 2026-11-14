@@ -78,6 +78,7 @@ export function CustomersPage() {
   const [loading, setLoading]       = useState(true)
   const [error, setError]           = useState<string | null>(null)
   const [search, setSearch]         = useState("")
+  const [debouncedSearch, setDebouncedSearch] = useState("")
   const [creditFilter, setCreditFilter] = useState<"" | "true" | "false">("")
   const [page, setPage]             = useState(1)
   const [totalItems, setTotalItems] = useState(0)
@@ -107,27 +108,39 @@ export function CustomersPage() {
   const submitBtnRef = useRef<HTMLButtonElement>(null)
 
   // ── Fetch ──────────────────────────────────────────────────────────────────
-  const fetchCustomers = useCallback(async () => {
+  const fetchCustomers = useCallback(async (signal?: AbortSignal) => {
     setLoading(true)
     setError(null)
     try {
       const params = new URLSearchParams({ page: String(page), limit: String(LIMIT) })
-      if (search.trim())   params.set("search", search.trim())
+      if (debouncedSearch) params.set("search", debouncedSearch)
       if (creditFilter)    params.set("creditEnabled", creditFilter)
 
-      const res = await fetch(`${API_BASE}/customers?${params}`, { headers: authHeaders })
+      const res = await fetch(`${API_BASE}/customers?${params}`, { headers: authHeaders, signal })
       if (!res.ok) throw new Error("Error al cargar clientes")
       const data = await res.json()
-      setCustomers(data.items ?? [])
-      setTotalItems(data.total ?? 0)
+      if (!signal?.aborted) {
+        setCustomers(data.items ?? [])
+        setTotalItems(data.total ?? 0)
+      }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Error desconocido")
+      if (!signal?.aborted) setError(err instanceof Error ? err.message : "Error desconocido")
     } finally {
-      setLoading(false)
+      if (!signal?.aborted) setLoading(false)
     }
-  }, [page, search, creditFilter, accessToken])
+  }, [page, debouncedSearch, creditFilter, accessToken])
 
-  useEffect(() => { void fetchCustomers() }, [fetchCustomers])
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(search.trim()), 300)
+    return () => clearTimeout(timer)
+  }, [search])
+
+  useEffect(() => {
+    if (search.trim() !== debouncedSearch) return
+    const controller = new AbortController()
+    void fetchCustomers(controller.signal)
+    return () => controller.abort()
+  }, [fetchCustomers, search, debouncedSearch])
   useEffect(() => { setPage(1) }, [search, creditFilter])
   useEffect(() => {
     if (showModal && !isReadOnly) setTimeout(() => firstInputRef.current?.focus(), 80)
@@ -340,19 +353,20 @@ export function CustomersPage() {
             </span>
           </div>
 
-          <table className={`${tableStyles.table} ${styles.customersTable}`}>
+          <div className={`${tableStyles.tableScroll} ${styles.customersTableScroll}`}>
+            <table className={`${tableStyles.table} ${styles.customersTable}`}>
             <thead className={tableStyles.tableHeader}>
               <tr>
                 <th className={`${tableStyles.tableHeaderCell} ${styles.headerCellOverride}`}>Nombre</th>
                 <th className={`${tableStyles.tableHeaderCell} ${styles.headerCellOverride}`}>Email</th>
-                <th className={`${tableStyles.tableHeaderCell} ${styles.headerCellOverride}`} style={{ width: 110 }}>CI</th>
-                <th className={`${tableStyles.tableHeaderCell} ${styles.headerCellOverride}`} style={{ width: 110 }}>RUC</th>
+                <th className={`${tableStyles.tableHeaderCell} ${styles.headerCellOverride}`} style={{ width: 70 }}>CI</th>
+                <th className={`${tableStyles.tableHeaderCell} ${styles.headerCellOverride}`} style={{ width: 90 }}>RUC</th>
                 <th className={`${tableStyles.tableHeaderCell} ${styles.headerCellOverride}`}>Contacto</th>
-                <th className={`${tableStyles.tableHeaderCell} ${styles.headerCellOverride}`} style={{ width: 130 }}>Límite Crédito</th>
-                <th className={`${tableStyles.tableHeaderCell} ${styles.headerCellOverride}`} style={{ width: 120 }}>Deuda Total</th>
-                <th className={`${tableStyles.tableHeaderCell} ${styles.headerCellOverride}`} style={{ width: 130 }}>Crédito Disponible</th>
-                <th className={`${tableStyles.tableHeaderCell} ${styles.headerCellOverride}`} style={{ width: 220 }}>Dirección</th>
-                <th className={`${tableStyles.tableHeaderCell} ${styles.headerCellOverride}`} style={{ width: 80 }} />
+                <th className={`${tableStyles.tableHeaderCell} ${styles.headerCellOverride}`} style={{ width: 120 }}>Límite Crédito</th>
+                <th className={`${tableStyles.tableHeaderCell} ${styles.headerCellOverride}`} style={{ width: 140 }}>Deuda Total</th>
+                <th className={`${tableStyles.tableHeaderCell} ${styles.headerCellOverride}`} style={{ width: 158 }}>Crédito Disponible</th>
+                <th className={`${tableStyles.tableHeaderCell} ${styles.headerCellOverride}`} style={{ width: 145 }}>Dirección</th>
+                <th className={`${tableStyles.tableHeaderCell} ${styles.headerCellOverride}`} style={{ width: 112 }} />
               </tr>
             </thead>
             <tbody>
@@ -378,20 +392,20 @@ export function CustomersPage() {
                 customers.map(c => (
                   <tr key={c.id} className={tableStyles.tableRow}>
                     <td className={tableStyles.tableCell}>
-                      <div className={styles.customerName}>{c.name}</div>
+                      <div className={styles.customerName} title={c.name}>{c.name}</div>
                     </td>
                     <td className={tableStyles.tableCell}>
-                      <div className={styles.customerSub}>{c.email || "—"}</div>
+                      <div className={styles.customerSub} title={c.email || undefined}>{c.email || "—"}</div>
                     </td>
                     <td className={tableStyles.tableCell}>
-                      <span className={styles.docNumber}>{c.documentNumber || "—"}</span>
+                      <span className={styles.docNumber} title={c.documentNumber || undefined}>{c.documentNumber || "—"}</span>
                     </td>
                     <td className={tableStyles.tableCell}>
-                      <span className={styles.docNumber}>{c.taxId || "—"}</span>
+                      <span className={styles.docNumber} title={c.taxId || undefined}>{c.taxId || "—"}</span>
                     </td>
                     <td className={tableStyles.tableCell}>
                       <div className={styles.contactWrapper}>
-                        <span className={styles.phoneText}>{c.phone || "—"}</span>
+                        <span className={styles.phoneText} title={c.phone || undefined}>{c.phone || "—"}</span>
                       </div>
                     </td>
                     <td className={tableStyles.tableCell}>
@@ -416,7 +430,7 @@ export function CustomersPage() {
                     </td>
                     <td className={tableStyles.tableCell}>
                       {c.creditEnabled ? (
-                        <span className={styles.creditLimitText} style={{ color: c.currentDebt > 0 ? "#ef4444" : "inherit", fontWeight: c.currentDebt > 0 ? "bold" : "normal", fontSize: "0.875rem" }}>
+                        <span className={styles.creditLimitText} title={formatCurrency(c.currentDebt)} style={{ color: c.currentDebt > 0 ? "#ef4444" : "inherit", fontWeight: c.currentDebt > 0 ? "bold" : "normal", fontSize: "0.875rem" }}>
                           {formatCurrency(c.currentDebt)}
                         </span>
                       ) : (
@@ -425,7 +439,7 @@ export function CustomersPage() {
                     </td>
                     <td className={tableStyles.tableCell}>
                       {c.creditEnabled ? (
-                        <span className={styles.creditLimitText} style={{ color: "#22c55e", fontWeight: "bold", fontSize: "0.875rem" }}>
+                        <span className={styles.creditLimitText} title={formatCurrency(Math.max(0, c.creditLimit - c.currentDebt))} style={{ color: "#22c55e", fontWeight: "bold", fontSize: "0.875rem" }}>
                           {formatCurrency(Math.max(0, c.creditLimit - c.currentDebt))}
                         </span>
                       ) : (
@@ -433,13 +447,13 @@ export function CustomersPage() {
                       )}
                     </td>
                     <td className={tableStyles.tableCell}>
-                      <div className={styles.addressWrapper}>
+                      <div className={styles.addressWrapper} title={c.address || undefined}>
                         {c.address || "—"}
                       </div>
                     </td>
                     <td className={`${tableStyles.tableCell} ${tableStyles.tableCellRight}`}>
                       <div className={styles.rowActions}>
-                        <button type="button" className={styles.iconBtn} onClick={() => openView(c)} title="Ver detalles">
+                        <button type="button" className={styles.iconBtn} onClick={() => openView(c)} title="Ver cliente" aria-label={`Ver cliente: ${c.name}`}>
                           <Eye size={14} />
                         </button>
                         <button type="button" className={styles.iconBtn} onClick={() => openEdit(c)} title="Editar">
@@ -454,7 +468,8 @@ export function CustomersPage() {
                 ))
               )}
             </tbody>
-          </table>
+            </table>
+          </div>
 
           {totalPages > 1 && (
             <div className={styles.pagination}>
@@ -484,7 +499,7 @@ export function CustomersPage() {
       ══════════════════════════════════════════════════ */}
       {showModal && (
         <div className={styles.modalOverlay} onClick={closeModal}>
-          <form className={styles.formModal} onSubmit={e => { e.preventDefault(); if (!saving && !saveSuccess) void handleSave(); }} onClick={e => e.stopPropagation()}>
+          <form data-pos-modal className={styles.formModal} onSubmit={e => { e.preventDefault(); if (!saving && !saveSuccess) void handleSave(); }} onClick={e => e.stopPropagation()}>
 
             <div className={styles.formModalHeader}>
               <span className={styles.formModalTitle}>
@@ -507,7 +522,7 @@ export function CustomersPage() {
               <div className={styles.formSection}>
                 <div className={styles.formSectionTitle}>Datos del cliente</div>
                 <div className={styles.formGrid}>
-                  <div className={`${tableStyles.formGroup} ${styles.formGridFull}`}>
+                  <div className={`${tableStyles.formGroup} ${styles.formGroupCompact} ${styles.formGridFull}`}>
                     <label className={tableStyles.label} htmlFor="name">Nombre completo *</label>
                     <input ref={firstInputRef} id="name" className={tableStyles.input}
                       value={form.name} onChange={setField("name")} placeholder="Juan Pérez" disabled={isReadOnly}
@@ -516,7 +531,7 @@ export function CustomersPage() {
                       }}
                     />
                   </div>
-                  <div className={tableStyles.formGroup}>
+                  <div className={`${tableStyles.formGroup} ${styles.formGroupCompact}`}>
                     <label className={tableStyles.label} htmlFor="documentNumber">Número de Cédula (CI)</label>
                     <input ref={documentNumberRef} id="documentNumber" className={tableStyles.input}
                       value={form.documentNumber} onChange={setField("documentNumber")}
@@ -526,7 +541,7 @@ export function CustomersPage() {
                       }}
                     />
                   </div>
-                  <div className={tableStyles.formGroup}>
+                  <div className={`${tableStyles.formGroup} ${styles.formGroupCompact}`}>
                     <label className={tableStyles.label} htmlFor="taxId">Número de RUC</label>
                     <input ref={taxIdRef} id="taxId" className={tableStyles.input}
                       value={form.taxId} onChange={setField("taxId")}
@@ -543,7 +558,7 @@ export function CustomersPage() {
               <div className={styles.formSection}>
                 <div className={styles.formSectionTitle}>Contacto</div>
                 <div className={styles.formGrid}>
-                  <div className={tableStyles.formGroup}>
+                  <div className={`${tableStyles.formGroup} ${styles.formGroupCompact}`}>
                     <label className={tableStyles.label} htmlFor="phone">Teléfono / Celular</label>
                     <input ref={phoneRef} id="phone" className={tableStyles.input} value={form.phone}
                       onChange={setField("phone")} placeholder="(0981)234567" disabled={isReadOnly}
@@ -552,7 +567,7 @@ export function CustomersPage() {
                       }}
                     />
                   </div>
-                  <div className={tableStyles.formGroup}>
+                  <div className={`${tableStyles.formGroup} ${styles.formGroupCompact}`}>
                     <label className={tableStyles.label} htmlFor="email">Email</label>
                     <input ref={emailRef} id="email" type="email" className={tableStyles.input}
                       value={form.email} onChange={setField("email")} placeholder="juan@email.com" disabled={isReadOnly}
@@ -567,7 +582,7 @@ export function CustomersPage() {
               {/* Ubicación */}
               <div className={styles.formSection}>
                 <div className={styles.formSectionTitle}>Ubicación</div>
-                <div className={`${tableStyles.formGroup} ${styles.formGridFull}`}>
+                <div className={`${tableStyles.formGroup} ${styles.formGroupCompact} ${styles.formGridFull}`}>
                   <label className={tableStyles.label} htmlFor="address">Dirección</label>
                   <input ref={addressRef} id="address" className={tableStyles.input} value={form.address}
                     onChange={setField("address")} placeholder="Av. Mariscal López 1234, Asunción" disabled={isReadOnly}
@@ -609,8 +624,8 @@ export function CustomersPage() {
                   />
                 </div>
                 {form.creditEnabled && (
-                  <div className={styles.formGrid}>
-                    <div className={tableStyles.formGroup}>
+                  <div className={styles.creditAmountsGrid}>
+                    <div className={`${tableStyles.formGroup} ${styles.formGroupCompact} ${styles.creditAmountField}`}>
                       <label className={tableStyles.label} htmlFor="creditLimit">Límite de crédito (Gs.)</label>
                       <input ref={creditLimitRef} id="creditLimit" type="text" className={tableStyles.input}
                         value={form.creditLimit} onChange={setField("creditLimit")} placeholder="0" disabled={isReadOnly}
@@ -619,13 +634,13 @@ export function CustomersPage() {
                         }}
                       />
                     </div>
-                    <div className={tableStyles.formGroup}>
+                    <div className={`${tableStyles.formGroup} ${styles.formGroupCompact} ${styles.creditAmountField}`}>
                       <label className={tableStyles.label} htmlFor="currentDebt">Deuda total (Gs.)</label>
                       <input id="currentDebt" type="text" className={tableStyles.input}
                         value={formatCurrency(form.currentDebt)} disabled={true}
                         style={{ color: form.currentDebt > 0 ? "#ef4444" : "inherit", fontWeight: "bold" }} />
                     </div>
-                    <div className={tableStyles.formGroup}>
+                    <div className={`${tableStyles.formGroup} ${styles.formGroupCompact} ${styles.creditAmountField}`}>
                       <label className={tableStyles.label} htmlFor="availableCredit">Crédito disponible (Gs.)</label>
                       <input id="availableCredit" type="text" className={tableStyles.input}
                         value={formatCurrency(Math.max(0, (parseFloat(form.creditLimit.replace(/\./g, "")) || 0) - form.currentDebt))}

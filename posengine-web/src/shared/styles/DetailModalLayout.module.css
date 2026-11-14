@@ -1,0 +1,44 @@
+.tabPanel { min-width: 0; }
+.tabPanel[hidden] { display: none; }
+.footer {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.7rem 1rem;
+  border-top: 1px solid var(--color-border);
+  background: var(--color-muted);
+}
+.footerMessage {
+  min-width: 0;
+  margin: 0;
+  color: var(--color-muted-foreground);
+  font-size: 0.72rem;
+  line-height: 1.4;
+}
+.footerActions { display: flex; flex: 0 0 auto; align-items: center; gap: 0.5rem; }
+.footerButton {
+  display: inline-flex;
+  min-height: 2.15rem;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  padding: 0.4rem 0.7rem;
+  border: 1px solid var(--color-border);
+  border-radius: 0.45rem;
+  background: var(--color-card);
+  color: var(--color-foreground);
+  font: inherit;
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.footerButton:disabled { cursor: not-allowed; opacity: 0.5; }
+.footerButton:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+.footerButtonDanger { border-color: color-mix(in srgb, var(--color-destructive) 45%, var(--color-border)); color: var(--color-destructive); }
+.footerButtonSuccess { border-color: color-mix(in srgb, var(--color-primary) 45%, var(--color-border)); color: var(--color-primary); }
+@media (max-width: 620px) {
+  .footer { align-items: flex-start; flex-direction: column; }
+  .footerActions { width: 100%; justify-content: flex-end; flex-wrap: wrap; }
+}

@@ -7,13 +7,16 @@ import {
     Search, Eye, Package, AlertCircle, Loader2,
     X, ChevronLeft, ChevronRight, CheckCircle2,
     Clock, XCircle, CreditCard, Banknote, FileText,
-    Hash, Calendar, Building2, Receipt, Tag, RotateCcw,
+    Hash, Calendar, Building2, Receipt, Tag,
     ChevronDown, Ban
 } from "lucide-react"
 import { useAuthStore } from "@/src/features/auth/store/auth.store"
+import { useCashSession } from "@/src/features/cash-session/hooks/useCashSession"
+import { useCommercialCapabilities } from "@/src/shared/hooks/useCommercialCapabilities"
 import { formatCurrency } from "@/src/shared/hooks/useFormatCurrency"
 import { API_BASE_URL } from "@/src/shared/config/api"
 import tableStyles from "@/src/features/products/pages/ProductsPage.module.css"
+import dataTableStyles from "@/src/shared/components/DataTable/DataTable.module.css"
 import styles from "./PurchaseHistoryPage.module.css"
 import {
     Combobox,
@@ -26,7 +29,11 @@ import {
     ComboboxValue,
 } from "@/components/ui/combobox"
 import { ConfirmDialog } from "@/src/shared/components/ConfirmDialog"
+import { DetailModalTabs, type DetailModalTab } from "@/src/shared/components/DetailModalTabs"
+import layout from "@/src/shared/styles/DetailModalLayout.module.css"
+import controls from "@/src/shared/styles/detailFormControls.module.css"
 import { PurchaseReturnModal } from "../components/PurchaseReturnModal"
+import { PurchaseReturnFinancePanel } from "../components/PurchaseReturnFinancePanel"
 
 const API_BASE = API_BASE_URL
 
@@ -63,6 +70,7 @@ interface PurchaseDebtPayment {
     id: string
     amount: number
     paymentDate: string
+    paymentMethod?: "CASH" | "TRANSFER" | null
     notes?: string
 }
 
@@ -73,6 +81,14 @@ interface PurchaseDebtInstallment {
     paidAmount: number
     dueDate: string
     status: "PENDING" | "PARTIAL" | "PAID"
+    adjustments?: { amount: number }[]
+    creditApplications?: { amount: number }[]
+}
+
+const getInstallmentBalance = (installment: PurchaseDebtInstallment) => {
+    const adjustments = (installment.adjustments ?? []).reduce((sum, row) => sum + Number(row.amount), 0)
+    const credits = (installment.creditApplications ?? []).reduce((sum, row) => sum + Number(row.amount), 0)
+    return Math.max(0, Number(installment.amount) - Number(installment.paidAmount) - adjustments - credits)
 }
 
 interface PurchaseDebt {
@@ -143,6 +159,8 @@ function formatDateTime(iso: string) {
 
 export function PurchaseHistoryPage() {
     const { accessToken } = useAuthStore()
+    const { session: activeCashSession, loading: cashSessionLoading } = useCashSession()
+    const { capabilities, loading: capabilitiesLoading, error: capabilitiesError } = useCommercialCapabilities(accessToken ?? "")
     const authHeaders = {
         "Content-Type": "application/json",
         Authorization: `Bearer ${accessToken}`,
@@ -153,6 +171,7 @@ export function PurchaseHistoryPage() {
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState<string | null>(null)
     const [search, setSearch] = useState("")
+    const [debouncedSearch, setDebouncedSearch] = useState("")
     const [statusFilter, setStatusFilter] = useState<PurchaseStatus | "ALL">("ALL")
     const [paymentFilter, setPaymentFilter] = useState<"CASH" | "CREDIT" | "ALL">("ALL")
     const [dateFrom, setDateFrom] = useState("")
@@ -177,20 +196,29 @@ export function PurchaseHistoryPage() {
     const [detailError, setDetailError] = useState<string | null>(null)
 
     const [showCancelConfirm, setShowCancelConfirm] = useState(false)
-    const [showReturnModal, setShowReturnModal] = useState(false)
     const [cancelling, setCancelling] = useState(false)
+    const [cancelReason, setCancelReason] = useState("")
+    const [supplierReceivedNothing, setSupplierReceivedNothing] = useState(false)
+    const [cancelPurchaseError, setCancelPurchaseError] = useState<string | null>(null)
 
     // ── Debt state ──────────────────────────────────────────────────────────────
-    const [activeDetailTab, setActiveDetailTab] = useState<"items" | "debt">("items")
+    const [activeDetailTab, setActiveDetailTab] = useState<DetailModalTab>("summary")
     const [registeringPayment, setRegisteringPayment] = useState(false)
     const [paymentError, setPaymentError] = useState<string | null>(null)
     const [paymentAmount, setPaymentAmount] = useState("")
+    const [paymentMethod, setPaymentMethod] = useState<"" | "CASH" | "TRANSFER">("")
     const [paymentNotes, setPaymentNotes] = useState("")
     const [paymentDateInput, setPaymentDateInput] = useState(() => new Date().toISOString().slice(0, 10))
     const [targetInstallmentId, setTargetInstallmentId] = useState("")
 
+    const refreshSelectedPurchase = async () => {
+        if (!selectedPurchase) return
+        const response = await fetch(`${API_BASE}/purchases/${selectedPurchase.id}`, { headers: authHeaders })
+        if (response.ok) setSelectedPurchase(await response.json())
+    }
+
     // ── Fetch list ─────────────────────────────────────────────────────────────
-    const fetchPurchases = useCallback(async () => {
+    const fetchPurchases = useCallback(async (signal?: AbortSignal) => {
         setLoading(true)
         setError(null)
         try {
@@ -198,28 +226,38 @@ export function PurchaseHistoryPage() {
                 page: String(page),
                 limit: String(LIMIT),
             })
-            if (search.trim())           params.set("search", search.trim())
+            if (debouncedSearch)         params.set("search", debouncedSearch)
             if (statusFilter !== "ALL")  params.set("status", statusFilter)
             if (paymentFilter !== "ALL") params.set("paymentType", paymentFilter)
             if (dateFrom)                params.set("dateFrom", dateFrom)
             if (dateTo)                  params.set("dateTo", dateTo)
             if (supplierId)              params.set("supplierId", supplierId)
 
-            const res = await fetch(`${API_BASE}/purchases?${params}`, { headers: authHeaders })
+            const res = await fetch(`${API_BASE}/purchases?${params}`, { headers: authHeaders, signal })
             if (!res.ok) throw new Error("Error al cargar compras")
             const data: PaginatedResponse = await res.json()
-            setPurchases(data.items ?? [])
-            setTotalItems(data.total ?? 0)
+            if (!signal?.aborted) {
+                setPurchases(data.items ?? [])
+                setTotalItems(data.total ?? 0)
+            }
         } catch (err) {
-            setError(err instanceof Error ? err.message : "Error desconocido")
+            if (!signal?.aborted) setError(err instanceof Error ? err.message : "Error desconocido")
         } finally {
-            setLoading(false)
+            if (!signal?.aborted) setLoading(false)
         }
-    }, [page, search, statusFilter, paymentFilter, dateFrom, dateTo, supplierId, accessToken])
+    }, [page, debouncedSearch, statusFilter, paymentFilter, dateFrom, dateTo, supplierId, accessToken])
 
     useEffect(() => {
-        void fetchPurchases()
-    }, [fetchPurchases])
+        const timer = setTimeout(() => setDebouncedSearch(search.trim()), 300)
+        return () => clearTimeout(timer)
+    }, [search])
+
+    useEffect(() => {
+        if (search.trim() !== debouncedSearch) return
+        const controller = new AbortController()
+        void fetchPurchases(controller.signal)
+        return () => controller.abort()
+    }, [fetchPurchases, search, debouncedSearch])
 
     // Fetch suppliers once
     useEffect(() => {
@@ -253,8 +291,9 @@ export function PurchaseHistoryPage() {
     // ── Open detail modal ──────────────────────────────────────────────────────
     const openDetail = async (purchase: Purchase) => {
         setSelectedPurchase({ ...purchase, items: undefined })
-        setActiveDetailTab("items")
+        setActiveDetailTab("summary")
         setPaymentAmount("")
+        setPaymentMethod("")
         setPaymentNotes("")
         setTargetInstallmentId("")
         setPaymentError(null)
@@ -287,12 +326,15 @@ export function PurchaseHistoryPage() {
 
     const handleCancelConfirm = async () => {
         if (!selectedPurchase) return
+        if (cancelReason.trim().length < 5 || !supplierReceivedNothing) return
         
         setCancelling(true)
+        setCancelPurchaseError(null)
         try {
             const res = await fetch(`${API_BASE}/purchases/${selectedPurchase.id}/cancel`, {
                 method: "PATCH",
                 headers: authHeaders,
+                body: JSON.stringify({ reason: cancelReason.trim(), supplierReceivedNothing }),
             })
 
             if (!res.ok) {
@@ -304,7 +346,7 @@ export function PurchaseHistoryPage() {
             setShowCancelConfirm(false)
             closeDetail()
         } catch (err) {
-            alert(err instanceof Error ? err.message : "Error desconocido")
+            setCancelPurchaseError(err instanceof Error ? err.message : "Error desconocido")
         } finally {
             setCancelling(false)
         }
@@ -313,9 +355,24 @@ export function PurchaseHistoryPage() {
     const handleRegisterPayment = async (e: React.FormEvent) => {
         e.preventDefault()
         if (!selectedPurchase || !selectedPurchase.debt) return
+        if (paymentMethod !== "CASH" && paymentMethod !== "TRANSFER") {
+            setPaymentError("Seleccioná efectivo o transferencia como medio de pago.")
+            return
+        }
+        if (paymentMethod === "CASH" && !activeCashSession) {
+            setPaymentError("Abrí una caja para registrar un pago en efectivo.")
+            return
+        }
         const cleanAmount = paymentAmount.replace(/\D/g, "")
         const amountNum = parseFloat(cleanAmount)
-        if (isNaN(amountNum) || amountNum <= 0) return
+        if (isNaN(amountNum) || amountNum <= 0) {
+            setPaymentError("El importe debe ser mayor que cero.")
+            return
+        }
+        if (amountNum > selectedPurchase.debt.balance + 0.01) {
+            setPaymentError("El pago no puede superar el saldo pendiente.")
+            return
+        }
 
         setRegisteringPayment(true)
         setPaymentError(null)
@@ -325,6 +382,8 @@ export function PurchaseHistoryPage() {
                 headers: authHeaders,
                 body: JSON.stringify({
                     amount: amountNum,
+                    paymentMethod,
+                    cashSessionId: activeCashSession?.id,
                     paymentDate: new Date(paymentDateInput).toISOString(),
                     installmentId: targetInstallmentId || undefined,
                     notes: paymentNotes.trim() || undefined,
@@ -344,6 +403,7 @@ export function PurchaseHistoryPage() {
             }
             // Clear payment input fields
             setPaymentAmount("")
+            setPaymentMethod("")
             setPaymentNotes("")
             setTargetInstallmentId("")
             // Refresh main purchases history list
@@ -356,7 +416,6 @@ export function PurchaseHistoryPage() {
     }
 
     const handleReturnSuccess = () => {
-        setShowReturnModal(false)
         void fetchPurchases()
         closeDetail()
     }
@@ -475,163 +534,184 @@ export function PurchaseHistoryPage() {
                     </div>
                 </div>
 
-                <div className={tableStyles.tableCard}>
-                    <div className={styles.tableToolbar}>
-                        <span className={styles.tableTitle}>
-                            Compras <span className={styles.tableCount}>{totalItems}</span>
-                        </span>
-                    </div>
+                <div className={dataTableStyles.historyResults}>
+                    <div className={`${tableStyles.tableCard} ${dataTableStyles.historyCard}`}>
+                        <div className={styles.tableToolbar}>
+                            <span className={styles.tableTitle}>
+                                Compras <span className={styles.tableCount}>{totalItems}</span>
+                            </span>
+                        </div>
 
-                    <table className={`${tableStyles.table} ${styles.historyTable}`}>
-                        <thead className={tableStyles.tableHeader}>
-                            <tr>
-                                <th className={`${tableStyles.tableHeaderCell} ${styles.headerCellOverride}`} style={{ width: 180 }}>Nro. Factura</th>
-                                <th className={`${tableStyles.tableHeaderCell} ${styles.headerCellOverride}`}>Proveedor</th>
-                                <th className={`${tableStyles.tableHeaderCell} ${styles.headerCellOverride}`} style={{ width: 150 }}>Fecha</th>
-                                <th className={`${tableStyles.tableHeaderCell} ${styles.headerCellOverride}`} style={{ width: 110 }}>Pago</th>
-                                <th className={`${tableStyles.tableHeaderCell} ${styles.headerCellOverride}`} style={{ width: 120 }}>Estado</th>
-                                <th className={`${tableStyles.tableHeaderCell} ${tableStyles.tableHeaderCellRight} ${styles.headerCellOverride}`} style={{ width: 150 }}>Total</th>
-                                <th className={`${tableStyles.tableHeaderCell} ${styles.headerCellOverride}`} style={{ width: 70 }} />
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {loading ? (
-                                <tr>
-                                    <td colSpan={7}>
-                                        <div className={tableStyles.emptyState}>
-                                            <Loader2 size={28} className={tableStyles.spinner} />
-                                        </div>
-                                    </td>
-                                </tr>
-                            ) : purchases.length === 0 ? (
-                                <tr>
-                                    <td colSpan={7}>
-                                        <div className={tableStyles.emptyState}>
-                                            <Package size={36} className={tableStyles.emptyStateIcon} />
-                                            <p className={tableStyles.emptyStateTitle}>Sin compras registradas</p>
-                                            <p>No se encontraron compras con los filtros seleccionados</p>
-                                        </div>
-                                    </td>
-                                </tr>
-                            ) : (
-                                purchases.map(purchase => {
-                                    const sc = STATUS_CONFIG[purchase.status]
-                                    return (
-                                        <tr key={purchase.id} className={tableStyles.tableRow}>
-                                            <td className={tableStyles.tableCell}>
-                                                <span className={styles.invoiceChip}>{purchase.invoiceNumber}</span>
-                                            </td>
-                                            <td className={tableStyles.tableCell}>
-                                                <div className={styles.supplierCell}>
-                                                    <span className={styles.supplierName}>{purchase.supplier.name}</span>
-                                                    {purchase.supplier.RUC && (
-                                                        <span className={styles.supplierRuc}>RUC: {purchase.supplier.RUC}</span>
-                                                    )}
+                        <div className={dataTableStyles.viewport}>
+                            <table className={`${tableStyles.table} ${dataTableStyles.naturalRows} ${dataTableStyles.compactCells} ${styles.historyTable}`}>
+                                <thead className={tableStyles.tableHeader}>
+                                    <tr>
+                                        <th className={`${tableStyles.tableHeaderCell} ${styles.headerCellOverride}`} style={{ width: 180 }}>Nro. Factura</th>
+                                        <th className={`${tableStyles.tableHeaderCell} ${styles.headerCellOverride}`}>Proveedor</th>
+                                        <th className={`${tableStyles.tableHeaderCell} ${styles.headerCellOverride}`} style={{ width: 150 }}>Fecha</th>
+                                        <th className={`${tableStyles.tableHeaderCell} ${styles.headerCellOverride}`} style={{ width: 110 }}>Pago</th>
+                                        <th className={`${tableStyles.tableHeaderCell} ${styles.headerCellOverride}`} style={{ width: 120 }}>Estado</th>
+                                        <th className={`${tableStyles.tableHeaderCell} ${tableStyles.tableHeaderCellRight} ${styles.headerCellOverride}`} style={{ width: 150 }}>Total</th>
+                                        <th className={`${tableStyles.tableHeaderCell} ${styles.headerCellOverride}`} style={{ width: 70 }} />
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {loading ? (
+                                        <tr>
+                                            <td colSpan={7}>
+                                                <div className={tableStyles.emptyState}>
+                                                    <Loader2 size={28} className={tableStyles.spinner} />
                                                 </div>
                                             </td>
-                                            <td className={tableStyles.tableCell}>
-                                                <span className={styles.dateText}>{formatDateTime(purchase.purchaseDate)}</span>
-                                            </td>
-                                            <td className={tableStyles.tableCell}>
-                                                <span className={`${styles.paymentBadge} ${purchase.paymentType === "CASH" ? styles.paymentCash : styles.paymentCredit}`}>
-                                                    {purchase.paymentType === "CASH"
-                                                        ? <><Banknote size={12} /> Contado</>
-                                                        : <><CreditCard size={12} /> Crédito</>
-                                                    }
-                                                </span>
-                                            </td>
-                                            <td className={tableStyles.tableCell}>
-                                                <span className={`${styles.statusBadge} ${sc.className}`}>
-                                                    {sc.icon}
-                                                    {sc.label}
-                                                </span>
-                                            </td>
-                                            <td className={`${tableStyles.tableCell} ${tableStyles.tableCellRight}`}>
-                                                <strong className={styles.totalAmount}>{formatCurrency(purchase.total)}</strong>
-                                            </td>
-                                            <td className={tableStyles.tableCell}>
-                                                <button
-                                                    type="button"
-                                                    className={styles.viewBtn}
-                                                    onClick={() => openDetail(purchase)}
-                                                    title="Ver detalle"
-                                                >
-                                                    <Eye size={14} />
-                                                </button>
+                                        </tr>
+                                    ) : purchases.length === 0 ? (
+                                        <tr>
+                                            <td colSpan={7}>
+                                                <div className={tableStyles.emptyState}>
+                                                    <Package size={36} className={tableStyles.emptyStateIcon} />
+                                                    <p className={tableStyles.emptyStateTitle}>Sin compras registradas</p>
+                                                    <p>No se encontraron compras con los filtros seleccionados</p>
+                                                </div>
                                             </td>
                                         </tr>
-                                    )
-                                })
-                            )}
-                        </tbody>
-                    </table>
-
-                    {totalPages > 1 && (
-                        <div className={styles.pagination}>
-                            <span className={styles.paginationInfo}>
-                                Mostrando {(page - 1) * LIMIT + 1}–{Math.min(page * LIMIT, totalItems)} de {totalItems}
-                            </span>
-                            <div className={styles.paginationControls}>
-                                <button
-                                    type="button"
-                                    className={styles.pageBtn}
-                                    onClick={() => setPage(p => Math.max(1, p - 1))}
-                                    disabled={page === 1}
-                                >
-                                    <ChevronLeft size={15} />
-                                </button>
-                                {Array.from({ length: totalPages }, (_, i) => i + 1)
-                                    .filter(p => p === 1 || p === totalPages || Math.abs(p - page) <= 1)
-                                    .reduce<(number | "...")[]>((acc, p, i, arr) => {
-                                        if (i > 0 && p - (arr[i - 1] as number) > 1) acc.push("...")
-                                        acc.push(p)
-                                        return acc
-                                    }, [])
-                                    .map((p, i) =>
-                                        p === "..." ? (
-                                            <span key={`dots-${i}`} className={styles.pageDots}>…</span>
-                                        ) : (
-                                            <button
-                                                key={p}
-                                                type="button"
-                                                className={`${styles.pageBtn} ${page === p ? styles.pageBtnActive : ""}`}
-                                                onClick={() => setPage(p as number)}
-                                            >
-                                                {p}
-                                            </button>
-                                        )
-                                    )
-                                }
-                                <button
-                                    type="button"
-                                    className={styles.pageBtn}
-                                    onClick={() => setPage(p => Math.min(totalPages, p + 1))}
-                                    disabled={page === totalPages}
-                                >
-                                    <ChevronRight size={15} />
-                                </button>
-                            </div>
+                                    ) : (
+                                        purchases.map(purchase => {
+                                            const sc = STATUS_CONFIG[purchase.status]
+                                            return (
+                                                <tr key={purchase.id} className={tableStyles.tableRow}>
+                                                    <td className={tableStyles.tableCell}>
+                                                        <span className={styles.invoiceChip}>{purchase.invoiceNumber}</span>
+                                                    </td>
+                                                    <td className={tableStyles.tableCell}>
+                                                        <div className={styles.supplierCell}>
+                                                            <span className={styles.supplierName}>{purchase.supplier.name}</span>
+                                                            {purchase.supplier.RUC && (
+                                                                <span className={styles.supplierRuc}>RUC: {purchase.supplier.RUC}</span>
+                                                            )}
+                                                        </div>
+                                                    </td>
+                                                    <td className={tableStyles.tableCell}>
+                                                        <span className={styles.dateText}>{formatDateTime(purchase.purchaseDate)}</span>
+                                                    </td>
+                                                    <td className={tableStyles.tableCell}>
+                                                        <span className={`${styles.paymentBadge} ${purchase.paymentType === "CASH" ? styles.paymentCash : styles.paymentCredit}`}>
+                                                            {purchase.paymentType === "CASH"
+                                                                ? <><Banknote size={12} /> Contado</>
+                                                                : <><CreditCard size={12} /> Crédito</>
+                                                            }
+                                                        </span>
+                                                    </td>
+                                                    <td className={tableStyles.tableCell}>
+                                                        <span className={`${styles.statusBadge} ${sc.className}`}>
+                                                            {sc.icon}
+                                                            {sc.label}
+                                                        </span>
+                                                    </td>
+                                                    <td className={`${tableStyles.tableCell} ${tableStyles.tableCellRight}`}>
+                                                        <strong className={styles.totalAmount}>{formatCurrency(purchase.total)}</strong>
+                                                    </td>
+                                                    <td className={tableStyles.tableCell}>
+                                                        <button
+                                                            type="button"
+                                                            className={styles.viewBtn}
+                                                            onClick={() => openDetail(purchase)}
+                                                            title="Ver detalle"
+                                                        >
+                                                            <Eye size={14} />
+                                                        </button>
+                                                    </td>
+                                                </tr>
+                                            )
+                                        })
+                                    )}
+                                </tbody>
+                            </table>
                         </div>
-                    )}
+
+                        {totalPages > 1 && (
+                            <div className={`${styles.pagination} ${dataTableStyles.fixedRegion}`}>
+                                <span className={styles.paginationInfo}>
+                                    Mostrando {(page - 1) * LIMIT + 1}–{Math.min(page * LIMIT, totalItems)} de {totalItems}
+                                </span>
+                                <div className={styles.paginationControls}>
+                                    <button
+                                        type="button"
+                                        className={styles.pageBtn}
+                                        onClick={() => setPage(p => Math.max(1, p - 1))}
+                                        disabled={page === 1}
+                                    >
+                                        <ChevronLeft size={15} />
+                                    </button>
+                                    {Array.from({ length: totalPages }, (_, i) => i + 1)
+                                        .filter(p => p === 1 || p === totalPages || Math.abs(p - page) <= 1)
+                                        .reduce<(number | "...")[]>((acc, p, i, arr) => {
+                                            if (i > 0 && p - (arr[i - 1] as number) > 1) acc.push("...")
+                                            acc.push(p)
+                                            return acc
+                                        }, [])
+                                        .map((p, i) =>
+                                            p === "..." ? (
+                                                <span key={`dots-${i}`} className={styles.pageDots}>…</span>
+                                            ) : (
+                                                <button
+                                                    key={p}
+                                                    type="button"
+                                                    className={`${styles.pageBtn} ${page === p ? styles.pageBtnActive : ""}`}
+                                                    onClick={() => setPage(p as number)}
+                                                >
+                                                    {p}
+                                                </button>
+                                            )
+                                        )
+                                    }
+                                    <button
+                                        type="button"
+                                        className={styles.pageBtn}
+                                        onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                                        disabled={page === totalPages}
+                                    >
+                                        <ChevronRight size={15} />
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+                    </div>
                 </div>
             </div>
 
             {selectedPurchase && (
                 <div className={tableStyles.modalOverlay} onClick={closeDetail}>
-                    <div className={styles.detailModal} onClick={e => e.stopPropagation()}>
-                        <div className={styles.detailModalHeader}>
+                    <div data-pos-modal className={styles.detailModal} onClick={event => event.stopPropagation()}>
+                        <header className={styles.detailModalHeader}>
                             <div className={styles.detailModalHeaderLeft}>
-                                <Receipt size={18} className={styles.detailModalIcon} />
+                                <Receipt size={18} className={styles.detailModalIcon} aria-hidden="true" />
                                 <div>
                                     <h2 className={styles.detailModalTitle}>Detalle de compra</h2>
+                                    <p className={styles.detailModalSubtitle}>Factura {selectedPurchase.invoiceNumber}</p>
                                 </div>
                             </div>
-                            <button type="button" className={styles.modalCloseBtn} onClick={closeDetail}>
-                                <X size={18} />
+                            <button type="button" className={styles.modalCloseBtn} onClick={closeDetail} aria-label="Cerrar detalle de compra">
+                                <X size={18} aria-hidden="true" />
                             </button>
-                        </div>
+                        </header>
+
+                        <DetailModalTabs id={`purchase-detail-${selectedPurchase.id.slice(0, 8)}`} value={activeDetailTab} onChange={setActiveDetailTab} disabled={loadingDetail || Boolean(detailError)} />
 
                         <div className={styles.detailModalBody}>
+                            {loadingDetail ? (
+                                <div className={styles.detailLoading}><Loader2 size={24} className={tableStyles.spinner} /> Cargando detalle…</div>
+                            ) : detailError ? (
+                                <div className={styles.detailError} role="alert"><AlertCircle size={16} />{detailError}</div>
+                            ) : (
+                                <>
+                                    <section
+                                        id={`purchase-detail-${selectedPurchase.id.slice(0, 8)}-summary-panel`}
+                                        role="tabpanel"
+                                        aria-labelledby={`purchase-detail-${selectedPurchase.id.slice(0, 8)}-summary-tab`}
+                                        hidden={activeDetailTab !== "summary"}
+                                        className={layout.tabPanel}
+                                    >
+
                             <div className={styles.receiptHeader}>
                                 <div className={styles.receiptHeaderGrid}>
                                     <div className={styles.receiptInfoBlock}>
@@ -706,49 +786,12 @@ export function PurchaseHistoryPage() {
                                 </div>
                             </div>
 
-                            {/* Tabs para Crédito */}
-                            {selectedPurchase.paymentType === "CREDIT" && !loadingDetail && !detailError && (
-                                <div className={styles.modalTabs}>
-                                    <button
-                                        type="button"
-                                        className={`${styles.modalTabBtn} ${activeDetailTab === "items" ? styles.modalTabBtnActive : ""}`}
-                                        onClick={() => setActiveDetailTab("items")}
-                                    >
-                                        <Package size={14} />
-                                        Productos
-                                    </button>
-                                    <button
-                                        type="button"
-                                        className={`${styles.modalTabBtn} ${activeDetailTab === "debt" ? styles.modalTabBtnActive : ""}`}
-                                        onClick={() => setActiveDetailTab("debt")}
-                                    >
-                                        <CreditCard size={14} />
-                                        Control de Deuda
-                                    </button>
+                            <div className={styles.receiptItemsSection}>
+                                <div className={styles.receiptItemsTitle}>
+                                    <Package size={14} aria-hidden="true" /> Productos originales
+                                    <span className={styles.receiptItemsCount}>{selectedPurchase.items?.length ?? 0}</span>
                                 </div>
-                            )}
-
-                            {activeDetailTab === "items" ? (
-                                <div className={styles.receiptItemsSection}>
-                                    <div className={styles.receiptItemsTitle}>
-                                        <Package size={14} />
-                                        Productos
-                                        {selectedPurchase.items && (
-                                            <span className={styles.receiptItemsCount}>{selectedPurchase.items.length}</span>
-                                        )}
-                                    </div>
-
-                                {loadingDetail ? (
-                                    <div className={styles.detailLoading}>
-                                        <Loader2 size={22} className={tableStyles.spinner} />
-                                        <span>Cargando productos…</span>
-                                    </div>
-                                ) : detailError ? (
-                                    <div className={styles.detailError}>
-                                        <AlertCircle size={16} />
-                                        {detailError}
-                                    </div>
-                                ) : (
+                                <div className={styles.receiptTableWrapper}>
                                     <table className={styles.receiptTable}>
                                         <thead>
                                             <tr>
@@ -764,25 +807,19 @@ export function PurchaseHistoryPage() {
                                             {(selectedPurchase.items ?? []).map((item, idx) => (
                                                 <tr key={item.id}>
                                                     <td className={styles.receiptTableNum}>{idx + 1}</td>
-                                                    <td>
-                                                        <span className={styles.codeChip}>
-                                                            {item.product.barcode || item.product.sku || "—"}
-                                                        </span>
-                                                    </td>
-                                                    <td className={styles.receiptTableName}>{item.product.name}</td>
+                                                    <td><span className={styles.codeChip}>{item.product.barcode || item.product.sku || "—"}</span></td>
+                                                    <td className={styles.receiptTableName} title={item.product.name}>{item.product.name}</td>
                                                     <td className={styles.receiptTableRight}>{item.quantity}</td>
                                                     <td className={styles.receiptTableRight}>{formatCurrency(item.unitCost)}</td>
-                                                    <td className={`${styles.receiptTableRight} ${styles.receiptTableSubtotal}`}>
-                                                        {formatCurrency(item.total)}
-                                                    </td>
+                                                    <td className={`${styles.receiptTableRight} ${styles.receiptTableSubtotal}`}>{formatCurrency(item.total)}</td>
                                                 </tr>
                                             ))}
                                         </tbody>
                                     </table>
-                                )}
                                 </div>
-                            ) : (
-                                !loadingDetail && !detailError && selectedPurchase.debt && (
+                            </div>
+
+                            {!loadingDetail && !detailError && selectedPurchase.debt && (
                                     <div className={styles.debtSection}>
                                         {/* Resumen Deuda Card */}
                                         <div className={styles.debtSummaryGrid}>
@@ -826,6 +863,29 @@ export function PurchaseHistoryPage() {
                                                     </div>
 
                                                     <div className={tableStyles.formGroup}>
+                                                        <label className={tableStyles.label} htmlFor="supplier-debt-payment-method">Medio de pago</label>
+                                                        <select
+                                                            id="supplier-debt-payment-method"
+                                                            className={tableStyles.input}
+                                                            value={paymentMethod}
+                                                            onChange={e => {
+                                                                setPaymentError(null)
+                                                                setPaymentMethod(e.target.value as "" | "CASH" | "TRANSFER")
+                                                            }}
+                                                            required
+                                                        >
+                                                            <option value="" disabled>Seleccionar medio de pago</option>
+                                                            <option value="CASH">Efectivo</option>
+                                                            <option value="TRANSFER">Transferencia</option>
+                                                        </select>
+                                                        {paymentMethod === "CASH" && !cashSessionLoading && !activeCashSession && (
+                                                            <div className={styles.paymentFormError} role="alert">
+                                                                Abrí una caja para registrar un pago en efectivo.
+                                                            </div>
+                                                        )}
+                                                    </div>
+
+                                                    <div className={tableStyles.formGroup}>
                                                         <label className={tableStyles.label}>Fecha Pago</label>
                                                         <input
                                                             type="date"
@@ -855,9 +915,9 @@ export function PurchaseHistoryPage() {
                                                                     <option 
                                                                         key={inst.id} 
                                                                         value={inst.id}
-                                                                        disabled={inst.status === "PAID"}
+                                                                        disabled={getInstallmentBalance(inst) <= 0.01}
                                                                     >
-                                                                        Cuota {inst.number} - {formatCurrency(inst.amount - inst.paidAmount)} pendiente
+                                                                        Cuota {inst.number} - {formatCurrency(getInstallmentBalance(inst))} pendiente
                                                                     </option>
                                                                 ))}
                                                             </select>
@@ -889,7 +949,7 @@ export function PurchaseHistoryPage() {
                                                     <button 
                                                         type="submit" 
                                                         className={styles.submitPaymentBtn}
-                                                        disabled={registeringPayment}
+                                                        disabled={registeringPayment || cashSessionLoading || !paymentMethod || (paymentMethod === "CASH" && !activeCashSession)}
                                                     >
                                                         {registeringPayment ? <Loader2 size={16} className={tableStyles.spinner} /> : null}
                                                         Registrar Pago
@@ -915,7 +975,7 @@ export function PurchaseHistoryPage() {
                                                                 <tr>
                                                                     <th>Cuota</th>
                                                                     <th>Vencimiento</th>
-                                                                    <th style={{ textAlign: "right" }}>Monto</th>
+                                                                    <th style={{ textAlign: "right" }}>Pendiente</th>
                                                                     <th style={{ textAlign: "right" }}>Abonado</th>
                                                                     <th>Estado</th>
                                                                 </tr>
@@ -925,7 +985,7 @@ export function PurchaseHistoryPage() {
                                                                     <tr key={inst.id} className={inst.status === "PAID" ? styles.rowPaid : ""}>
                                                                         <td>Cuota {inst.number}</td>
                                                                         <td>{new Date(inst.dueDate).toLocaleDateString()}</td>
-                                                                        <td style={{ textAlign: "right" }}>{formatCurrency(inst.amount)}</td>
+                                                                        <td style={{ textAlign: "right" }}>{formatCurrency(getInstallmentBalance(inst))}</td>
                                                                         <td style={{ textAlign: "right" }}>{formatCurrency(inst.paidAmount)}</td>
                                                                         <td>
                                                                             <span className={`${styles.badge} ${
@@ -955,7 +1015,7 @@ export function PurchaseHistoryPage() {
                                                                         {new Date(pmt.paymentDate).toLocaleDateString()}
                                                                     </span>
                                                                     <span className={styles.paymentItemAmount}>
-                                                                        {formatCurrency(pmt.amount)}
+                                                                        {formatCurrency(pmt.amount)} · {pmt.paymentMethod === "CASH" ? "Efectivo" : pmt.paymentMethod === "TRANSFER" ? "Transferencia" : "Sin clasificar"}
                                                                     </span>
                                                                 </div>
                                                                 {pmt.notes && <span className={styles.paymentItemNotes}>{pmt.notes}</span>}
@@ -966,69 +1026,106 @@ export function PurchaseHistoryPage() {
                                             </div>
                                         </div>
                                     </div>
-                                )
                             )}
 
-                            {!loadingDetail && !detailError && (
-                                <>
-                                    <div className={styles.receiptTotalFooter}>
-                                        <div className={styles.receiptTotalDivider} />
-                                        <div className={styles.receiptTotalRow}>
-                                            <span className={styles.receiptTotalLabel}>TOTAL A PAGAR</span>
-                                            <span className={styles.receiptTotalValue}>{formatCurrency(selectedPurchase.total)}</span>
-                                        </div>
-                                    </div>
+                            <div className={styles.receiptTotalFooter}>
+                                <div className={styles.receiptTotalDivider} />
+                                <div className={styles.receiptTotalRow}>
+                                    <span className={styles.receiptTotalLabel}>TOTAL DE LA COMPRA</span>
+                                    <span className={styles.receiptTotalValue}>{formatCurrency(selectedPurchase.total)}</span>
+                                </div>
+                            </div>
+                                    </section>
 
-                                    {selectedPurchase.status === "RECEIVED" && (
-                                        <div className={styles.modalActions}>
-                                            <button
-                                                type="button"
-                                                className={styles.cancelBtn}
-                                                onClick={() => setShowCancelConfirm(true)}
-                                                disabled={cancelling}
-                                            >
-                                                {cancelling ? <Loader2 size={16} className={tableStyles.spinner} /> : <Ban size={16} />}
-                                                Anular Factura
-                                            </button>
-
-                                            <button
-                                                type="button"
-                                                className={styles.returnBtn}
-                                                onClick={() => setShowReturnModal(true)}
-                                            >
-                                                <RotateCcw size={16} />
-                                                Registrar Devolución
-                                            </button>
-                                        </div>
-                                    )}
+                                    <section
+                                        id={`purchase-detail-${selectedPurchase.id.slice(0, 8)}-returns-panel`}
+                                        role="tabpanel"
+                                        aria-labelledby={`purchase-detail-${selectedPurchase.id.slice(0, 8)}-returns-tab`}
+                                        hidden={activeDetailTab !== "returns"}
+                                        className={layout.tabPanel}
+                                    >
+                                        <PurchaseReturnModal
+                                            key={`return-form-${selectedPurchase.id}`}
+                                            inline
+                                            open
+                                            purchase={{
+                                                id: selectedPurchase.id,
+                                                invoiceNumber: selectedPurchase.invoiceNumber,
+                                                supplier: selectedPurchase.supplier,
+                                                paymentType: selectedPurchase.paymentType,
+                                                debtBalance: selectedPurchase.debt?.balance ?? 0,
+                                                total: selectedPurchase.total,
+                                                items: selectedPurchase.items,
+                                            }}
+                                            loading={false}
+                                            accessToken={accessToken ?? ""}
+                                            cashSessionId={activeCashSession?.id}
+                                            cashSessionLoading={cashSessionLoading}
+                                            onSuccess={handleReturnSuccess}
+                                        />
+                                        <PurchaseReturnFinancePanel
+                                            key={`return-history-${selectedPurchase.id}`}
+                                            purchaseId={selectedPurchase.id}
+                                            supplierId={selectedPurchase.supplier.id}
+                                            supplierName={selectedPurchase.supplier.name}
+                                            purchaseNumber={selectedPurchase.invoiceNumber}
+                                            paymentType={selectedPurchase.paymentType}
+                                            debtBalance={selectedPurchase.debt?.balance ?? 0}
+                                            cashSessionId={activeCashSession?.id}
+                                            accessToken={accessToken ?? ""}
+                                            onCreditApplied={refreshSelectedPurchase}
+                                        />
+                                    </section>
                                 </>
                             )}
                         </div>
+
+                        <footer className={layout.footer}>
+                            <p className={layout.footerMessage}>
+                                {selectedPurchase.status === "RECEIVED" && !loadingDetail && !detailError && (
+                                    <span id="purchase-cancel-block-reason">
+                                        {capabilities?.purchaseCancellations.enabled === true
+                                            ? ""
+                                            : capabilities?.purchaseCancellations.reason || capabilitiesError || (capabilitiesLoading ? "Verificando la disponibilidad de anulación…" : "La anulación no está disponible temporalmente.")}
+                                    </span>
+                                )}
+                            </p>
+                            <div className={layout.footerActions}>
+                                {selectedPurchase.status === "RECEIVED" && (
+                                    <button type="button" className={`${layout.footerButton} ${layout.footerButtonDanger}`} onClick={() => { setCancelPurchaseError(null); setCancelReason(""); setSupplierReceivedNothing(false); setShowCancelConfirm(true) }} disabled={capabilitiesLoading || capabilities?.purchaseCancellations.enabled !== true || cancelling} aria-describedby={capabilities?.purchaseCancellations.enabled !== true ? "purchase-cancel-block-reason" : undefined}>
+                                        {cancelling ? <Loader2 size={14} className={tableStyles.spinner} /> : <Ban size={14} />} Anular compra
+                                    </button>
+                                )}
+                                <button type="button" className={layout.footerButton} onClick={closeDetail}>Cerrar</button>
+                            </div>
+                        </footer>
                     </div>
                 </div>
             )}
 
             <ConfirmDialog
                 open={showCancelConfirm}
-                title="Anular Factura"
-                message="¿Estás seguro de que deseas anular esta compra? Esta acción revertirá completamente el stock de todos los productos ingresados y no se puede deshacer."
-                confirmText="Anular Factura"
-                cancelText="Cerrar"
+                title="Anular compra errónea"
+                message="Usá esta corrección solo si el proveedor confirma que no recibió el pago. Si el pago se realizó, registrá una devolución del proveedor."
+                confirmText="Confirmar anulación"
+                cancelText="Volver"
                 type="danger"
                 loading={cancelling}
+                confirmDisabled={cancelReason.trim().length < 5 || !supplierReceivedNothing}
                 onConfirm={handleCancelConfirm}
-                onCancel={() => setShowCancelConfirm(false)}
-            />
+                onCancel={() => { setShowCancelConfirm(false); setCancelPurchaseError(null) }}
+            >
+                <label className={controls.label}>
+                    Motivo (mínimo 5 caracteres)
+                    <textarea className={controls.control} rows={3} maxLength={500} value={cancelReason} onChange={event => setCancelReason(event.target.value)} autoFocus />
+                </label>
+                <label className={styles.cancelSupplierConfirm}>
+                    <input type="checkbox" checked={supplierReceivedNothing} onChange={event => setSupplierReceivedNothing(event.target.checked)} />
+                    Confirmo que el proveedor no recibió el pago.
+                </label>
+                {cancelPurchaseError && <p className={styles.cancelPurchaseError} role="alert">{cancelPurchaseError}</p>}
+            </ConfirmDialog>
 
-            {selectedPurchase && (
-                <PurchaseReturnModal
-                    open={showReturnModal}
-                    purchase={selectedPurchase}
-                    loading={false}
-                    onClose={() => setShowReturnModal(false)}
-                    onSuccess={handleReturnSuccess}
-                />
-            )}
         </div>
     )
 }

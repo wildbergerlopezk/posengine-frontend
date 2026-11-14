@@ -1,57 +1,96 @@
-import { ExceptionFilter, Catch, ArgumentsHost, HttpException, HttpStatus } from '@nestjs/common'
-import { Prisma } from '../../generated/prisma/client'
-import { Response } from 'express'
-import { MailService } from '../mail/mail.service'
+import {
+  ArgumentsHost,
+  Catch,
+  ExceptionFilter,
+  HttpException,
+  HttpStatus,
+} from '@nestjs/common';
+import { randomUUID } from 'node:crypto';
+import { Request, Response } from 'express';
+import { Prisma } from '../../generated/prisma/client';
+
+const INTERNAL_ERROR_MESSAGE = 'Error interno del servidor. Intentá nuevamente más tarde.';
 
 @Catch()
 export class AllExceptionsFilter implements ExceptionFilter {
-  constructor(private readonly mailService?: MailService) {}
+  catch(exception: unknown, host: ArgumentsHost) {
+    const ctx = host.switchToHttp();
+    const response = ctx.getResponse<Response>();
+    const request = ctx.getRequest<Request>();
+    const requestId = randomUUID();
 
-  catch(exception: any, host: ArgumentsHost) {
-    const ctx = host.switchToHttp()
-    const res = ctx.getResponse<Response>()
-
-    let status = HttpStatus.INTERNAL_SERVER_ERROR
-    let code = 'INTERNAL_ERROR'
-    let message: any = 'Error interno del servidor'
-    let details: any = undefined
+    let status = HttpStatus.INTERNAL_SERVER_ERROR;
+    let code = 'INTERNAL_ERROR';
+    let message = INTERNAL_ERROR_MESSAGE;
+    let details: string[] | undefined;
+    let internalCode = 'UNEXPECTED_ERROR';
 
     if (exception instanceof HttpException) {
-      status = exception.getStatus()
-      const payload: any = exception.getResponse()
-      if (typeof payload === 'string') {
-        message = payload
+      status = exception.getStatus();
+      internalCode = `HTTP_${status}`;
+      const payload = exception.getResponse();
+      const payloadMessage = typeof payload === 'string'
+        ? payload
+        : 'message' in payload
+          ? payload.message
+          : undefined;
+
+      if (status === HttpStatus.BAD_REQUEST && Array.isArray(payloadMessage)) {
+        code = 'VALIDATION_ERROR';
+        message = 'Revisá los datos ingresados.';
+        details = payloadMessage.filter((item): item is string => typeof item === 'string');
+      } else if (status === HttpStatus.UNAUTHORIZED) {
+        code = 'UNAUTHORIZED';
+        message = 'Autenticación requerida o credenciales inválidas.';
+      } else if (status === HttpStatus.FORBIDDEN) {
+        code = 'FORBIDDEN';
+        message = 'No tenés permisos para realizar esta operación.';
+      } else if (status === HttpStatus.NOT_FOUND) {
+        code = 'NOT_FOUND';
+        message = 'No se encontró el recurso solicitado.';
+      } else if (status === HttpStatus.CONFLICT) {
+        code = 'CONFLICT';
+        message = typeof payloadMessage === 'string' ? payloadMessage : 'La operación entra en conflicto con datos existentes.';
+      } else if (status === HttpStatus.TOO_MANY_REQUESTS) {
+        code = 'RATE_LIMITED';
+        message = 'Demasiadas solicitudes. Intentá nuevamente más tarde.';
+      } else if (status === HttpStatus.SERVICE_UNAVAILABLE) {
+        code = 'SERVICE_UNAVAILABLE';
+        message = 'El servicio no está disponible temporalmente. Intentá nuevamente.';
+      } else if (status >= HttpStatus.INTERNAL_SERVER_ERROR) {
+        code = 'INTERNAL_ERROR';
+        message = INTERNAL_ERROR_MESSAGE;
       } else {
-        message = payload.message || exception.message
-        details = payload.details ?? payload.error
+        code = this.httpStatusToCode(status);
+        message = typeof payloadMessage === 'string' ? payloadMessage : exception.message;
       }
-      code = this.httpStatusToCode(status)
     }
 
     if (exception instanceof Prisma.PrismaClientKnownRequestError) {
-      status = HttpStatus.BAD_REQUEST
+      internalCode = `PRISMA_${exception.code}`;
+      details = undefined;
+
       switch (exception.code) {
         case 'P2002':
-          message = 'Ya existe un registro con este valor único'
-          code = 'UNIQUE_CONSTRAINT'
-          details = exception.meta?.target
-          break
-        case 'P2025':
-          message = 'Registro no encontrado'
-          code = 'NOT_FOUND'
-          break
+          status = HttpStatus.CONFLICT;
+          code = 'UNIQUE_CONSTRAINT';
+          message = 'Ya existe un registro con este valor.';
+          break;
         case 'P2003':
-          message = 'Violación de clave foránea (referencia a registro inexistente)'
-          code = 'FOREIGN_KEY'
-          break
         case 'P2014':
-          message = 'No se puede eliminar: el registro está relacionado con otros datos'
-          code = 'RELATION_INTEGRITY'
-          details = exception.meta?.relation_name
-          break
+          status = HttpStatus.CONFLICT;
+          code = 'DATA_CONFLICT';
+          message = 'La operación entra en conflicto con datos existentes.';
+          break;
+        case 'P2025':
+          status = HttpStatus.NOT_FOUND;
+          code = 'NOT_FOUND';
+          message = 'No se encontró el recurso solicitado.';
+          break;
         default:
-          message = 'Error en la base de datos'
-          code = `PRISMA_${exception.code}`
+          status = HttpStatus.INTERNAL_SERVER_ERROR;
+          code = 'INTERNAL_ERROR';
+          message = INTERNAL_ERROR_MESSAGE;
       }
     }
 
@@ -59,94 +98,64 @@ export class AllExceptionsFilter implements ExceptionFilter {
       exception instanceof Prisma.PrismaClientValidationError ||
       exception instanceof Prisma.PrismaClientUnknownRequestError
     ) {
-      status = HttpStatus.BAD_REQUEST
-      message = 'Consulta a la base de datos inválida'
-      code = 'PRISMA_VALIDATION'
+      internalCode = 'PRISMA_CLIENT_ERROR';
+      status = HttpStatus.INTERNAL_SERVER_ERROR;
+      code = 'INTERNAL_ERROR';
+      message = INTERNAL_ERROR_MESSAGE;
+      details = undefined;
     }
 
-    if (Array.isArray(message) && status === HttpStatus.BAD_REQUEST) {
-      details = message
-      message = 'Validación fallida'
-      code = 'VALIDATION_ERROR'
+    response.setHeader('X-Request-ID', requestId);
+
+    if (status >= HttpStatus.INTERNAL_SERVER_ERROR) {
+      const exceptionName = exception instanceof Error ? exception.name : 'UnknownError';
+      const stack = exception instanceof Error ? redactSensitiveText(exception.stack ?? '') : '';
+      console.error('API internal error', {
+        requestId,
+        status,
+        method: request.method,
+        path: request.path || request.url?.split('?')[0],
+        code: internalCode,
+        exception: exceptionName,
+        stack,
+      });
     }
 
-    console.error(
-      `[${new Date().toISOString()}] ERROR ${code}:`,
-      message,
-      details ?? (exception?.stack ? exception.stack : String(exception)),
-    )
-
-    // Enviar alerta de correo si es un error 500 y MailService está disponible
-    if (status === HttpStatus.INTERNAL_SERVER_ERROR && this.mailService) {
-      try {
-        const request = ctx.getRequest<any>()
-        const url = request.url
-        const method = request.method
-        const body = request.body ? JSON.stringify(sanitizeObject(request.body), null, 2) : 'No body'
-        const headers = request.headers ? JSON.stringify(sanitizeObject(request.headers), null, 2) : 'No headers'
-        const tenantId = request.user?.tenantId || 'No tenant'
-        const userEmail = request.user?.email || 'Invitado'
-        const stack = exception?.stack ? exception.stack : String(exception)
-
-        const html = `
-          <h3>🚨 Error 500 Interno en el Servidor</h3>
-          <p><strong>Ruta:</strong> ${method} ${url}</p>
-          <p><strong>Usuario:</strong> ${userEmail} (Tenant: ${tenantId})</p>
-          <p><strong>Timestamp:</strong> ${new Date().toISOString()}</p>
-          <h4>Mensaje del error:</h4>
-          <pre style="background: #f4f4f4; padding: 10px; border: 1px solid #ddd; font-family: monospace;">${message}</pre>
-          <h4>Stack Trace:</h4>
-          <pre style="background: #f4f4f4; padding: 10px; border: 1px solid #ddd; overflow: auto; max-height: 400px; font-family: monospace;">${stack}</pre>
-          <h4>Request Headers:</h4>
-          <pre style="background: #f4f4f4; padding: 10px; border: 1px solid #ddd; font-family: monospace;">${headers}</pre>
-          <h4>Request Body:</h4>
-          <pre style="background: #f4f4f4; padding: 10px; border: 1px solid #ddd; font-family: monospace;">${body}</pre>
-        `
-
-        this.mailService.sendErrorAlert(`Error 500 en ${method} ${url}`, html)
-          .catch(err => console.error('Error al enviar alerta por correo:', err))
-      } catch (err) {
-        console.error('Error en el filtro al procesar alerta por correo:', err)
-      }
-    }
-
-    res.status(status).json({
+    return response.status(status).json({
       success: false,
+      statusCode: status,
       code,
       message,
       details,
+      requestId,
       timestamp: new Date().toISOString(),
-    })
+    });
   }
 
-  private httpStatusToCode(s: number): string {
-    const entry = Object.entries(HttpStatus).find(([, v]) => v === s)
-    return entry ? entry[0] : 'UNKNOWN'
+  private httpStatusToCode(status: number): string {
+    switch (status) {
+      case HttpStatus.BAD_REQUEST:
+        return 'BAD_REQUEST';
+      case HttpStatus.UNAUTHORIZED:
+        return 'UNAUTHORIZED';
+      case HttpStatus.FORBIDDEN:
+        return 'FORBIDDEN';
+      case HttpStatus.NOT_FOUND:
+        return 'NOT_FOUND';
+      case HttpStatus.CONFLICT:
+        return 'CONFLICT';
+      case HttpStatus.TOO_MANY_REQUESTS:
+        return 'RATE_LIMITED';
+      case HttpStatus.SERVICE_UNAVAILABLE:
+        return 'SERVICE_UNAVAILABLE';
+      default:
+        return `HTTP_${status}`;
+    }
   }
 }
 
-function sanitizeObject(obj: any): any {
-  if (!obj || typeof obj !== 'object') {
-    return obj
-  }
-
-  if (Array.isArray(obj)) {
-    return obj.map(sanitizeObject)
-  }
-
-  const sanitized: any = {}
-  const sensitiveKeys = ['password', 'authorization', 'cookie', 'token', 'refreshtoken', 'accesstoken', 'jwt', 'secret']
-
-  for (const key of Object.keys(obj)) {
-    const lowerKey = key.toLowerCase()
-    if (sensitiveKeys.some(sk => lowerKey.includes(sk))) {
-      sanitized[key] = '[FILTRADO]'
-    } else if (typeof obj[key] === 'object') {
-      sanitized[key] = sanitizeObject(obj[key])
-    } else {
-      sanitized[key] = obj[key]
-    }
-  }
-
-  return sanitized
+function redactSensitiveText(value: string): string {
+  return value
+    .replace(/\bBearer\s+[A-Za-z0-9._~+/=-]+/gi, 'Bearer [FILTRADO]')
+    .replace(/((?:password|token|secret|authorization|cookie)\s*[:=]\s*)[^\s,;]+/gi, '$1[FILTRADO]');
 }
