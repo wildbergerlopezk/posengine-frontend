@@ -11,6 +11,7 @@ import {
     ChevronDown, Ban
 } from "lucide-react"
 import { useAuthStore } from "@/src/features/auth/store/auth.store"
+import { clearIdempotencyKey, prepareIdempotencyKey } from "@/src/shared/api/idempotency"
 import { useCashSession } from "@/src/features/cash-session/hooks/useCashSession"
 import { useCommercialCapabilities } from "@/src/shared/hooks/useCommercialCapabilities"
 import { formatCurrency } from "@/src/shared/hooks/useFormatCurrency"
@@ -158,7 +159,7 @@ function formatDateTime(iso: string) {
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export function PurchaseHistoryPage() {
-    const { accessToken } = useAuthStore()
+    const { accessToken, user } = useAuthStore()
     const { session: activeCashSession, loading: cashSessionLoading } = useCashSession()
     const { capabilities, loading: capabilitiesLoading, error: capabilitiesError } = useCommercialCapabilities(accessToken ?? "")
     const authHeaders = {
@@ -377,23 +378,28 @@ export function PurchaseHistoryPage() {
         setRegisteringPayment(true)
         setPaymentError(null)
         try {
+            const payload = {
+                amount: amountNum,
+                paymentMethod,
+                cashSessionId: activeCashSession?.id,
+                paymentDate: new Date(paymentDateInput).toISOString(),
+                installmentId: targetInstallmentId || undefined,
+                notes: paymentNotes.trim() || undefined,
+            }
+            const operation = `PURCHASE_DEBT_PAYMENT:${selectedPurchase.id}`
+            const idempotencyKey = await prepareIdempotencyKey(operation, user?.id ?? "", user?.tenantId, payload)
             const res = await fetch(`${API_BASE}/purchases/${selectedPurchase.id}/debt/payments`, {
                 method: "POST",
-                headers: authHeaders,
-                body: JSON.stringify({
-                    amount: amountNum,
-                    paymentMethod,
-                    cashSessionId: activeCashSession?.id,
-                    paymentDate: new Date(paymentDateInput).toISOString(),
-                    installmentId: targetInstallmentId || undefined,
-                    notes: paymentNotes.trim() || undefined,
-                })
+                headers: { ...authHeaders, "Idempotency-Key": idempotencyKey },
+                body: JSON.stringify(payload)
             })
 
             if (!res.ok) {
                 const data = await res.json().catch(() => ({}))
+                if (res.status >= 400 && res.status < 500 && res.status !== 409) clearIdempotencyKey(operation, user?.id ?? "", user?.tenantId)
                 throw new Error(data.message || "Error al registrar el pago")
             }
+            clearIdempotencyKey(operation, user?.id ?? "", user?.tenantId)
 
             // Reload detailed view
             const updatedPurchaseRes = await fetch(`${API_BASE}/purchases/${selectedPurchase.id}`, { headers: authHeaders })

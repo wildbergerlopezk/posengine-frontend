@@ -9,6 +9,7 @@ import {
 import { useAuthStore } from "@/src/features/auth/store/auth.store"
 import { formatCurrency } from "@/src/shared/hooks/useFormatCurrency"
 import { API_BASE_URL } from "@/src/shared/config/api"
+import { clearIdempotencyKey, prepareIdempotencyKey } from "@/src/shared/api/idempotency"
 import styles from "./payments.module.css"
 
 const API_BASE = API_BASE_URL
@@ -165,23 +166,34 @@ export default function ClientsPaymentsPage() {
     setError(null)
 
     try {
+      const payload = {
+        customerId: selectedCustomerId,
+        amount: cleanAmount,
+        paymentMethod,
+        notes: notes.trim() || undefined,
+      }
+      const idempotencyKey = await prepareIdempotencyKey(
+        "CUSTOMER_PAY_TO_ACCOUNT",
+        user?.id ?? "",
+        user?.tenantId,
+        payload,
+      )
       const res = await fetch(`${API_BASE}/customer-payments/pay-to-account`, {
         method: "POST",
-        headers: authHeaders,
-        body: JSON.stringify({
-          customerId: selectedCustomerId,
-          amount: cleanAmount,
-          paymentMethod,
-          notes: notes.trim() || undefined,
-        }),
+        headers: { ...authHeaders, "Idempotency-Key": idempotencyKey },
+        body: JSON.stringify(payload),
       })
 
       if (!res.ok) {
         const body = await res.json().catch(() => ({}))
+        if (res.status >= 400 && res.status < 500 && res.status !== 409) {
+          clearIdempotencyKey("CUSTOMER_PAY_TO_ACCOUNT", user?.id ?? "", user?.tenantId)
+        }
         throw new Error(body.message || "Error al procesar el pago")
       }
 
       const result = await res.json()
+      clearIdempotencyKey("CUSTOMER_PAY_TO_ACCOUNT", user?.id ?? "", user?.tenantId)
       setSuccessResult(result)
       
       // Reset form fields

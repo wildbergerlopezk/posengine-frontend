@@ -4,6 +4,7 @@ import { create } from "zustand"
 import { createJSONStorage, persist } from "zustand/middleware"
 import type { AuthResponse } from "../types/auth.types"
 import { clearLabelDraftOnLogout } from "@/src/features/labels/store/labelDraft.store"
+import { invalidateCommercialCapabilities } from "@/src/shared/hooks/commercialCapabilitiesCache.mjs"
 
 type AuthUser = AuthResponse["user"]
 
@@ -30,15 +31,18 @@ export const useAuthStore = create<AuthState>()(
       refreshToken: null,
       isAuthenticated: false,
 
-      setAuth: ({ user, accessToken, refreshToken }) =>
+      setAuth: ({ user, accessToken, refreshToken }) => {
+        invalidateCommercialCapabilities()
         set({
           user,
           accessToken,
           refreshToken: refreshToken || null,
           isAuthenticated: true,
-        }),
+        })
+      },
 
       logout: () => {
+        invalidateCommercialCapabilities()
         clearLabelDraftOnLogout()
         set({
           user: null,

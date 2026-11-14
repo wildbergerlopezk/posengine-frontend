@@ -3,6 +3,7 @@ import { PrismaService } from '../../../prisma/prisma.service'
 import { Prisma } from '../../../generated/prisma/client'
 import { CreatePurchaseDebtDto } from '../dto/create-purchase-debt.dto'
 import { CreatePurchaseDebtPaymentDto } from '../dto/create-purchase-debt-payment.dto'
+import { claimIdempotency, completeIdempotency, findIdempotencyReplay, requireIdempotencyResource } from '../../../common/idempotency'
 
 @Injectable()
 export class PurchaseDebtService {
@@ -55,8 +56,15 @@ export class PurchaseDebtService {
     return debt
   }
 
-  async registerPayment(tenantId: string, purchaseId: string, dto: CreatePurchaseDebtPaymentDto) {
+  async registerPayment(tenantId: string, purchaseId: string, dto: CreatePurchaseDebtPaymentDto, idempotencyKey?: string) {
+    const payload = { purchaseId, supplierPayment: dto }
+    const replay = await findIdempotencyReplay(this.prisma, tenantId, 'SUPPLIER_DEBT_PAYMENT', idempotencyKey, payload)
+    if (replay) return this.replayDebtPayment(this.prisma, tenantId, purchaseId, replay)
+
     return this.prisma.$transaction(async (tx) => {
+      const claim = await claimIdempotency(tx, tenantId, 'SUPPLIER_DEBT_PAYMENT', idempotencyKey, payload)
+      if (claim && !claim.created) return this.replayDebtPayment(tx, tenantId, purchaseId, claim)
+
       if (!Number.isFinite(dto.amount) || dto.amount <= 0) {
         throw new BadRequestException('El importe del pago debe ser positivo.')
       }
@@ -170,7 +178,7 @@ export class PurchaseDebtService {
         installment.adjustments.reduce((sum, adjustment) => sum + Number(adjustment.amount), 0) +
         installment.creditApplications.reduce((sum, application) => sum + Number(application.amount), 0)
 
-      await tx.purchaseDebtPayment.create({
+      const payment = await tx.purchaseDebtPayment.create({
         data: {
           tenantId,
           purchaseDebtId: debt.id,
@@ -230,7 +238,7 @@ export class PurchaseDebtService {
         }
       }
 
-      return tx.purchaseDebt.findUnique({
+      const result = await tx.purchaseDebt.findUnique({
         where: { id: debt.id },
         include: {
           installments: { orderBy: { number: 'asc' }, include: { adjustments: true, creditApplications: true } },
@@ -238,6 +246,27 @@ export class PurchaseDebtService {
           adjustments: { orderBy: { createdAt: 'asc' } },
         },
       })
+      await completeIdempotency(tx, tenantId, claim, 'PURCHASE_DEBT_PAYMENT', [payment.id])
+      return result
     })
+  }
+
+  private async replayDebtPayment(
+    client: Prisma.TransactionClient | PrismaService,
+    tenantId: string,
+    purchaseId: string,
+    claim: NonNullable<Awaited<ReturnType<typeof findIdempotencyReplay>>>,
+  ) {
+    requireIdempotencyResource(claim, 'PURCHASE_DEBT_PAYMENT')
+    const debt = await client.purchaseDebt.findFirst({
+      where: { purchaseId, tenantId },
+      include: {
+        installments: { orderBy: { number: 'asc' }, include: { adjustments: true, creditApplications: true } },
+        payments: true,
+        adjustments: { orderBy: { createdAt: 'asc' } },
+      },
+    })
+    if (!debt) throw new NotFoundException('La deuda original ya no está disponible.')
+    return debt
   }
 }

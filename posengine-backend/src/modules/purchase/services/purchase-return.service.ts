@@ -7,6 +7,8 @@ import {
 import { PurchaseReturnStatus, PurchaseStatus } from '../../../generated/prisma/enums'
 import { CommercialOperationPolicy } from '../../../common/commercial-operation-policy'
 import { PrismaService } from '../../../prisma/prisma.service'
+import type { Prisma } from '../../../generated/prisma/client'
+import { claimIdempotency, completeIdempotency, findIdempotencyReplay, requireIdempotencyResource } from '../../../common/idempotency'
 import {
   ApplyPurchaseReturnCreditDto,
   ConfirmPurchaseReturnDto,
@@ -18,8 +20,11 @@ import {
 export class PurchaseReturnService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async create(tenantId: string, dto: CreatePurchaseReturnDto, actorId?: string) {
+  async create(tenantId: string, dto: CreatePurchaseReturnDto, actorId?: string, idempotencyKey?: string) {
     CommercialOperationPolicy.assertEnabled('PURCHASE_RETURNS')
+    const payload = { purchaseReturn: dto }
+    const replay = await findIdempotencyReplay(this.prisma, tenantId, 'PURCHASE_RETURN_CREATE', idempotencyKey, payload)
+    if (replay) return this.replayCreatedReturn(this.prisma, tenantId, replay)
 
     if (!dto.items?.length) {
       throw new BadRequestException('La devolución debe incluir al menos un ítem.')
@@ -37,6 +42,9 @@ export class PurchaseReturnService {
     }
 
     return this.prisma.$transaction(async (tx) => {
+      const claim = await claimIdempotency(tx, tenantId, 'PURCHASE_RETURN_CREATE', idempotencyKey, payload)
+      if (claim && !claim.created) return this.replayCreatedReturn(tx, tenantId, claim)
+
       const lockedPurchase = await tx.$queryRaw<Array<{ id: string }>>`
         SELECT "id"
         FROM "purchases"
@@ -124,7 +132,7 @@ export class PurchaseReturnService {
         }
       }
 
-      return tx.purchaseReturn.create({
+      const created = await tx.purchaseReturn.create({
         data: {
           tenantId,
           purchaseId: dto.purchaseId,
@@ -140,7 +148,19 @@ export class PurchaseReturnService {
           items: { include: { product: { select: { id: true, name: true } } } },
         },
       })
+      await completeIdempotency(tx, tenantId, claim, 'PURCHASE_RETURN', [created.id])
+      return created
     }, { timeout: 15_000 })
+  }
+
+  private async replayCreatedReturn(client: Prisma.TransactionClient | PrismaService, tenantId: string, claim: NonNullable<Awaited<ReturnType<typeof findIdempotencyReplay>>>) {
+    const id = requireIdempotencyResource(claim, 'PURCHASE_RETURN')
+    const returned = await client.purchaseReturn.findFirst({
+      where: { id, tenantId },
+      include: { items: { include: { product: { select: { id: true, name: true } } } } },
+    })
+    if (!returned) throw new NotFoundException('La devolución original ya no está disponible.')
+    return returned
   }
 
   async confirm(returnId: string, tenantId: string, dto: ConfirmPurchaseReturnDto = {}, actorId?: string) {
@@ -433,14 +453,20 @@ export class PurchaseReturnService {
     throw new ConflictException('Solo se pueden cancelar devoluciones en estado PENDING')
   }
 
-  async settleRefund(settlementId: string, tenantId: string, dto: SettlePurchaseReturnRefundDto, actorId?: string) {
+  async settleRefund(settlementId: string, tenantId: string, dto: SettlePurchaseReturnRefundDto, actorId?: string, idempotencyKey?: string) {
     CommercialOperationPolicy.assertEnabled('PURCHASE_RETURN_SETTLEMENTS')
+    const payload = { settlementId, refundReceipt: dto }
+    const replay = await findIdempotencyReplay(this.prisma, tenantId, 'PURCHASE_RETURN_REFUND', idempotencyKey, payload)
+    if (replay) return this.replayRefundSettlement(this.prisma, tenantId, settlementId, replay)
     if (dto.paymentMethod !== 'CASH' && dto.paymentMethod !== 'TRANSFER') {
       throw new BadRequestException('El medio del reembolso debe ser CASH o TRANSFER.')
     }
     const amount = Math.round(dto.amount * 100) / 100
     if (!Number.isFinite(amount) || amount <= 0) throw new BadRequestException('El importe recibido debe ser positivo.')
     return this.prisma.$transaction(async (tx) => {
+      const claim = await claimIdempotency(tx, tenantId, 'PURCHASE_RETURN_REFUND', idempotencyKey, payload)
+      if (claim && !claim.created) return this.replayRefundSettlement(tx, tenantId, settlementId, claim)
+
       await tx.$queryRaw<Array<{ id: string }>>`
         SELECT "id" FROM "purchase_return_settlements" WHERE "id" = ${settlementId} AND "tenantId" = ${tenantId} FOR UPDATE
       `
@@ -522,18 +548,36 @@ export class PurchaseReturnService {
           },
         })
       }
-      return tx.purchaseReturnSettlement.findFirst({
+      const result = await tx.purchaseReturnSettlement.findFirst({
         where: { id: settlementId, tenantId }, include: { receipts: { orderBy: { effectiveAt: 'asc' } } },
       })
+      await completeIdempotency(tx, tenantId, claim, 'PURCHASE_RETURN_SETTLEMENT', [settlementId])
+      return result
     })
   }
 
-  async applySupplierCredit(settlementId: string, tenantId: string, dto: ApplyPurchaseReturnCreditDto, actorId?: string) {
+  private async replayRefundSettlement(client: Prisma.TransactionClient | PrismaService, tenantId: string, settlementId: string, claim: NonNullable<Awaited<ReturnType<typeof findIdempotencyReplay>>>) {
+    requireIdempotencyResource(claim, 'PURCHASE_RETURN_SETTLEMENT')
+    const settlement = await client.purchaseReturnSettlement.findFirst({
+      where: { id: settlementId, tenantId },
+      include: { receipts: { orderBy: { effectiveAt: 'asc' } } },
+    })
+    if (!settlement) throw new NotFoundException('El reembolso original ya no está disponible.')
+    return settlement
+  }
+
+  async applySupplierCredit(settlementId: string, tenantId: string, dto: ApplyPurchaseReturnCreditDto, actorId?: string, idempotencyKey?: string) {
     CommercialOperationPolicy.assertEnabled('SUPPLIER_CREDIT_APPLICATIONS')
+    const payload = { settlementId, supplierCreditApplication: dto }
+    const replay = await findIdempotencyReplay(this.prisma, tenantId, 'SUPPLIER_CREDIT_APPLICATION', idempotencyKey, payload)
+    if (replay) return this.replayCreditApplication(this.prisma, tenantId, settlementId, replay)
     if (!Number.isFinite(dto.amount) || dto.amount <= 0) {
       throw new BadRequestException('El importe del crédito debe ser positivo.')
     }
     return this.prisma.$transaction(async (tx) => {
+      const claim = await claimIdempotency(tx, tenantId, 'SUPPLIER_CREDIT_APPLICATION', idempotencyKey, payload)
+      if (claim && !claim.created) return this.replayCreditApplication(tx, tenantId, settlementId, claim)
+
       await tx.$queryRaw<Array<{ id: string }>>`
         SELECT "id" FROM "purchase_return_settlements" WHERE "id" = ${settlementId} AND "tenantId" = ${tenantId} FOR UPDATE
       `
@@ -612,10 +656,21 @@ export class PurchaseReturnService {
           status: newAppliedAmount >= Number(settlement.amount) - 0.01 ? 'APPLIED' : 'PARTIALLY_APPLIED',
         },
       })
-      return tx.purchaseReturnSettlement.findFirst({
+      const result = await tx.purchaseReturnSettlement.findFirst({
         where: { id: settlementId, tenantId }, include: { applications: true },
       })
+      await completeIdempotency(tx, tenantId, claim, 'PURCHASE_RETURN_SETTLEMENT', [settlementId])
+      return result
     }, { timeout: 15_000 })
+  }
+
+  private async replayCreditApplication(client: Prisma.TransactionClient | PrismaService, tenantId: string, settlementId: string, claim: NonNullable<Awaited<ReturnType<typeof findIdempotencyReplay>>>) {
+    requireIdempotencyResource(claim, 'PURCHASE_RETURN_SETTLEMENT')
+    const settlement = await client.purchaseReturnSettlement.findFirst({
+      where: { id: settlementId, tenantId }, include: { applications: true },
+    })
+    if (!settlement) throw new NotFoundException('La aplicación de crédito original ya no está disponible.')
+    return settlement
   }
 
   async findAll(tenantId: string, purchaseId?: string, supplierId?: string) {

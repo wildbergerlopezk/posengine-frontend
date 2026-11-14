@@ -10,7 +10,7 @@ import {
   ChevronDown, ChevronRight, HelpCircle, Layers
 } from "lucide-react"
 import { toast } from "sonner"
-import { apiClient } from "@/src/shared/api/apiClient"
+import { logoutApi } from "@/src/features/auth/api/logout.api"
 import { useAuthStore } from "@/src/features/auth/store/auth.store"
 import styles from "./Sidebar.module.css"
 
@@ -95,13 +95,13 @@ export function Sidebar() {
   }
 
   const handleLogout = async () => {
-    const { refreshToken, accessToken } = useAuthStore.getState()
-    if (!refreshToken || !accessToken) {
+    const { refreshToken } = useAuthStore.getState()
+    if (!refreshToken) {
       toast.error("No se pudo cerrar la sesión en el servidor. Volvé a intentar.")
       return
     }
     try {
-      await apiClient.post("/auth/logout")
+      await logoutApi(refreshToken)
     } catch {
       toast.error("No se pudo cerrar la sesión en el servidor. Volvé a intentar.")
       return

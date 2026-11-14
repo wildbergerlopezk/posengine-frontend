@@ -6,6 +6,8 @@ import { API_BASE_URL } from "@/src/shared/config/api"
 import { formatCurrency } from "@/src/shared/hooks/useFormatCurrency"
 import { useCashSession } from "@/src/features/cash-session/hooks/useCashSession"
 import { useCommercialCapabilities } from "@/src/shared/hooks/useCommercialCapabilities"
+import { useAuthStore } from "@/src/features/auth/store/auth.store"
+import { clearIdempotencyKey, getOrCreateIdempotencyTimestamp, prepareIdempotencyKey } from "@/src/shared/api/idempotency"
 import controls from "@/src/shared/styles/detailFormControls.module.css"
 import styles from "./SaleReturnPanel.module.css"
 
@@ -21,6 +23,7 @@ const toLocalDateTimeInput = (date: Date) =>
   new Date(date.getTime() - date.getTimezoneOffset() * 60_000).toISOString().slice(0, 16)
 
 export function SaleReturnPanel({ sale, accessToken, onChanged }: { sale: Sale; accessToken: string; onChanged: () => void }) {
+  const user = useAuthStore(state => state.user)
   const headers = useMemo(() => ({ "Content-Type": "application/json", Authorization: `Bearer ${accessToken}` }), [accessToken])
   const { capabilities, loading: capabilitiesLoading, error: capabilitiesError, refresh: refreshCapabilities } = useCommercialCapabilities(accessToken)
   const { session: activeCashSession, loading: cashSessionLoading } = useCashSession()
@@ -75,18 +78,28 @@ export function SaleReturnPanel({ sale, accessToken, onChanged }: { sale: Sale; 
     if (!canCreateReturn) { setError(returnBlockMessage || "La devolución no está disponible temporalmente."); return }
     setBusy(true); setError(null)
     try {
+      const returnOperation = `SALE_RETURN_CREATE:${sale.id}`
+      const returnDate = getOrCreateIdempotencyTimestamp(returnOperation, user?.id ?? "", user?.tenantId, new Date().toISOString())
+      const payload = { saleId: sale.id, returnDate, reason, items: selected.map(({ item, quantity }) => ({ saleItemId: item.id, quantity, disposition: dispositions[item.id] || "RESTOCKABLE" })) }
+      const idempotencyKey = await prepareIdempotencyKey(returnOperation, user?.id ?? "", user?.tenantId, payload)
       const createResponse = await fetch(`${API_BASE_URL}/sale-returns`, {
-        method: "POST", headers,
-        body: JSON.stringify({ saleId: sale.id, returnDate: new Date().toISOString(), reason, items: selected.map(({ item, quantity }) => ({ saleItemId: item.id, quantity, disposition: dispositions[item.id] || "RESTOCKABLE" })) }),
+        method: "POST", headers: { ...headers, "Idempotency-Key": idempotencyKey },
+        body: JSON.stringify(payload),
       })
       const created = await createResponse.json().catch(() => null)
-      if (!createResponse.ok) throw new Error(created?.message || "No se pudo crear la devolución.")
-      const confirmResponse = await fetch(`${API_BASE_URL}/sale-returns/${created.id}/confirm`, {
-        method: "PATCH", headers,
-        body: JSON.stringify(refund > 0.01 ? { settlementDisposition: safeSettlement } : {}),
-      })
-      const result = await confirmResponse.json().catch(() => null)
-      if (!confirmResponse.ok) throw new Error(result?.message || "No se pudo confirmar la devolución.")
+      if (!createResponse.ok) {
+        if (createResponse.status >= 400 && createResponse.status < 500 && createResponse.status !== 409) clearIdempotencyKey(returnOperation, user?.id ?? "", user?.tenantId)
+        throw new Error(created?.message || "No se pudo crear la devolución.")
+      }
+      if (created.status !== "CONFIRMED") {
+        const confirmResponse = await fetch(`${API_BASE_URL}/sale-returns/${created.id}/confirm`, {
+          method: "PATCH", headers,
+          body: JSON.stringify(refund > 0.01 ? { settlementDisposition: safeSettlement } : {}),
+        })
+        const result = await confirmResponse.json().catch(() => null)
+        if (!confirmResponse.ok) throw new Error(result?.message || "No se pudo confirmar la devolución.")
+      }
+      clearIdempotencyKey(returnOperation, user?.id ?? "", user?.tenantId)
       setQuantities({}); setReason(""); await load(); onChanged()
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "No se pudo completar la devolución.")
@@ -102,12 +115,19 @@ export function SaleReturnPanel({ sale, accessToken, onChanged }: { sale: Sale; 
     if (draft.method === "CASH" && (!activeCashSession || cashSessionLoading)) { setError("Abrí una sesión de caja para registrar el reembolso en efectivo."); return }
     setBusy(true); setError(null)
     try {
+      const payload = { amount: Number(draft.amount), paymentMethod: draft.method, effectiveAt: new Date(draft.date).toISOString() }
+      const operation = `SALE_RETURN_SETTLE:${settlementId}`
+      const idempotencyKey = await prepareIdempotencyKey(operation, user?.id ?? "", user?.tenantId, payload)
       const response = await fetch(`${API_BASE_URL}/sale-returns/settlements/${settlementId}/settle`, {
-        method: "PATCH", headers,
-        body: JSON.stringify({ amount: Number(draft.amount), paymentMethod: draft.method, effectiveAt: new Date(draft.date).toISOString() }),
+        method: "PATCH", headers: { ...headers, "Idempotency-Key": idempotencyKey },
+        body: JSON.stringify(payload),
       })
       const data = await response.json().catch(() => null)
-      if (!response.ok) throw new Error(data?.message || "No se pudo registrar el reembolso recibido.")
+      if (!response.ok) {
+        if (response.status >= 400 && response.status < 500 && response.status !== 409) clearIdempotencyKey(operation, user?.id ?? "", user?.tenantId)
+        throw new Error(data?.message || "No se pudo registrar el reembolso recibido.")
+      }
+      clearIdempotencyKey(operation, user?.id ?? "", user?.tenantId)
       setReceiptDrafts(values => ({ ...values, [settlementId]: { ...draft, amount: "" } }))
       await load()
     } catch (cause) {

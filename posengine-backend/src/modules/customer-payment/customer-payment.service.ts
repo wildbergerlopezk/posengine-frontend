@@ -6,6 +6,7 @@ import { CreateCustomerPaymentDto } from './dto/create-customer-payment.dto'
 import { CustomerPaymentFilterDto } from './dto/customer-payment-filter.dto'
 import { PayToAccountDto } from './dto/pay-to-account.dto'
 import { VoidPaymentDto } from './dto/void-payment.dto'
+import { claimIdempotency, completeIdempotency, findIdempotencyReplay, requireIdempotencyResource } from '../../common/idempotency'
 
 @Injectable()
 export class CustomerPaymentService {
@@ -40,7 +41,16 @@ export class CustomerPaymentService {
   }
 
   // ── Create ──────────────────────────────────────────────────────────────────
-  async create(tenantId: string, dto: CreateCustomerPaymentDto) {
+  async create(tenantId: string, dto: CreateCustomerPaymentDto, idempotencyKey?: string) {
+    const payload = { customerPayment: dto }
+    const replay = await findIdempotencyReplay(this.prisma, tenantId, 'CUSTOMER_PAYMENT_CREATE', idempotencyKey, payload)
+    if (replay) {
+      const id = requireIdempotencyResource(replay, 'CUSTOMER_PAYMENT')
+      const existing = await this.findPaymentResult(this.prisma, tenantId, id)
+      if (!existing) throw new NotFoundException('El pago original ya no está disponible.')
+      return existing
+    }
+    try {
     const customer = await this.prisma.customer.findFirst({
       where: { id: dto.customerId, tenantId },
     })
@@ -80,6 +90,14 @@ export class CustomerPaymentService {
 
     const paymentMethod = dto.paymentMethod ?? PaymentMethod.CASH
     return this.prisma.$transaction(async (tx) => {
+      const claim = await claimIdempotency(tx, tenantId, 'CUSTOMER_PAYMENT_CREATE', idempotencyKey, payload)
+      if (claim && !claim.created) {
+        const id = requireIdempotencyResource(claim, 'CUSTOMER_PAYMENT')
+        const existing = await this.findPaymentResult(tx, tenantId, id)
+        if (!existing) throw new NotFoundException('El pago original ya no está disponible.')
+        return existing
+      }
+
       const customerLock = await tx.customer.updateMany({
         where: { id: dto.customerId, tenantId }, data: { currentDebt: { increment: 0 } },
       })
@@ -130,13 +148,34 @@ export class CustomerPaymentService {
         })
       }
 
-      return tx.customerPayment.findUnique({
-        where: { id: payment.id },
+      const result = await tx.customerPayment.findFirst({
+        where: { id: payment.id, tenantId },
         include: {
           customer: { select: { id: true, name: true } },
           sale: { select: { id: true, saleDate: true, total: true, remainingBalance: true } },
         },
       })
+      await completeIdempotency(tx, tenantId, claim, 'CUSTOMER_PAYMENT', [payment.id])
+      return result
+    })
+    } catch (error) {
+      const validationReplay = await findIdempotencyReplay(this.prisma, tenantId, 'CUSTOMER_PAYMENT_CREATE', idempotencyKey, payload)
+      if (validationReplay) {
+        const id = requireIdempotencyResource(validationReplay, 'CUSTOMER_PAYMENT')
+        const existing = await this.findPaymentResult(this.prisma, tenantId, id)
+        if (existing) return existing
+      }
+      throw error
+    }
+  }
+
+  private findPaymentResult(client: Prisma.TransactionClient | PrismaService, tenantId: string, id: string) {
+    return client.customerPayment.findFirst({
+      where: { id, tenantId },
+      include: {
+        customer: { select: { id: true, name: true } },
+        sale: { select: { id: true, saleDate: true, total: true, remainingBalance: true } },
+      },
     })
   }
 
@@ -224,7 +263,11 @@ export class CustomerPaymentService {
   }
 
   // ── Pago a cuenta con distribución FIFO ─────────────────────────────────────
-  async payToAccount(tenantId: string, dto: PayToAccountDto) {
+  async payToAccount(tenantId: string, dto: PayToAccountDto, idempotencyKey?: string) {
+    const payload = { payToAccount: dto }
+    const replay = await findIdempotencyReplay(this.prisma, tenantId, 'CUSTOMER_PAY_TO_ACCOUNT', idempotencyKey, payload)
+    if (replay) return this.replayAccountPayment(this.prisma, tenantId, dto.amount, replay)
+    try {
     const customer = await this.prisma.customer.findFirst({
       where: { id: dto.customerId, tenantId },
     })
@@ -247,6 +290,9 @@ export class CustomerPaymentService {
     })
 
     return this.prisma.$transaction(async (tx) => {
+      const claim = await claimIdempotency(tx, tenantId, 'CUSTOMER_PAY_TO_ACCOUNT', idempotencyKey, payload)
+      if (claim && !claim.created) return this.replayAccountPayment(tx, tenantId, dto.amount, claim)
+
       const customerLock = await tx.customer.updateMany({
         where: { id: dto.customerId, tenantId }, data: { currentDebt: { increment: 0 } },
       })
@@ -326,12 +372,37 @@ export class CustomerPaymentService {
         data: { currentDebt: { decrement: dto.amount } },
       })
 
-      return {
+      const result = {
         totalApplied: dto.amount,
         salesAffected: paymentsCreated.length,
         payments: paymentsCreated,
       }
+      await completeIdempotency(tx, tenantId, claim, 'CUSTOMER_PAYMENT_BATCH', paymentsCreated.map((payment) => payment.id))
+      return result
     })
+    } catch (error) {
+      const validationReplay = await findIdempotencyReplay(this.prisma, tenantId, 'CUSTOMER_PAY_TO_ACCOUNT', idempotencyKey, payload)
+      if (validationReplay) return this.replayAccountPayment(this.prisma, tenantId, dto.amount, validationReplay)
+      throw error
+    }
+  }
+
+  private async replayAccountPayment(
+    client: Prisma.TransactionClient | PrismaService,
+    tenantId: string,
+    amount: number,
+    claim: NonNullable<Awaited<ReturnType<typeof findIdempotencyReplay>>>,
+  ) {
+    if (claim.resourceType !== 'CUSTOMER_PAYMENT_BATCH' || !claim.resourceIds.length) {
+      throw new ConflictException('El resultado original del pago a cuenta no está disponible.')
+    }
+    const rows = await client.customerPayment.findMany({
+      where: { id: { in: claim.resourceIds }, tenantId },
+    })
+    const byId = new Map(rows.map((row) => [row.id, row]))
+    const payments = claim.resourceIds.map((id) => byId.get(id))
+    if (payments.some((payment) => !payment)) throw new NotFoundException('El pago original ya no está disponible.')
+    return { totalApplied: amount, salesAffected: payments.length, payments }
   }
 
   // ── Anular un pago con reversión de deudas ───────────────────────────────────

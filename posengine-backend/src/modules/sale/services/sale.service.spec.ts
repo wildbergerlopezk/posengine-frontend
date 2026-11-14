@@ -118,6 +118,21 @@ describe('SaleService.create payment accounting', () => {
     },
   );
 
+  it('does not log a routine successful sale unless performance logging is opted in', async () => {
+    const previousSetting = process.env.POSENGINE_LOG_SALE_PERFORMANCE;
+    delete process.env.POSENGINE_LOG_SALE_PERFORMANCE;
+    const log = jest.spyOn((service as any).logger, 'log');
+
+    try {
+      await create(PaymentMethod.CASH);
+      expect(log).not.toHaveBeenCalledWith(expect.stringContaining('sale.transaction.completed'));
+    } finally {
+      log.mockRestore();
+      if (previousSetting === undefined) delete process.env.POSENGINE_LOG_SALE_PERFORMANCE;
+      else process.env.POSENGINE_LOG_SALE_PERFORMANCE = previousSetting;
+    }
+  });
+
   it('records a CASH sale without a customer as paid', async () => {
     const sale = await create(PaymentMethod.CASH);
     expect(sale).toMatchObject({
@@ -139,6 +154,20 @@ describe('SaleService.create payment accounting', () => {
       'cash-session-1',
       undefined,
     );
+  });
+
+  it('does not log successful sales when performance logging is disabled', async () => {
+    const previousFlag = process.env.POSENGINE_LOG_SALE_PERFORMANCE;
+    delete process.env.POSENGINE_LOG_SALE_PERFORMANCE;
+    const log = jest.spyOn((service as any).logger, 'log');
+
+    try {
+      await create(PaymentMethod.CASH);
+      expect(log).not.toHaveBeenCalled();
+    } finally {
+      if (previousFlag === undefined) delete process.env.POSENGINE_LOG_SALE_PERFORMANCE;
+      else process.env.POSENGINE_LOG_SALE_PERFORMANCE = previousFlag;
+    }
   });
 
   it('retains pending and partial CREDIT balances', async () => {
@@ -240,6 +269,7 @@ describe('SaleService.create payment accounting', () => {
   );
 
   it('stops cash and credit writes when a stock operation fails inside the transaction callback', async () => {
+    const errorLog = jest.spyOn((service as any).logger, 'error').mockImplementation(() => undefined);
     stockMovementService.registerSale.mockRejectedValue(
       new Error('intermediate stock failure'),
     );
@@ -255,6 +285,8 @@ describe('SaleService.create payment accounting', () => {
     expect(
       saleCreditService.processCreditDebtAndPayments,
     ).not.toHaveBeenCalled();
+    expect(errorLog).toHaveBeenCalledWith(expect.stringContaining('sale.transaction.failed'));
+    expect(errorLog).toHaveBeenCalledWith(expect.stringContaining('"errorType":"Error"'));
   });
 
   it('blocks cancellation and restoration at the service boundary by default', async () => {

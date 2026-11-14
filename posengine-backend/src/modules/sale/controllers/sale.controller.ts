@@ -11,6 +11,7 @@ import {
   HttpStatus,
   UseGuards,
   Request,
+  Headers,
 } from '@nestjs/common'
 import {
   ApiTags,
@@ -20,6 +21,7 @@ import {
   ApiBody,
   ApiParam,
   ApiQuery,
+  ApiHeader,
 } from '@nestjs/swagger'
 import { SaleService } from '../services/sale.service'
 import { SaleLifecycleActionDto } from '../dto/sale-lifecycle-action.dto'
@@ -44,6 +46,7 @@ export class SaleController {
   @Roles(UserRole.ADMIN, UserRole.SUPERADMIN)
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Registrar una nueva venta' })
+  @ApiHeader({ name: 'Idempotency-Key', required: false })
   @ApiBody({ type: CreateSaleDto })
   @ApiResponse({ status: 201, description: 'Venta registrada correctamente' })
   @ApiResponse({ status: 400, description: 'Sin caja abierta, stock insuficiente o precio inválido' })
@@ -52,8 +55,9 @@ export class SaleController {
     @CurrentUser() user: AuthenticatedUser,
     @Request() req: any,
     @Body() dto: CreateSaleDto,
+    @Headers('idempotency-key') idempotencyKey?: string,
   ) {
-    return this.saleService.create(user.tenantId, req.cashSession.id, dto)
+    return this.saleService.create(user.tenantId, req.cashSession.id, dto, idempotencyKey)
   }
 
   @Get()

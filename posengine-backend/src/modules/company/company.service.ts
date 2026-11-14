@@ -7,12 +7,18 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { CreateCompanyDto } from './dto/create-company.dto';
 import { UpdateCompanyDto } from './dto/update-company.dto';
 import { PaginationQueryDto } from '../../common/dto/pagination-query.dto';
+import { UploadService } from '../upload/upload.service';
 
 @Injectable()
 export class CompanyService {
-  constructor(private readonly prisma: PrismaService) { }
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly uploadService: UploadService,
+  ) { }
 
   async create(tenantId: string, dto: CreateCompanyDto) {
+    if (dto.logoUrl) await this.uploadService.assertOwnedLogoUrl(tenantId, dto.logoUrl);
+
     const existingSlug = await this.prisma.company.findUnique({
       where: { slug: dto.slug },
     });
@@ -101,7 +107,10 @@ export class CompanyService {
   }
 
   async update(id: string, tenantId: string, dto: UpdateCompanyDto) {
-    await this.findOne(id, tenantId);
+    const company = await this.findOne(id, tenantId);
+    if (dto.logoUrl && dto.logoUrl !== company.logoUrl) {
+      await this.uploadService.assertOwnedLogoUrl(tenantId, dto.logoUrl);
+    }
 
     if (dto.slug) {
       const conflictSlug = await this.prisma.company.findFirst({

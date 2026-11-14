@@ -16,6 +16,7 @@ import { CreateSaleDto } from './../dto/create-sale.dto'
 import { SaleFilterDto } from './../dto/sale-filter.dto'
 import { CashSessionStatus, SaleStatus, PriceType, PaymentStatus, PaymentMethod } from '../../../generated/prisma/enums'
 import type { Prisma } from '../../../generated/prisma/client'
+import { claimIdempotency, completeIdempotency, findIdempotencyReplay, requireIdempotencyResource } from '../../../common/idempotency'
 
 @Injectable()
 export class SaleService {
@@ -29,7 +30,16 @@ export class SaleService {
   ) {}
 
   // ── Create ───────────────────────────────────────────────────────────────
-  async create(tenantId: string, cashSessionId: string, dto: CreateSaleDto) {
+  async create(tenantId: string, cashSessionId: string, dto: CreateSaleDto, idempotencyKey?: string) {
+    const idempotencyPayload = { cashSessionId, sale: dto }
+    const replay = await findIdempotencyReplay(this.prisma, tenantId, 'SALE_CREATE', idempotencyKey, idempotencyPayload)
+    if (replay) {
+      const id = requireIdempotencyResource(replay, 'SALE')
+      const existing = await this.findCreateResult(this.prisma, tenantId, id)
+      if (!existing) throw new NotFoundException('La venta original ya no está disponible.')
+      return existing
+    }
+    try {
     const salePaymentMethod = dto.paymentMethod ?? PaymentMethod.CASH
     const hasInitialPayment = (dto.amountPaid ?? 0) > 0
     const initialMethod = dto.initialPaymentMethod
@@ -70,7 +80,26 @@ export class SaleService {
     const customer = await this.saleCreditService.validateCreditLimit(tenantId, dto, total)
 
     // 5. Ejecutar la transacción
-    return this.executeSaleTransaction(tenantId, cashSessionId, dto, customer, total)
+    return this.executeSaleTransaction(tenantId, cashSessionId, dto, customer, total, idempotencyKey, idempotencyPayload)
+    } catch (error) {
+      const validationReplay = await findIdempotencyReplay(this.prisma, tenantId, 'SALE_CREATE', idempotencyKey, idempotencyPayload)
+      if (validationReplay) {
+        const id = requireIdempotencyResource(validationReplay, 'SALE')
+        const existing = await this.findCreateResult(this.prisma, tenantId, id)
+        if (existing) return existing
+      }
+      throw error
+    }
+  }
+
+  private findCreateResult(client: Prisma.TransactionClient | PrismaService, tenantId: string, id: string) {
+    return client.sale.findFirst({
+      where: { id, tenantId },
+      include: {
+        customer: { select: { id: true, name: true } },
+        items: { include: { product: { select: { id: true, name: true, sku: true, unitType: true } } } },
+      },
+    })
   }
 
   private async executeSaleTransaction(
@@ -79,6 +108,8 @@ export class SaleService {
     dto: CreateSaleDto,
     customer: any,
     total: number,
+    idempotencyKey?: string,
+    idempotencyPayload?: unknown,
   ) {
     const paymentMethod = dto.paymentMethod ?? PaymentMethod.CASH
     const isCreditSale = paymentMethod === PaymentMethod.CREDIT
@@ -94,12 +125,22 @@ export class SaleService {
 
     // Sort items by productId to prevent deadlocks
     const sortedItems = [...dto.items].sort((a, b) => a.productId.localeCompare(b.productId))
-    const startedAt = performance.now()
+    const logPerformance = process.env.POSENGINE_LOG_SALE_PERFORMANCE === 'true'
+    const startedAt = logPerformance ? performance.now() : 0
     const stagesMs: Record<string, number> = {}
-    let succeeded = false
 
     try {
       const result = await this.prisma.$transaction(async (tx) => {
+        const idempotencyClaim = await claimIdempotency(
+          tx, tenantId, 'SALE_CREATE', idempotencyKey, idempotencyPayload,
+        )
+        if (idempotencyClaim && !idempotencyClaim.created) {
+          const existingId = requireIdempotencyResource(idempotencyClaim, 'SALE')
+          const existing = await this.findCreateResult(tx, tenantId, existingId)
+          if (!existing) throw new NotFoundException('La venta original ya no está disponible.')
+          return existing
+        }
+
         let transactionCustomer = customer
         if (isCreditSale && customer?.id) {
           const customerLock = await tx.customer.updateMany({
@@ -127,7 +168,7 @@ export class SaleService {
           throw new ConflictException('La caja ya está cerrada o no pertenece al negocio actual.')
         }
 
-        let stageStartedAt = performance.now()
+        let stageStartedAt = logPerformance ? performance.now() : 0
         const sale = await tx.sale.create({
           data: {
             tenantId,
@@ -139,9 +180,9 @@ export class SaleService {
             remainingBalance,
           },
         })
-        stagesMs.saleCreate = performance.now() - stageStartedAt
+        if (logPerformance) stagesMs.saleCreate = performance.now() - stageStartedAt
 
-        stageStartedAt = performance.now()
+        if (logPerformance) stageStartedAt = performance.now()
         for (const item of sortedItems) {
           const saleItem = await tx.saleItem.create({
             data: {
@@ -163,18 +204,18 @@ export class SaleService {
             tx,
           )
         }
-        stagesMs.itemsAndStock = performance.now() - stageStartedAt
+        if (logPerformance) stagesMs.itemsAndStock = performance.now() - stageStartedAt
 
         // Solo lo cobrado en el momento entra a totalSales de la caja
-        stageStartedAt = performance.now()
+        if (logPerformance) stageStartedAt = performance.now()
         await tx.cashSession.update({
           where: { id: cashSessionId },
           data: { totalSales: { increment: total - remainingBalance } },
         })
-        stagesMs.cashUpdate = performance.now() - stageStartedAt
+        if (logPerformance) stagesMs.cashUpdate = performance.now() - stageStartedAt
 
         // Registrar deuda y señas/entregas del cliente
-        stageStartedAt = performance.now()
+        if (logPerformance) stageStartedAt = performance.now()
         await this.saleCreditService.processCreditDebtAndPayments(
           tx,
           tenantId,
@@ -186,9 +227,9 @@ export class SaleService {
           cashSessionId,
           dto.initialPaymentMethod,
         )
-        stagesMs.creditAccounting = performance.now() - stageStartedAt
+        if (logPerformance) stagesMs.creditAccounting = performance.now() - stageStartedAt
 
-        stageStartedAt = performance.now()
+        if (logPerformance) stageStartedAt = performance.now()
         const createdSale = await tx.sale.findUnique({
           where: { id: sale.id },
           include: {
@@ -200,21 +241,29 @@ export class SaleService {
             },
           },
         })
-        stagesMs.resultRead = performance.now() - stageStartedAt
+        if (logPerformance) stagesMs.resultRead = performance.now() - stageStartedAt
+        await completeIdempotency(tx, tenantId, idempotencyClaim, 'SALE', [sale.id])
         return createdSale
       }, { timeout: 15_000 })
-      succeeded = true
+      if (logPerformance) {
+        this.logger.log(JSON.stringify({
+          event: 'sale.transaction.completed',
+          outcome: 'success',
+          itemCount: sortedItems.length,
+          durationMs: Math.round(performance.now() - startedAt),
+          stagesMs: Object.fromEntries(
+            Object.entries(stagesMs).map(([stage, duration]) => [stage, Math.round(duration)]),
+          ),
+        }))
+      }
       return result
-    } finally {
-      this.logger.log(JSON.stringify({
-        event: 'sale.transaction.completed',
-        outcome: succeeded ? 'success' : 'failure',
+    } catch (error) {
+      this.logger.error(JSON.stringify({
+        event: 'sale.transaction.failed',
         itemCount: sortedItems.length,
-        durationMs: Math.round(performance.now() - startedAt),
-        stagesMs: Object.fromEntries(
-          Object.entries(stagesMs).map(([stage, duration]) => [stage, Math.round(duration)]),
-        ),
+        errorType: error instanceof Error ? error.name : 'UnknownError',
       }))
+      throw error
     }
   }
 

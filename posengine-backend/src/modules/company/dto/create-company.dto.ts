@@ -83,9 +83,9 @@ export class CreateCompanyDto {
   @Transform(({ value }) => value?.trim() || undefined)
   emissionPoint?: string;
 
-  @ApiPropertyOptional({ example: 'https://miempresa.com/logo.png' })
+  @ApiPropertyOptional({ example: 'URL devuelta por POST /upload para un archivo de la empresa actual' })
   @IsOptional()
-  @IsString({ message: 'la URL del logo debe ser una cadena de texto' })
+  @IsString({ message: 'la referencia del logo debe ser una cadena de texto' })
   @Transform(({ value }) => value?.trim() || undefined)
   logoUrl?: string;
 

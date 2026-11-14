@@ -15,6 +15,7 @@ import { PurchaseValidationService } from './purchase-validation.service'
 import { PurchaseDebtService } from './purchase-debt.service'
 import { CommercialOperationPolicy } from '../../../common/commercial-operation-policy'
 import { CancelPurchaseDto } from '../dto/cancel-purchase.dto'
+import { claimIdempotency, completeIdempotency, findIdempotencyReplay, requireIdempotencyResource } from '../../../common/idempotency'
 
 @Injectable()
 export class PurchaseService {
@@ -49,14 +50,44 @@ export class PurchaseService {
     return { invoiceNumber }
   }
 
-  async create(tenantId: string, cashSessionId: string, dto: CreatePurchaseDto) {
-    // 1. Validar reglas de negocio utilizando el validador
-    const productIds = await this.purchaseValidationService.validateCreatePurchase(tenantId, dto)
+  async create(tenantId: string, cashSessionId: string, dto: CreatePurchaseDto, idempotencyKey?: string) {
+    const idempotencyPayload = { cashSessionId, purchase: dto }
+    const replay = await findIdempotencyReplay(this.prisma, tenantId, 'PURCHASE_CREATE', idempotencyKey, idempotencyPayload)
+    if (replay) {
+      const id = requireIdempotencyResource(replay, 'PURCHASE')
+      const existing = await this.findCreateResult(this.prisma, tenantId, id)
+      if (!existing) throw new NotFoundException('La compra original ya no está disponible.')
+      return existing
+    }
+
+    // A concurrent winner can make a later validation fail (for example, an
+    // invoice-number uniqueness check). Recover its committed result by key.
+    try {
+      await this.purchaseValidationService.validateCreatePurchase(tenantId, dto)
+    } catch (error) {
+      const validationReplay = await findIdempotencyReplay(this.prisma, tenantId, 'PURCHASE_CREATE', idempotencyKey, idempotencyPayload)
+      if (validationReplay) {
+        const id = requireIdempotencyResource(validationReplay, 'PURCHASE')
+        const existing = await this.findCreateResult(this.prisma, tenantId, id)
+        if (existing) return existing
+      }
+      throw error
+    }
 
     // 2. Ordenar items para evitar deadlocks
     const sortedItems = [...dto.items].sort((a, b) => a.productId.localeCompare(b.productId))
 
     return this.prisma.$transaction(async (tx) => {
+      const idempotencyClaim = await claimIdempotency(
+        tx, tenantId, 'PURCHASE_CREATE', idempotencyKey, idempotencyPayload,
+      )
+      if (idempotencyClaim && !idempotencyClaim.created) {
+        const existingId = requireIdempotencyResource(idempotencyClaim, 'PURCHASE')
+        const existing = await this.findCreateResult(tx, tenantId, existingId)
+        if (!existing) throw new NotFoundException('La compra original ya no está disponible.')
+        return existing
+      }
+
       const openSession = await tx.cashSession.updateMany({
         where: { id: cashSessionId, tenantId, status: 'OPEN' },
         data: { totalSales: { increment: 0 } },
@@ -83,18 +114,8 @@ export class PurchaseService {
         await this.purchaseDebtService.createForPurchase(tx, tenantId, purchase.id, dto.total, dto.debt!)
       }
 
-      const productStocks = await tx.product.findMany({
-        where: { id: { in: productIds }, tenantId },
-        select: { id: true, stock: true },
-      })
-      const stockMap = new Map(productStocks.map((product) => [product.id, product.stock]))
-
       // Process items sequentially to ensure deterministic execution order
       for (const item of sortedItems) {
-        const before = stockMap.get(item.productId) ?? 0
-        const after = before + item.quantity
-        stockMap.set(item.productId, after)
-
         const purchaseItem = await tx.purchaseItem.create({
           data: {
             purchaseId: purchase.id,
@@ -105,37 +126,28 @@ export class PurchaseService {
           },
         })
 
-        await tx.stockMovement.create({
-          data: {
-            tenantId,
-            productId: item.productId,
-            type: 'PURCHASE',
-            quantity: item.quantity,
-            before,
-            after,
-            referenceId: purchaseItem.id,
-            notes: 'Ingreso por compra',
-            sourceType: 'PURCHASE',
-          },
-        })
-
-        await tx.product.update({
-          where: { id: item.productId },
-          data: { stock: after },
-        })
+        await this.stockMovementService.registerPurchase(
+          tenantId,
+          item.productId,
+          item.quantity,
+          purchaseItem.id,
+          tx,
+        )
       }
 
-      return tx.purchase.findUnique({
-        where: { id: purchase.id },
-        include: {
-          supplier: true,
-          items: true,
-          debt: true,
-        },
-      })
+      const result = await this.findCreateResult(tx, tenantId, purchase.id)
+      await completeIdempotency(tx, tenantId, idempotencyClaim, 'PURCHASE', [purchase.id])
+      return result
     }, {
       timeout: 30_000,
       maxWait: 5_000,
+    })
+  }
+
+  private findCreateResult(client: Prisma.TransactionClient | PrismaService, tenantId: string, id: string) {
+    return client.purchase.findFirst({
+      where: { id, tenantId },
+      include: { supplier: true, items: true, debt: true },
     })
   }
 

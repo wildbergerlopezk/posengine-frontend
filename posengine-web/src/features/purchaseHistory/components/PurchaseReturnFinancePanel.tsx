@@ -5,6 +5,8 @@ import { AlertCircle, CheckCircle2, Loader2, Wallet } from "lucide-react"
 import { API_BASE_URL } from "@/src/shared/config/api"
 import { formatCurrency } from "@/src/shared/hooks/useFormatCurrency"
 import { useCommercialCapabilities } from "@/src/shared/hooks/useCommercialCapabilities"
+import { clearIdempotencyKey, getOrCreateIdempotencyTimestamp, prepareIdempotencyKey } from "@/src/shared/api/idempotency"
+import { useAuthStore } from "@/src/features/auth/store/auth.store"
 import controls from "@/src/shared/styles/detailFormControls.module.css"
 import styles from "./PurchaseReturnFinancePanel.module.css"
 
@@ -50,6 +52,7 @@ interface Props {
 }
 
 export function PurchaseReturnFinancePanel(props: Props) {
+  const user = useAuthStore(state => state.user)
   const headers = useMemo(() => ({ "Content-Type": "application/json", Authorization: `Bearer ${props.accessToken}` }), [props.accessToken])
   const { capabilities, loading: capabilitiesLoading, error: capabilitiesError, refresh: refreshCapabilities } = useCommercialCapabilities(props.accessToken)
   const [returns, setReturns] = useState<PurchaseReturn[]>([])
@@ -102,19 +105,28 @@ export function PurchaseReturnFinancePanel(props: Props) {
     setError(null)
     setNotice(null)
     try {
+      const payload = {
+        amount,
+        paymentMethod,
+        effectiveAt: receiptDates[settlement.id]
+          ? new Date(`${receiptDates[settlement.id]}T12:00:00`).toISOString()
+          : getOrCreateIdempotencyTimestamp(`PURCHASE_RETURN_SETTLE:${settlement.id}`, user?.id ?? "", user?.tenantId, new Date().toISOString()),
+        reference: receiptReferences[settlement.id]?.trim() || undefined,
+        notes: receiptNotes[settlement.id]?.trim() || undefined,
+      }
+      const operation = `PURCHASE_RETURN_SETTLE:${settlement.id}`
+      const idempotencyKey = await prepareIdempotencyKey(operation, user?.id ?? "", user?.tenantId, payload)
       const response = await fetch(`${API_BASE_URL}/purchase-returns/settlements/${settlement.id}/settle`, {
         method: "PATCH",
-        headers,
-        body: JSON.stringify({
-          amount,
-          paymentMethod,
-          effectiveAt: receiptDates[settlement.id] ? new Date(`${receiptDates[settlement.id]}T12:00:00`).toISOString() : new Date().toISOString(),
-          reference: receiptReferences[settlement.id]?.trim() || undefined,
-          notes: receiptNotes[settlement.id]?.trim() || undefined,
-        }),
+        headers: { ...headers, "Idempotency-Key": idempotencyKey },
+        body: JSON.stringify(payload),
       })
       const body = await response.json()
-      if (!response.ok) throw new Error(body.message || "No se pudo registrar el reembolso.")
+      if (!response.ok) {
+        if (response.status >= 400 && response.status < 500 && response.status !== 409) clearIdempotencyKey(operation, user?.id ?? "", user?.tenantId)
+        throw new Error(body.message || "No se pudo registrar el reembolso.")
+      }
+      clearIdempotencyKey(operation, user?.id ?? "", user?.tenantId)
       setNotice("Reembolso registrado; se actualizó el saldo pendiente.")
       setReceiptAmounts((current) => ({ ...current, [settlement.id]: "" }))
       await fetchReturns()
@@ -140,13 +152,20 @@ export function PurchaseReturnFinancePanel(props: Props) {
     setError(null)
     setNotice(null)
     try {
+      const payload = { purchaseId: props.purchaseId, amount }
+      const operation = `PURCHASE_RETURN_CREDIT:${settlement.id}`
+      const idempotencyKey = await prepareIdempotencyKey(operation, user?.id ?? "", user?.tenantId, payload)
       const response = await fetch(`${API_BASE_URL}/purchase-returns/settlements/${settlement.id}/apply-credit`, {
         method: "POST",
-        headers,
-        body: JSON.stringify({ purchaseId: props.purchaseId, amount }),
+        headers: { ...headers, "Idempotency-Key": idempotencyKey },
+        body: JSON.stringify(payload),
       })
       const body = await response.json()
-      if (!response.ok) throw new Error(body.message || "No se pudo aplicar el crédito.")
+      if (!response.ok) {
+        if (response.status >= 400 && response.status < 500 && response.status !== 409) clearIdempotencyKey(operation, user?.id ?? "", user?.tenantId)
+        throw new Error(body.message || "No se pudo aplicar el crédito.")
+      }
+      clearIdempotencyKey(operation, user?.id ?? "", user?.tenantId)
       setNotice(`Crédito aplicado a la compra ${props.purchaseNumber}.`)
       setCreditAmounts((current) => ({ ...current, [settlement.id]: "" }))
       await Promise.all([fetchReturns(), props.onCreditApplied()])

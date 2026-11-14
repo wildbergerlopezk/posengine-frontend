@@ -170,6 +170,21 @@ describe('StockMovementService purchase inventory updates', () => {
     });
   });
 
+  it('rejects purchase stock updates for products outside the tenant', async () => {
+    tx.$queryRaw.mockResolvedValue([]);
+
+    await expect(service.registerPurchase(
+      'tenant-a',
+      'product-b',
+      2,
+      'purchase-item-1',
+      tx as any,
+    )).rejects.toBeInstanceOf(NotFoundException);
+
+    expect(tx.$queryRaw).toHaveBeenCalledTimes(1);
+    expect(tx.stockMovement.create).not.toHaveBeenCalled();
+  });
+
   it('subtracts purchase cancellation stock conditionally and records the actual before/after', async () => {
     tx.$queryRaw.mockResolvedValue([{ stock: 2.5 }]);
     await service.registerPurchaseCancellation('tenant-1', 'product-1', 2.5, 'purchase-item-1', tx as any);

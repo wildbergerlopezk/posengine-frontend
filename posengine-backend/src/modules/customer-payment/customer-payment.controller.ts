@@ -4,6 +4,7 @@ import {
   Post,
   Param,
   Body,
+  Headers,
   Query,
   HttpCode,
   HttpStatus,
@@ -14,6 +15,7 @@ import {
   ApiResponse,
   ApiBearerAuth,
   ApiBody,
+  ApiHeader,
   ApiParam,
 } from '@nestjs/swagger'
 import { CustomerPaymentService } from './customer-payment.service'
@@ -38,6 +40,7 @@ export class CustomerPaymentController {
   @Roles(UserRole.ADMIN, UserRole.SUPERADMIN)
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Registrar un pago de un cliente (a cuenta o a una venta puntual)' })
+  @ApiHeader({ name: 'Idempotency-Key', required: false })
   @ApiBody({ type: CreateCustomerPaymentDto })
   @ApiResponse({ status: 201, description: 'Pago registrado correctamente' })
   @ApiResponse({ status: 400, description: 'Monto inválido o supera la deuda/saldo pendiente' })
@@ -45,8 +48,9 @@ export class CustomerPaymentController {
   create(
     @CurrentUser() user: AuthenticatedUser,
     @Body() dto: CreateCustomerPaymentDto,
+    @Headers('idempotency-key') idempotencyKey?: string,
   ) {
-    return this.customerPaymentService.create(user.tenantId, dto)
+    return this.customerPaymentService.create(user.tenantId, dto, idempotencyKey)
   }
 
   @Get()
@@ -90,12 +94,14 @@ export class CustomerPaymentController {
   @Roles(UserRole.ADMIN, UserRole.SUPERADMIN)
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Registrar un pago a cuenta, distribuido automáticamente entre las ventas pendientes más antiguas (FIFO)' })
+  @ApiHeader({ name: 'Idempotency-Key', required: false })
   @ApiResponse({ status: 201, description: 'Pago aplicado y distribuido correctamente' })
   payToAccount(
     @CurrentUser() user: AuthenticatedUser,
     @Body() dto: PayToAccountDto,
+    @Headers('idempotency-key') idempotencyKey?: string,
   ) {
-    return this.customerPaymentService.payToAccount(user.tenantId, dto)
+    return this.customerPaymentService.payToAccount(user.tenantId, dto, idempotencyKey)
   }
 
   @Post(':id/void')

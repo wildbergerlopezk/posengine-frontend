@@ -1,0 +1,15 @@
+.env
+.env.*
+!.env.example
+node_modules
+.next
+out
+build
+coverage
+.git
+.vercel
+*.log
+*.tsbuildinfo
+test-results
+playwright-report
+uploads/mock-*

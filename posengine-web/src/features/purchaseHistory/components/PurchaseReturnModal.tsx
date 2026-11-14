@@ -5,6 +5,8 @@ import { AlertTriangle, Info, Loader2, Package, RotateCcw } from "lucide-react"
 import { formatCurrency } from "@/src/shared/hooks/useFormatCurrency"
 import { API_BASE_URL } from "@/src/shared/config/api"
 import { useCommercialCapabilities } from "@/src/shared/hooks/useCommercialCapabilities"
+import { useAuthStore } from "@/src/features/auth/store/auth.store"
+import { clearIdempotencyKey, getOrCreateIdempotencyTimestamp, prepareIdempotencyKey } from "@/src/shared/api/idempotency"
 import controls from "@/src/shared/styles/detailFormControls.module.css"
 import styles from "./PurchaseReturnModal.module.css"
 
@@ -54,6 +56,7 @@ interface Props {
 }
 
 export function PurchaseReturnModal({ open, inline = false, purchase, loading, accessToken = "", cashSessionId, cashSessionLoading = false, onClose, onSuccess }: Props) {
+  const user = useAuthStore(state => state.user)
   const [reason, setReason] = useState("")
   const [creditNote, setCreditNote] = useState("")
   const [settlementDisposition, setSettlementDisposition] = useState<"REFUND_PENDING" | "REFUND_CASH" | "REFUND_TRANSFER" | "SUPPLIER_CREDIT">("REFUND_PENDING")
@@ -139,28 +142,38 @@ export function PurchaseReturnModal({ open, inline = false, purchase, loading, a
     setSubmitting(true)
     setError(null)
     try {
+      const returnOperation = `PURCHASE_RETURN_CREATE:${purchase.id}`
+      const returnDate = getOrCreateIdempotencyTimestamp(returnOperation, user?.id ?? "", user?.tenantId, new Date().toISOString())
+      const payload = {
+        purchaseId: purchase.id,
+        returnDate,
+        reason,
+        creditNoteNumber: creditNote,
+        items: selected.map(({ item, quantity }) => ({ purchaseItemId: item.id, quantity })),
+      }
+      const idempotencyKey = await prepareIdempotencyKey(returnOperation, user?.id ?? "", user?.tenantId, payload)
       const response = await fetch(`${API_BASE_URL}/purchase-returns`, {
         method: "POST",
-        headers,
-        body: JSON.stringify({
-          purchaseId: purchase.id,
-          returnDate: new Date().toISOString(),
-          reason,
-          creditNoteNumber: creditNote,
-          items: selected.map(({ item, quantity }) => ({ purchaseItemId: item.id, quantity })),
-        }),
+        headers: { ...headers, "Idempotency-Key": idempotencyKey },
+        body: JSON.stringify(payload),
       })
       const created = await response.json().catch(() => null)
-      if (!response.ok) throw new Error(created?.message || "Error al crear la devolución.")
+      if (!response.ok) {
+        if (response.status >= 400 && response.status < 500 && response.status !== 409) clearIdempotencyKey(returnOperation, user?.id ?? "", user?.tenantId)
+        throw new Error(created?.message || "Error al crear la devolución.")
+      }
 
-      const confirmResponse = await fetch(`${API_BASE_URL}/purchase-returns/${created.id}/confirm`, {
-        method: "PATCH",
-        headers,
-        body: JSON.stringify(excess > 0.01 ? { settlementDisposition: safeDisposition } : {}),
-      })
-      const confirmation = await confirmResponse.json().catch(() => null)
-      if (!confirmResponse.ok) throw new Error(confirmation?.message || "Devolución creada, pero no se pudo confirmar.")
+      if (created.status !== "CONFIRMED") {
+        const confirmResponse = await fetch(`${API_BASE_URL}/purchase-returns/${created.id}/confirm`, {
+          method: "PATCH",
+          headers,
+          body: JSON.stringify(excess > 0.01 ? { settlementDisposition: safeDisposition } : {}),
+        })
+        const confirmation = await confirmResponse.json().catch(() => null)
+        if (!confirmResponse.ok) throw new Error(confirmation?.message || "Devolución creada, pero no se pudo confirmar.")
+      }
 
+      clearIdempotencyKey(returnOperation, user?.id ?? "", user?.tenantId)
       onSuccess()
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "No se pudo completar la devolución.")

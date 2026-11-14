@@ -1,5 +1,6 @@
 import { API_BASE_URL } from "@/src/shared/config/api"
 import { useAuthStore } from "@/src/features/auth/store/auth.store"
+import { createRefreshCoordinator } from "@/src/features/auth/utils/refresh-coordinator"
 
 interface RequestOptions extends RequestInit {
   skipAuth?: boolean
@@ -32,17 +33,32 @@ function toApiError(status: number, data: any): ApiError {
   )
 }
 
-let isRefreshing = false
-let refreshQueue: Array<(token: string) => void> = []
-
-const processQueue = (token: string) => {
-  refreshQueue.forEach((callback) => callback(token))
-  refreshQueue = []
-}
-
-const rejectQueue = () => {
-  refreshQueue = []
-}
+const refreshSession = createRefreshCoordinator({
+  getAuth: () => {
+    const { isAuthenticated, refreshToken, user } = useAuthStore.getState()
+    return { isAuthenticated, refreshToken, user }
+  },
+  refresh: async (refreshToken: string) => {
+    const response = await fetch(`${API_BASE_URL}/auth/refresh`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Client-Request": "true",
+      },
+      body: JSON.stringify({ refreshToken }),
+    })
+    const data = await response.json().catch(() => null)
+    if (!response.ok || typeof data?.accessToken !== "string" || typeof data?.refreshToken !== "string") {
+      throw response.ok ? new Error("Invalid refresh response") : toApiError(response.status, data)
+    }
+    return { accessToken: data.accessToken, refreshToken: data.refreshToken }
+  },
+  setAuth: (credentials, user) => useAuthStore.getState().setAuth({ ...credentials, user }),
+  onFailure: () => {
+    useAuthStore.getState().logout()
+    if (typeof window !== "undefined") window.location.href = "/login"
+  },
+})
 
 async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
   const { skipAuth = false, ...init } = options
@@ -57,7 +73,7 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
   // Marcar la petición para que el AuthInterceptor temporal no la vuelva a interceptar
   headers.set("X-Client-Request", "true")
 
-  const { accessToken, refreshToken, setAuth, logout } = useAuthStore.getState()
+  const { accessToken, isAuthenticated, logout } = useAuthStore.getState()
 
   if (accessToken && !skipAuth) {
     headers.set("Authorization", `Bearer ${accessToken}`)
@@ -80,85 +96,25 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
   }
 
   if (response.status === 401 && !skipAuth) {
-    if (!refreshToken) {
-      logout()
-      if (typeof window !== "undefined") {
-        window.location.href = "/login"
-      }
+    const currentAuth = useAuthStore.getState()
+    if (!currentAuth.isAuthenticated || !currentAuth.refreshToken) {
+      if (isAuthenticated) logout()
+      if (typeof window !== "undefined") window.location.href = "/login"
       throw new Error("No refresh token available")
     }
 
-    if (isRefreshing) {
-      return new Promise<T>((resolve, reject) => {
-        refreshQueue.push((newToken) => {
-          const retryHeaders = new Headers(init.headers)
-          retryHeaders.set("Authorization", `Bearer ${newToken}`)
-          const retryInit = { ...init, headers: retryHeaders }
-          fetch(url, retryInit)
-            .then(async (res) => {
-              const data = await res.json().catch(() => null)
-              if (!res.ok) {
-                reject(toApiError(res.status, data))
-              } else {
-                resolve(data)
-              }
-            })
-            .catch(reject)
-        })
-      })
-    }
-
-    isRefreshing = true
-
-    try {
-      const refreshRes = await fetch(`${API_BASE_URL}/auth/refresh`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "X-Client-Request": "true",
-        },
-        body: JSON.stringify({ refreshToken }),
-      })
-
-      if (refreshRes.ok) {
-        const data = await refreshRes.json()
-        const currentUser = useAuthStore.getState().user
-        setAuth({
-          accessToken: data.accessToken,
-          refreshToken: data.refreshToken,
-          user: currentUser!,
-        })
-
-        processQueue(data.accessToken)
-
-        const retryHeaders = new Headers(init.headers)
-        retryHeaders.set("Authorization", `Bearer ${data.accessToken}`)
-        const retryInit = { ...init, headers: retryHeaders }
-        
-        const finalRes = await fetch(url, retryInit)
-        const finalData = await finalRes.json().catch(() => null)
-        if (!finalRes.ok) {
-          throw toApiError(finalRes.status, finalData)
-        }
-        return finalData
-      } else {
-        logout()
-        rejectQueue()
-        if (typeof window !== "undefined") {
-          window.location.href = "/login"
-        }
-        throw new Error("Session expired")
-      }
-    } catch (err) {
-      logout()
-      rejectQueue()
-      if (typeof window !== "undefined") {
-        window.location.href = "/login"
-      }
-      throw err
-    } finally {
-      isRefreshing = false
-    }
+    // A different request may already have refreshed the captured access token.
+    // Retry with the current access token instead of replaying an old refresh token.
+    const activeAccessToken = currentAuth.accessToken
+    const newToken = activeAccessToken && activeAccessToken !== accessToken
+      ? activeAccessToken
+      : await refreshSession(currentAuth.refreshToken)
+    const retryHeaders = new Headers(init.headers)
+    retryHeaders.set("Authorization", `Bearer ${newToken}`)
+    const retryResponse = await fetch(url, { ...init, headers: retryHeaders })
+    const retryData = await retryResponse.json().catch(() => null)
+    if (!retryResponse.ok) throw toApiError(retryResponse.status, retryData)
+    return retryData
   }
 
   const contentType = response.headers.get("Content-Type") || ""

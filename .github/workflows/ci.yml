@@ -1,0 +1,90 @@
+name: PosEngine CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  frontend:
+    name: Frontend checks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
+          cache: npm
+          cache-dependency-path: posengine-web/package-lock.json
+      - name: Install dependencies
+        working-directory: posengine-web
+        run: npm ci
+      - name: TypeScript
+        working-directory: posengine-web
+        run: npm run typecheck
+      - name: Complete frontend test suite
+        working-directory: posengine-web
+        run: npm test
+      - name: Production build
+        working-directory: posengine-web
+        run: npm run build
+      - name: Production dependency audit
+        working-directory: posengine-web
+        run: npm audit --omit=dev
+
+  backend:
+    name: Backend and PostgreSQL checks
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: posengine_test
+          POSTGRES_PASSWORD: posengine_test_only
+          POSTGRES_DB: posengine_sales_test
+        ports:
+          - 55439:5432
+        options: >-
+          --health-cmd "pg_isready -U posengine_test -d posengine_sales_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      DATABASE_URL: postgresql://posengine_test:posengine_test_only@127.0.0.1:55439/posengine_sales_test?schema=public
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
+          cache: npm
+          cache-dependency-path: posengine-backend/package-lock.json
+      - name: Install dependencies
+        working-directory: posengine-backend
+        run: npm ci
+      - name: Generate Prisma Client
+        working-directory: posengine-backend
+        run: npm run prisma:generate
+      - name: Validate Prisma schema
+        working-directory: posengine-backend
+        run: npm run prisma:validate
+      - name: Backend unit suite
+        working-directory: posengine-backend
+        run: npm run test:unit -- --runInBand
+      - name: Production build
+        working-directory: posengine-backend
+        run: npm run build:compiled
+      - name: Production dependency audit
+        working-directory: posengine-backend
+        run: npm audit --omit=dev
+      - name: Apply migrations to isolated PostgreSQL
+        working-directory: posengine-backend
+        run: npm run db:migrate:deploy
+      - name: PostgreSQL integration suite
+        working-directory: posengine-backend
+        run: npm run test:postgres

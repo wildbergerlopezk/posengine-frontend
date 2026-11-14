@@ -3,6 +3,8 @@ import {
   NotFoundException,
   ConflictException,
   BadRequestException,
+  InternalServerErrorException,
+  Optional,
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CreateProductDto } from './dto/create-product.dto';
@@ -12,15 +14,22 @@ import { ProductSearchDto } from './dto/product-search.dto';
 import { Prisma } from '../../generated/prisma/client';
 import { StockMovementService } from '../stock-movement/stock-movement.service';
 import { StockMovementType, UnitType } from '../../generated/prisma/enums';
-import * as fs from 'fs'
-import { join } from 'path'
+import { UploadService } from '../upload/upload.service';
 
 @Injectable()
 export class ProductService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly stockMovementService: StockMovementService,
+    @Optional() private readonly uploadService?: UploadService,
   ) { }
+
+  private getUploads() {
+    if (!this.uploadService) {
+      throw new InternalServerErrorException('El almacenamiento de archivos no está disponible')
+    }
+    return this.uploadService
+  }
 
   // ── Validación de cantidad según unitType ────────────────────────────────
   // Se exporta como método público para que SaleService y PurchaseService
@@ -85,6 +94,8 @@ export class ProductService {
 
   // ── Create ───────────────────────────────────────────────────────────────
   async create(tenantId: string, dto: CreateProductDto) {
+    if (dto.imageUrl) await this.getUploads().assertOwnedAssetIfManaged(tenantId, dto.imageUrl)
+
     // Validate category
     const category = await this.prisma.category.findFirst({
       where: { id: dto.categoryId, tenantId },
@@ -424,17 +435,12 @@ export class ProductService {
       'El stock mínimo',
     )
 
-    if (dto.imageUrl && current.imageUrl && dto.imageUrl !== current.imageUrl) {
-      const oldFilename = current.imageUrl.split('/uploads/')[1]
-
-      if (oldFilename) {
-        const filePath = join(process.cwd(), 'uploads', oldFilename)
-
-        if (fs.existsSync(filePath)) {
-          fs.unlinkSync(filePath)
-        }
-      }
+    if (dto.imageUrl && dto.imageUrl !== current.imageUrl) {
+      await this.getUploads().assertOwnedAssetIfManaged(tenantId, dto.imageUrl)
     }
+    const replacedImageUrl = dto.imageUrl && current.imageUrl && dto.imageUrl !== current.imageUrl
+      ? current.imageUrl
+      : null
 
     // ── STOCK CHANGE LOGIC ────────────────────────────────────────────────
     if (dto.stock !== undefined && dto.stock !== current.stock) {
@@ -449,7 +455,7 @@ export class ProductService {
 
       const { stock: _stock, ...restDto } = dto
 
-      return this.prisma.product.update({
+      const updatedProduct = await this.prisma.product.update({
         where: { id },
         data: {
           ...(restDto.categoryId && { categoryId: restDto.categoryId }),
@@ -479,10 +485,12 @@ export class ProductService {
           supplier: { select: { id: true, name: true } },
         },
       })
+      if (replacedImageUrl) await this.getUploads().deleteOwnedAssetByUrl(tenantId, replacedImageUrl)
+      return updatedProduct
     }
 
     // ── UPDATE NORMAL ─────────────────────────────────────────────────────
-    return this.prisma.product.update({
+    const updatedProduct = await this.prisma.product.update({
       where: { id },
       data: {
         ...(dto.categoryId && { categoryId: dto.categoryId }),
@@ -513,6 +521,8 @@ export class ProductService {
         supplier: { select: { id: true, name: true } },
       },
     })
+    if (replacedImageUrl) await this.getUploads().deleteOwnedAssetByUrl(tenantId, replacedImageUrl)
+    return updatedProduct
   }
 
   // ── Deactivate ───────────────────────────────────────────────────────────

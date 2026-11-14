@@ -34,6 +34,14 @@ const { PurchaseService } = require('../dist/src/modules/purchase/services/purch
 const { PurchaseValidationService } = require('../dist/src/modules/purchase/services/purchase-validation.service.js')
 const { PurchaseReturnService } = require('../dist/src/modules/purchase/services/purchase-return.service.js')
 const { SaleReturnService } = require('../dist/src/modules/sale/services/sale-return.service.js')
+const { RefreshTokenService } = require('../dist/src/modules/auth/services/refresh-token.service.js')
+const { LogoutService } = require('../dist/src/modules/auth/services/logout.service.js')
+const { LoginService } = require('../dist/src/modules/auth/services/login.service.js')
+const { QuickPinService } = require('../dist/src/modules/auth/services/quick-pin.service.js')
+const { TokenService } = require('../dist/src/modules/auth/services/token.service.js')
+const { UserService } = require('../dist/src/modules/user/user.service.js')
+const { hashToken } = require('../dist/src/modules/auth/utils/hash-token.util.js')
+const bcrypt = require('bcrypt')
 const { PaymentMethod, PaymentStatus, PriceType } = require('../dist/src/generated/prisma/enums.js')
 
 const prisma = new PrismaService()
@@ -87,7 +95,7 @@ function instrumentTransactionClient(tx, counts) {
 
 function makeSaleService(stockMovementService = new StockMovementService(prisma), saleCreditService = new SaleCreditService(prisma)) {
   const countsByTransaction = []
-  const transactionPrisma = {
+  const transactionPrisma = new Proxy({
     $transaction: (callback, options) => {
       const counts = {}
       return prisma.$transaction(async (tx) => {
@@ -99,7 +107,13 @@ function makeSaleService(stockMovementService = new StockMovementService(prisma)
         }
       }, options)
     },
-  }
+  }, {
+    get(target, property, receiver) {
+      if (Reflect.has(target, property)) return Reflect.get(target, property, receiver)
+      const value = prisma[property]
+      return typeof value === 'function' ? value.bind(prisma) : value
+    },
+  })
 
   const productService = new ProductService(prisma, stockMovementService)
   const validation = new SaleValidationService(prisma, productService)
@@ -122,8 +136,7 @@ function makeSaleReturnService(prismaClient = prisma) {
   return new SaleReturnService(prismaClient)
 }
 
-function makePurchaseService() {
-  const stockMovementService = new StockMovementService(prisma)
+function makePurchaseService(stockMovementService = new StockMovementService(prisma)) {
   const productService = new ProductService(prisma, stockMovementService)
   const validation = new PurchaseValidationService(prisma, productService)
   const debtService = new PurchaseDebtService(prisma)
@@ -273,6 +286,126 @@ async function fixtureTest(options, run) {
   try { return await run(fixture) } finally { await cleanupFixture(fixture) }
 }
 
+test('concurrent refresh requests claim a token once and replay does not revoke unrelated sessions', () =>
+  fixtureTest({}, async (fixture) => {
+    const initial = await createRefreshToken(fixture)
+    const unrelatedSession = await createRefreshToken(fixture)
+    const refreshService = makeRefreshService()
+    const heldLock = await holdUserRowLock(fixture)
+    const attempts = Promise.allSettled([
+      refreshService.refresh({ refreshToken: initial.rawToken }),
+      refreshService.refresh({ refreshToken: initial.rawToken }),
+    ])
+    try {
+      assert.ok(await waitForRefreshUserLockWaits(2) >= 2, 'both refresh transactions must overlap on the user row')
+    } finally {
+      heldLock.release()
+    }
+    await heldLock.transaction
+    const outcomes = await attempts
+    assert.equal(outcomes.filter(({ status }) => status === 'fulfilled').length, 1)
+    assert.equal(outcomes.filter(({ status }) => status === 'rejected').length, 1)
+
+    const rotatedRoot = await prisma.refreshToken.findUnique({ where: { id: initial.token.id } })
+    assert.ok(rotatedRoot.revokedAt)
+    assert.ok(rotatedRoot.replacedBy)
+    assert.equal(await prisma.refreshToken.count({ where: { userId: fixture.user.id, revokedAt: null } }), 2)
+    await assert.rejects(refreshService.refresh({ refreshToken: initial.rawToken }))
+    assert.equal(await prisma.refreshToken.count({ where: { tokenHash: unrelatedSession.tokenHash, revokedAt: null } }), 1)
+    assert.equal(await prisma.refreshToken.count({ where: { userId: fixture.user.id, revokedAt: null } }), 2)
+  }))
+
+test('refresh rejects expired and revoked tokens without changing other active sessions', () =>
+  fixtureTest({}, async (fixture) => {
+    const expired = await createRefreshToken(fixture, { expiresAt: new Date(Date.now() - 1_000) })
+    const revoked = await createRefreshToken(fixture, { revokedAt: new Date() })
+    const active = await createRefreshToken(fixture)
+    const refreshService = makeRefreshService()
+    await assert.rejects(refreshService.refresh({ refreshToken: expired.rawToken }))
+    await assert.rejects(refreshService.refresh({ refreshToken: revoked.rawToken }))
+    assert.equal(await prisma.refreshToken.count({ where: { tokenHash: active.tokenHash, revokedAt: null } }), 1)
+  }))
+
+test('logout racing with refresh cannot leave an active descendant session', () =>
+  fixtureTest({}, async (fixture) => {
+    const initial = await createRefreshToken(fixture)
+    const refreshService = makeRefreshService()
+    const logoutService = new LogoutService(prisma)
+    const heldLock = await holdUserRowLock(fixture)
+    const refreshAttempt = refreshService.refresh({ refreshToken: initial.rawToken })
+    const logoutAttempt = logoutService.logout({ refreshToken: initial.rawToken })
+    try {
+      assert.ok(await waitForRefreshUserLockWaits(2) >= 2, 'refresh and logout must overlap on the user row')
+    } finally {
+      heldLock.release()
+    }
+    await heldLock.transaction
+    const [refreshOutcome, logoutOutcome] = await Promise.allSettled([refreshAttempt, logoutAttempt])
+    assert.equal(logoutOutcome.status, 'fulfilled')
+    assert.ok(['fulfilled', 'rejected'].includes(refreshOutcome.status))
+    assert.equal(await prisma.refreshToken.count({ where: { userId: fixture.user.id, revokedAt: null } }), 0)
+    await assert.rejects(refreshService.refresh({ refreshToken: initial.rawToken }))
+  }))
+
+test('failed replacement token creation rolls back the refresh claim', () =>
+  fixtureTest({}, async (fixture) => {
+    const initial = await createRefreshToken(fixture)
+    const transactionProxy = {
+      $transaction: (callback, options) => prisma.$transaction((tx) => callback(new Proxy(tx, {
+        get(target, property) {
+          const value = Reflect.get(target, property, target)
+          if (property !== 'refreshToken') return value
+          return new Proxy(value, {
+            get(delegate, operation) {
+              if (operation === 'create') return async () => { throw new Error('injected create failure') }
+              const method = Reflect.get(delegate, operation, delegate)
+              return typeof method === 'function' ? method.bind(delegate) : method
+            },
+          })
+        },
+      })), options),
+      refreshToken: prisma.refreshToken,
+    }
+    await assert.rejects(makeRefreshService(transactionProxy).refresh({ refreshToken: initial.rawToken }), /injected create failure/)
+    const stored = await prisma.refreshToken.findUnique({ where: { id: initial.token.id } })
+    assert.equal(stored.revokedAt, null)
+    assert.equal(stored.replacedBy, null)
+    assert.equal(await prisma.refreshToken.count({ where: { userId: fixture.user.id } }), 1)
+  }))
+
+test('conventional login, logout and authorized PIN login preserve device authorization', () =>
+  fixtureTest({}, async (fixture) => {
+    const password = 'integration-only-password'
+    const pin = '123456'
+    await prisma.user.update({
+      where: { id: fixture.user.id },
+      data: { password: await bcrypt.hash(password, 4), quickPinHash: await bcrypt.hash(pin, 4) },
+    })
+    const rawDeviceToken = randomUUID().replaceAll('-', '')
+    await prisma.quickPinDevice.create({
+      data: {
+        userId: fixture.user.id,
+        tokenHash: hashToken(rawDeviceToken),
+        expiresAt: new Date(Date.now() + 60_000),
+      },
+    })
+    const tokenService = new TokenService({ sign: () => 'integration-access-token' }, prisma)
+    const conventionalLogin = new LoginService(new UserService(prisma), tokenService)
+    const session = await conventionalLogin.login({ email: fixture.user.email, password, isRemember: false })
+    assert.ok(session.accessToken)
+    assert.ok(session.refreshToken)
+    const logout = new LogoutService(prisma)
+    await logout.logout({ refreshToken: session.refreshToken })
+
+    const quickPin = new QuickPinService(prisma, tokenService)
+    assert.deepEqual(await quickPin.deviceStatus(rawDeviceToken), { enabled: true, userName: fixture.user.name })
+    const pinSession = await quickPin.login(rawDeviceToken, { pin })
+    assert.ok(pinSession.accessToken)
+    assert.ok(pinSession.refreshToken)
+    assert.equal(await prisma.refreshToken.count({ where: { tokenHash: hashToken(pinSession.refreshToken), revokedAt: null } }), 1)
+    assert.equal(await prisma.quickPinDevice.count({ where: { userId: fixture.user.id, revokedAt: null } }), 1)
+  }))
+
 function itemsFor(products, quantity = 1) {
   return products.map((product) => ({
     productId: product.id,
@@ -280,6 +413,171 @@ function itemsFor(products, quantity = 1) {
     unitPrice: 100,
     priceType: PriceType.PUBLIC,
   }))
+}
+
+function deferred() {
+  let resolve
+  const promise = new Promise((done) => { resolve = done })
+  return { promise, resolve }
+}
+
+async function holdProductRowLock(fixture, product = fixture.products[0]) {
+  const acquired = deferred()
+  const release = deferred()
+  const transaction = prisma.$transaction(async (tx) => {
+    const rows = await tx.$queryRaw`
+      UPDATE "products"
+      SET "updatedAt" = "updatedAt"
+      WHERE "id" = ${product.id} AND "tenantId" = ${fixture.tenant.id}
+      RETURNING "id"
+    `
+    assert.equal(rows.length, 1)
+    acquired.resolve()
+    await release.promise
+  })
+  await acquired.promise
+  return { release: release.resolve, transaction }
+}
+
+async function waitForProductLockWaits(expectedCount, timeoutMs = 10_000) {
+  const deadline = Date.now() + timeoutMs
+  let observed = 0
+  while (Date.now() < deadline) {
+    const rows = await prisma.$queryRaw`
+      SELECT count(*)::int AS count
+      FROM pg_stat_activity
+      WHERE datname = current_database()
+        AND pid <> pg_backend_pid()
+        AND state = 'active'
+        AND wait_event_type = 'Lock'
+        AND query ILIKE '%UPDATE "products"%'
+    `
+    observed = Number(rows[0]?.count ?? 0)
+    if (observed >= expectedCount) return observed
+    await new Promise((resolve) => setTimeout(resolve, 20))
+  }
+  throw new Error(`Expected ${expectedCount} overlapping product updates; observed ${observed} lock waiters`)
+}
+
+async function holdIdempotencyKey(fixture, operation, key) {
+  const acquired = deferred()
+  const release = deferred()
+  const transaction = prisma.$transaction(async (tx) => {
+    await tx.idempotencyRecord.create({
+      data: {
+        tenantId: fixture.tenant.id,
+        operation,
+        key,
+        requestHash: '0'.repeat(64),
+      },
+    })
+    acquired.resolve()
+    await release.promise
+    throw new Error('rollback test idempotency lock')
+  }).catch((error) => {
+    if (error.message !== 'rollback test idempotency lock') throw error
+  })
+  await acquired.promise
+  return { release: release.resolve, transaction }
+}
+
+async function waitForIdempotencyLockWaits(expectedCount, timeoutMs = 10_000) {
+  const deadline = Date.now() + timeoutMs
+  let observed = 0
+  while (Date.now() < deadline) {
+    const rows = await prisma.$queryRaw`
+      SELECT count(*)::int AS count
+      FROM pg_stat_activity
+      WHERE datname = current_database()
+        AND pid <> pg_backend_pid()
+        AND state = 'active'
+        AND wait_event_type = 'Lock'
+        AND query ILIKE '%idempotency_records%'
+    `
+    observed = Number(rows[0]?.count ?? 0)
+    if (observed >= expectedCount) return observed
+    await new Promise((resolve) => setTimeout(resolve, 20))
+  }
+  throw new Error(`Expected ${expectedCount} overlapping idempotency inserts; observed ${observed} lock waiters`)
+}
+
+async function holdUserRowLock(fixture) {
+  const acquired = deferred()
+  const release = deferred()
+  const transaction = prisma.$transaction(async (tx) => {
+    const rows = await tx.$queryRaw`
+      UPDATE "users"
+      SET "updatedAt" = "updatedAt"
+      WHERE "id" = ${fixture.user.id}
+      RETURNING "id"
+    `
+    assert.equal(rows.length, 1)
+    acquired.resolve()
+    await release.promise
+  })
+  await acquired.promise
+  return { release: release.resolve, transaction }
+}
+
+async function waitForRefreshUserLockWaits(expectedCount, timeoutMs = 10_000) {
+  const deadline = Date.now() + timeoutMs
+  let observed = 0
+  while (Date.now() < deadline) {
+    const rows = await prisma.$queryRaw`
+      SELECT count(*)::int AS count
+      FROM pg_stat_activity
+      WHERE datname = current_database()
+        AND pid <> pg_backend_pid()
+        AND state = 'active'
+        AND wait_event_type = 'Lock'
+        AND query ILIKE '%FOR UPDATE%'
+        AND query ILIKE '%"users"%'
+    `
+    observed = Number(rows[0]?.count ?? 0)
+    if (observed >= expectedCount) return observed
+    await new Promise((resolve) => setTimeout(resolve, 20))
+  }
+  throw new Error(`Expected ${expectedCount} overlapping refresh/logout requests; observed ${observed} lock waiters`)
+}
+
+async function createRefreshToken(fixture, { rawToken = randomUUID().replaceAll('-', ''), expiresAt = new Date(Date.now() + 60_000), revokedAt = null } = {}) {
+  const tokenHash = hashToken(rawToken)
+  const token = await prisma.refreshToken.create({
+    data: { userId: fixture.user.id, tokenHash, expiresAt, revokedAt },
+  })
+  return { rawToken, tokenHash, token }
+}
+
+function makeRefreshService(prismaClient = prisma) {
+  return new RefreshTokenService(prismaClient, { signAccessToken: (_user, token) => `access:${hashToken(token)}` })
+}
+
+async function createPurchaseSupplier(fixture) {
+  return prisma.supplier.create({
+    data: { tenantId: fixture.tenant.id, name: `Concurrency supplier ${randomUUID()}` },
+  })
+}
+
+function purchaseDto(fixture, supplier, product, quantity, paymentType = 'CASH') {
+  const invoiceSequence = String(Math.floor(Math.random() * 9_999_999) + 1).padStart(7, '0')
+  const unitCost = 20
+  return {
+    supplierId: supplier.id,
+    invoiceNumber: `001-001-${invoiceSequence}`,
+    purchaseDate: new Date().toISOString(),
+    paymentType,
+    total: quantity * unitCost,
+    ...(paymentType === 'CREDIT' && {
+      debt: { scheduleType: 'NONE', dueDate: new Date(Date.now() + 86_400_000).toISOString() },
+    }),
+    items: [{ productId: product.id, quantity, unitCost }],
+  }
+}
+
+async function createSecondOpenSession(fixture) {
+  return prisma.cashSession.create({
+    data: { tenantId: fixture.tenant.id, openedBy: fixture.user.id, openingAmount: 0 },
+  })
 }
 
 async function cashTotals(fixture) {
@@ -593,6 +891,148 @@ test('purchase registration is rejected for a closed or foreign cash session', (
       (error) => error.getStatus?.() === 409,
     )
     assert.equal(await prisma.purchase.count({ where: { tenantId: f.tenant.id } }), 0)
+  }))
+
+test('cash and credit purchases preserve stock and credit accounting', () =>
+  fixtureTest({ stock: 10 }, async (f) => {
+    const supplier = await createPurchaseSupplier(f)
+    const purchases = makePurchaseService()
+    const cashPurchase = await purchases.create(
+      f.tenant.id,
+      f.cashSession.id,
+      purchaseDto(f, supplier, f.products[0], 2, 'CASH'),
+    )
+    const creditPurchase = await purchases.create(
+      f.tenant.id,
+      f.cashSession.id,
+      purchaseDto(f, supplier, f.products[0], 3, 'CREDIT'),
+    )
+
+    assert.equal(cashPurchase.status, 'RECEIVED')
+    assert.equal(cashPurchase.debt, null)
+    assert.equal(creditPurchase.status, 'RECEIVED')
+    assert.equal(Number(creditPurchase.debt.balance), 60)
+    assert.equal((await prisma.product.findUnique({ where: { id: f.products[0].id } })).stock, 15)
+    const movements = await prisma.stockMovement.findMany({
+      where: { tenantId: f.tenant.id, productId: f.products[0].id },
+      orderBy: { before: 'asc' },
+    })
+    assert.deepEqual(movements.map(({ before, after }) => [before, after]), [[10, 12], [12, 15]])
+  }))
+
+test('two overlapping purchases of the same product both increment stock and chain movement values', () =>
+  fixtureTest({ stock: 10 }, async (f) => {
+    const supplier = await createPurchaseSupplier(f)
+    const secondSession = await createSecondOpenSession(f)
+    const purchases = makePurchaseService()
+    const heldLock = await holdProductRowLock(f)
+    const outcomesPromise = Promise.allSettled([
+      purchases.create(f.tenant.id, f.cashSession.id, purchaseDto(f, supplier, f.products[0], 2)),
+      purchases.create(f.tenant.id, secondSession.id, purchaseDto(f, supplier, f.products[0], 5)),
+    ])
+
+    try {
+      assert.ok(await waitForProductLockWaits(2) >= 2, 'both transactions must wait on the product row')
+    } finally {
+      heldLock.release()
+    }
+    await heldLock.transaction
+    const outcomes = await outcomesPromise
+    assert.equal(outcomes.filter(({ status }) => status === 'fulfilled').length, 2)
+    assert.equal(outcomes.filter(({ status }) => status === 'rejected').length, 0)
+    assert.equal((await prisma.product.findUnique({ where: { id: f.products[0].id } })).stock, 17)
+    const movements = await prisma.stockMovement.findMany({
+      where: { tenantId: f.tenant.id, productId: f.products[0].id },
+    })
+    const firstMovement = movements.find(({ before }) => before === 10)
+    assert.ok(firstMovement)
+    const secondMovement = movements.find(({ before }) => before === firstMovement.after)
+    assert.ok(secondMovement)
+    assert.equal(secondMovement.after, 17)
+    assert.deepEqual([firstMovement.after - firstMovement.before, secondMovement.after - secondMovement.before].sort((a, b) => a - b), [2, 5])
+  }))
+
+test('overlapping purchase and sale preserve the final stock and before/after chain', () =>
+  fixtureTest({ stock: 10 }, async (f) => {
+    const supplier = await createPurchaseSupplier(f)
+    const secondSession = await createSecondOpenSession(f)
+    const purchases = makePurchaseService()
+    const { service: sales } = makeSaleService()
+    const heldLock = await holdProductRowLock(f)
+    const outcomesPromise = Promise.allSettled([
+      purchases.create(f.tenant.id, f.cashSession.id, purchaseDto(f, supplier, f.products[0], 5)),
+      sales.create(f.tenant.id, secondSession.id, {
+        paymentMethod: PaymentMethod.CASH,
+        items: [{ productId: f.products[0].id, quantity: 3, unitPrice: 100, priceType: PriceType.PUBLIC }],
+      }),
+    ])
+
+    try {
+      assert.ok(await waitForProductLockWaits(2) >= 2, 'purchase and sale must overlap at the product row')
+    } finally {
+      heldLock.release()
+    }
+    await heldLock.transaction
+    const outcomes = await outcomesPromise
+    assert.equal(outcomes.filter(({ status }) => status === 'fulfilled').length, 2)
+    assert.equal(outcomes.filter(({ status }) => status === 'rejected').length, 0)
+    const finalStock = (await prisma.product.findUnique({ where: { id: f.products[0].id } })).stock
+    assert.equal(finalStock, 12)
+    const movements = await prisma.stockMovement.findMany({
+      where: { tenantId: f.tenant.id, productId: f.products[0].id },
+    })
+    assert.equal(movements.length, 2)
+    let current = 10
+    const remaining = [...movements]
+    while (remaining.length) {
+      const index = remaining.findIndex((movement) => movement.before === current)
+      assert.notEqual(index, -1, `no movement continues stock from ${current}`)
+      current = remaining.splice(index, 1)[0].after
+    }
+    assert.equal(current, finalStock)
+  }))
+
+test('purchase stock update rejects products owned by another tenant', () =>
+  fixtureTest({ stock: 10 }, async (f) => {
+    const foreign = await createFixture({ stock: 9 })
+    try {
+      const stock = new StockMovementService(prisma)
+      await assert.rejects(
+        prisma.$transaction((tx) => stock.registerPurchase(
+          f.tenant.id,
+          foreign.products[0].id,
+          2,
+          randomUUID(),
+          tx,
+        )),
+        (error) => error.getStatus?.() === 404,
+      )
+      assert.equal((await prisma.product.findUnique({ where: { id: foreign.products[0].id } })).stock, 9)
+      assert.equal(await prisma.stockMovement.count({ where: { tenantId: f.tenant.id } }), 0)
+    } finally {
+      await cleanupFixture(foreign)
+    }
+  }))
+
+test('purchase failure after stock update rolls back purchase, movement and inventory', () =>
+  fixtureTest({ stock: 10 }, async (f) => {
+    const supplier = await createPurchaseSupplier(f)
+    const stock = new StockMovementService(prisma)
+    const registerPurchase = stock.registerPurchase.bind(stock)
+    stock.registerPurchase = async (...args) => {
+      await registerPurchase(...args)
+      throw new Error('injected after purchase stock movement')
+    }
+    const purchases = makePurchaseService(stock)
+
+    await assert.rejects(
+      purchases.create(f.tenant.id, f.cashSession.id, purchaseDto(f, supplier, f.products[0], 4)),
+      /injected after purchase stock movement/,
+    )
+    assert.equal(await prisma.purchase.count({ where: { tenantId: f.tenant.id } }), 0)
+    assert.equal(await prisma.purchaseItem.count({ where: { purchase: { tenantId: f.tenant.id } } }), 0)
+    assert.equal(await prisma.stockMovement.count({ where: { tenantId: f.tenant.id } }), 0)
+    assert.equal((await prisma.product.findUnique({ where: { id: f.products[0].id } })).stock, 10)
   }))
 
 for (const [label, counted, expectedDifference] of [['surplus', 110, 10], ['shortage', 90, -10]]) {
@@ -1399,7 +1839,7 @@ test('failure after a stock movement rolls back the complete sale transaction', 
       amountPaid: 50,
       initialPaymentMethod: PaymentMethod.CASH,
       items: itemsFor(f.products),
-    }), /intentional integration failure after credit and cash writes/)
+    }, 'rollback-after-stock-key'), /intentional integration failure after credit and cash writes/)
     assert.equal(await prisma.sale.count({ where: { tenantId: f.tenant.id } }), 0)
     assert.equal(await prisma.saleItem.count({ where: { sale: { tenantId: f.tenant.id } } }), 0)
     assert.equal(await prisma.stockMovement.count({ where: { tenantId: f.tenant.id } }), 0)
@@ -1408,6 +1848,7 @@ test('failure after a stock movement rolls back the complete sale transaction', 
     assert.equal(Number((await prisma.cashSession.findUnique({ where: { id: f.cashSession.id } })).totalSales), 0)
     assert.equal(Number((await prisma.customer.findUnique({ where: { id: f.customer.id } })).currentDebt), 0)
     assert.equal(await prisma.customerPayment.count({ where: { tenantId: f.tenant.id } }), 0)
+    assert.equal(await prisma.idempotencyRecord.count({ where: { tenantId: f.tenant.id, key: 'rollback-after-stock-key' } }), 0)
   }))
 
 test('product inventory pagination remains correct at 100, 101 and 1,000 records', () =>
@@ -2464,6 +2905,140 @@ test('commercial acceptance journey reconciles purchases, sales, returns, debt, 
     assert.equal(dashboard.billing.netToday, 100)
   }))
 
+test('sale create replay returns the same sale without repeating stock or cash effects', () =>
+  fixtureTest({ stock: 10 }, async (f) => {
+    const { service } = makeSaleService()
+    const dto = { paymentMethod: PaymentMethod.CASH, items: itemsFor(f.products, 2) }
+    const first = await service.create(f.tenant.id, f.cashSession.id, dto, 'sale-retry-key')
+    const replay = await service.create(f.tenant.id, f.cashSession.id, dto, 'sale-retry-key')
+    assert.equal(replay.id, first.id)
+    assert.equal(await prisma.sale.count({ where: { tenantId: f.tenant.id } }), 1)
+    assert.equal(await prisma.stockMovement.count({ where: { tenantId: f.tenant.id } }), 1)
+    assert.equal((await prisma.product.findUnique({ where: { id: f.products[0].id } })).stock, 8)
+    assert.equal(Number((await prisma.cashSession.findUnique({ where: { id: f.cashSession.id } })).totalSales), 200)
+    await assert.rejects(
+      service.create(f.tenant.id, f.cashSession.id, { ...dto, items: itemsFor(f.products, 1) }, 'sale-retry-key'),
+      /contenido diferente/i,
+    )
+  }))
+
+test('concurrent sale retries with the same key overlap at PostgreSQL and commit one operation', () =>
+  fixtureTest({ stock: 10 }, async (f) => {
+    const { service } = makeSaleService()
+    const key = 'sale-concurrent-retry-key'
+    const dto = { paymentMethod: PaymentMethod.CASH, items: itemsFor(f.products, 2) }
+    const held = await holdIdempotencyKey(f, 'SALE_CREATE', key)
+    const attempts = Promise.all([
+      service.create(f.tenant.id, f.cashSession.id, dto, key),
+      service.create(f.tenant.id, f.cashSession.id, dto, key),
+    ])
+    try {
+      assert.ok(await waitForIdempotencyLockWaits(2) >= 2, 'both inserts must overlap on the tenant/operation/key unique index')
+    } finally {
+      held.release()
+    }
+    await held.transaction
+    const [first, replay] = await attempts
+    assert.equal(first.id, replay.id)
+    assert.equal(await prisma.sale.count({ where: { tenantId: f.tenant.id } }), 1)
+    assert.equal(await prisma.stockMovement.count({ where: { tenantId: f.tenant.id } }), 1)
+    assert.equal((await prisma.product.findUnique({ where: { id: f.products[0].id } })).stock, 8)
+    assert.equal(Number((await prisma.cashSession.findUnique({ where: { id: f.cashSession.id } })).totalSales), 200)
+  }))
+
+test('purchase create retry returns its original purchase and does not increment inventory twice', () =>
+  fixtureTest({ stock: 2 }, async (f) => {
+    const supplier = await createPurchaseSupplier(f)
+    const service = makePurchaseService()
+    const dto = purchaseDto(f, supplier, f.products[0], 3, 'CASH')
+    const first = await service.create(f.tenant.id, f.cashSession.id, dto, 'purchase-retry-key')
+    const replay = await service.create(f.tenant.id, f.cashSession.id, dto, 'purchase-retry-key')
+    assert.equal(replay.id, first.id)
+    assert.equal(await prisma.purchase.count({ where: { tenantId: f.tenant.id } }), 1)
+    assert.equal(await prisma.stockMovement.count({ where: { tenantId: f.tenant.id } }), 1)
+    assert.equal((await prisma.product.findUnique({ where: { id: f.products[0].id } })).stock, 5)
+  }))
+
+test('customer FIFO account payment replay does not reduce the customer debt twice', () =>
+  fixtureTest({}, async (f) => {
+    const { service } = makeSaleService()
+    await service.create(f.tenant.id, f.cashSession.id, {
+      paymentMethod: PaymentMethod.CREDIT,
+      customerId: f.customer.id,
+      items: itemsFor(f.products),
+    })
+    const payments = makeCustomerPaymentService()
+    const dto = { customerId: f.customer.id, amount: 25, paymentMethod: PaymentMethod.CASH }
+    const first = await payments.payToAccount(f.tenant.id, dto, 'customer-payment-retry-key')
+    const replay = await payments.payToAccount(f.tenant.id, dto, 'customer-payment-retry-key')
+    assert.deepEqual(replay.payments.map((payment) => payment.id), first.payments.map((payment) => payment.id))
+    assert.equal(await prisma.customerPayment.count({ where: { tenantId: f.tenant.id } }), 1)
+    assert.equal(Number((await prisma.customer.findUnique({ where: { id: f.customer.id } })).currentDebt), 75)
+    assert.equal((await cashTotals(f)).totalCashDebtPayments, 25)
+  }))
+
+test('supplier debt payment replay preserves a single payment and one debt reduction', () =>
+  fixtureTest({}, async (f) => {
+    const { purchase, debt } = await createSupplierDebt(f)
+    const paymentService = new PurchaseDebtService(prisma)
+    const dto = {
+      amount: 25,
+      paymentMethod: 'CASH',
+      paymentDate: new Date().toISOString(),
+      cashSessionId: f.cashSession.id,
+    }
+    const first = await paymentService.registerPayment(f.tenant.id, purchase.id, dto, 'supplier-payment-retry-key')
+    const replay = await paymentService.registerPayment(f.tenant.id, purchase.id, dto, 'supplier-payment-retry-key')
+    assert.equal(replay.id, first.id)
+    assert.equal(replay.payments.length, 1)
+    assert.equal(await prisma.purchaseDebtPayment.count({ where: { tenantId: f.tenant.id } }), 1)
+    assert.equal(Number((await prisma.purchaseDebt.findUnique({ where: { id: debt.id } })).balance), 75)
+  }))
+
+test('sale return create and partial refund replays return the original resources without repeated effects', () =>
+  fixtureTest({ stock: 10 }, async (f) => {
+    const { service } = makeSaleService()
+    const sale = await service.create(f.tenant.id, f.cashSession.id, {
+      paymentMethod: PaymentMethod.CASH,
+      items: itemsFor(f.products),
+    })
+    const returns = makeSaleReturnService()
+    const dto = {
+      saleId: sale.id,
+      returnDate: new Date().toISOString(),
+      reason: 'Idempotency integration',
+      items: [{ saleItemId: sale.items[0].id, quantity: 1, disposition: 'RESTOCKABLE' }],
+    }
+    const returned = await returns.create(f.tenant.id, f.user.id, dto, 'sale-return-create-key')
+    assert.equal((await returns.create(f.tenant.id, f.user.id, dto, 'sale-return-create-key')).id, returned.id)
+    await returns.confirm(returned.id, f.tenant.id, f.user.id, { settlementDisposition: 'REFUND_PENDING' })
+    assert.equal((await returns.create(f.tenant.id, f.user.id, dto, 'sale-return-create-key')).status, 'CONFIRMED')
+    const settlement = await prisma.saleReturnSettlement.findFirst({ where: { saleReturnId: returned.id } })
+    const receipt = { amount: 40, paymentMethod: 'TRANSFER', effectiveAt: new Date().toISOString() }
+    const first = await returns.settleRefund(settlement.id, f.tenant.id, f.user.id, receipt, 'sale-refund-settle-key')
+    const replay = await returns.settleRefund(settlement.id, f.tenant.id, f.user.id, receipt, 'sale-refund-settle-key')
+    assert.equal(replay.id, first.id)
+    assert.equal(await prisma.saleReturnRefundReceipt.count({ where: { settlementId: settlement.id } }), 1)
+    assert.equal(await prisma.saleReturn.count({ where: { tenantId: f.tenant.id } }), 1)
+    assert.equal(await prisma.stockMovement.count({ where: { tenantId: f.tenant.id } }), 2)
+  }))
+
+test('purchase return creation replay does not create another pending return', () =>
+  fixtureTest({ stock: 2 }, async (f) => {
+    const { purchase, item } = await createPurchaseWithItem(f, 3)
+    const returned = makePurchaseReturnService()
+    const dto = {
+      purchaseId: purchase.id,
+      returnDate: new Date().toISOString(),
+      reason: 'Idempotency integration',
+      items: [{ purchaseItemId: item.id, quantity: 1 }],
+    }
+    const first = await returned.create(f.tenant.id, dto, f.user.id, 'purchase-return-create-key')
+    const replay = await returned.create(f.tenant.id, dto, f.user.id, 'purchase-return-create-key')
+    assert.equal(replay.id, first.id)
+    assert.equal(await prisma.purchaseReturn.count({ where: { tenantId: f.tenant.id } }), 1)
+  }))
+
 async function main() {
   await prisma.$connect()
   const identity = await prisma.$queryRaw`
@@ -2473,6 +3048,7 @@ async function main() {
   `
   assert.equal(identity[0].database, expectedDatabase)
   assert.match(identity[0].server_version, /^16/)
+  process.env.POSENGINE_LOG_SALE_PERFORMANCE = 'true'
   process.env.POSENGINE_ENABLE_PURCHASE_RETURNS = 'true'
   process.env.POSENGINE_ENABLE_PURCHASE_SETTLEMENTS = 'true'
   process.env.POSENGINE_ENABLE_SUPPLIER_CREDIT_APPLICATIONS = 'true'

@@ -8,8 +8,10 @@ import { Injectable } from '@nestjs/common'
 import { jsPDF } from 'jspdf'
 import autoTable from 'jspdf-autotable'
 import type { InternalReceiptSnapshot } from './internal-receipt.service'
+import { UploadService } from '../upload/upload.service'
 
 interface ReceiptForPdf {
+  tenantId: string
   docNumber: number
   total: number
   createdAt: Date | string
@@ -23,20 +25,16 @@ const money = (n: number) =>
 
 @Injectable()
 export class InternalReceiptPdfService {
+  constructor(private readonly uploadService: UploadService) {}
+
   async generate(receipt: ReceiptForPdf): Promise<Buffer> {
     const { company } = receipt.snapshot
 
-    // Fetch and convert logo image to Base64 if logoUrl exists
+    // Only tenant-owned objects in PosEngine storage may be embedded in a PDF.
     let logoBase64: string | null = null
     if (company.logoUrl) {
-      try {
-        const response = await fetch(company.logoUrl)
-        const arrayBuffer = await response.arrayBuffer()
-        const buffer = Buffer.from(arrayBuffer)
-        logoBase64 = buffer.toString('base64')
-      } catch (error) {
-        console.error('Error fetching company logo:', error)
-      }
+      const logo = await this.uploadService.getCompanyLogo(receipt.tenantId, company.logoUrl)
+      if (logo) logoBase64 = logo.toString('base64')
     }
 
     // A4 en orientación horizontal (landscape)

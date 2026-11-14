@@ -1,10 +1,11 @@
 import {
   Controller, Get, Post, Patch, Param,
-  Body, Query, HttpCode, HttpStatus,
+  Body, Query, Headers, HttpCode, HttpStatus,
 } from '@nestjs/common';
 import {
   ApiTags, ApiOperation, ApiResponse,
   ApiBearerAuth, ApiBody, ApiParam, ApiQuery,
+  ApiHeader,
 } from '@nestjs/swagger';
 import { PurchaseReturnService } from '../services/purchase-return.service';
 import {
@@ -27,6 +28,7 @@ export class PurchaseReturnController {
   @Roles(UserRole.ADMIN, UserRole.SUPERADMIN)
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Crear una devolución de compra (en estado PENDING)' })
+  @ApiHeader({ name: 'Idempotency-Key', required: false })
   @ApiBody({ type: CreatePurchaseReturnDto })
   @ApiResponse({ status: 201, description: 'Devolución creada, pendiente de confirmación' })
   @ApiResponse({ status: 400, description: 'Unidades ya vendidas o cantidad inválida' })
@@ -35,8 +37,9 @@ export class PurchaseReturnController {
     @CurrentUser('tenantId') tenantId: string,
     @CurrentUser('id') actorId: string,
     @Body() dto: CreatePurchaseReturnDto,
+    @Headers('idempotency-key') idempotencyKey?: string,
   ) {
-    return this.purchaseReturnService.create(tenantId, dto, actorId);
+    return this.purchaseReturnService.create(tenantId, dto, actorId, idempotencyKey);
   }
 
   @Patch(':id/confirm')
@@ -57,25 +60,29 @@ export class PurchaseReturnController {
   @Patch('settlements/:settlementId/settle')
   @Roles(UserRole.ADMIN, UserRole.SUPERADMIN)
   @ApiOperation({ summary: 'Registrar que un reembolso pendiente fue recibido' })
+  @ApiHeader({ name: 'Idempotency-Key', required: false })
   settleRefund(
     @Param('settlementId') settlementId: string,
     @CurrentUser('tenantId') tenantId: string,
     @CurrentUser('id') actorId: string,
     @Body() dto: SettlePurchaseReturnRefundDto,
+    @Headers('idempotency-key') idempotencyKey?: string,
   ) {
-    return this.purchaseReturnService.settleRefund(settlementId, tenantId, dto, actorId);
+    return this.purchaseReturnService.settleRefund(settlementId, tenantId, dto, actorId, idempotencyKey);
   }
 
   @Post('settlements/:settlementId/apply-credit')
   @Roles(UserRole.ADMIN, UserRole.SUPERADMIN)
   @ApiOperation({ summary: 'Aplicar crédito de proveedor a una compra a crédito del mismo proveedor' })
+  @ApiHeader({ name: 'Idempotency-Key', required: false })
   applySupplierCredit(
     @Param('settlementId') settlementId: string,
     @CurrentUser('tenantId') tenantId: string,
     @CurrentUser('id') actorId: string,
     @Body() dto: ApplyPurchaseReturnCreditDto,
+    @Headers('idempotency-key') idempotencyKey?: string,
   ) {
-    return this.purchaseReturnService.applySupplierCredit(settlementId, tenantId, dto, actorId);
+    return this.purchaseReturnService.applySupplierCredit(settlementId, tenantId, dto, actorId, idempotencyKey);
   }
 
   @Patch(':id/cancel')

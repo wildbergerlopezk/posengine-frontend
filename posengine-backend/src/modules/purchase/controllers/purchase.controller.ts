@@ -11,6 +11,7 @@ import {
   HttpStatus,
   UseGuards,
   Request,
+  Headers,
 } from '@nestjs/common';
 import { CancelPurchaseDto } from '../dto/cancel-purchase.dto'
 import {
@@ -20,6 +21,7 @@ import {
   ApiBearerAuth,
   ApiBody,
   ApiParam,
+  ApiHeader,
 } from '@nestjs/swagger';
 import { PurchaseService } from '../services/purchase.service';
 import { CreatePurchaseDto } from '../dto/create-purchase.dto';
@@ -60,6 +62,7 @@ export class PurchaseController {
   @Roles(UserRole.ADMIN, UserRole.SUPERADMIN)
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Create a new purchase' })
+  @ApiHeader({ name: 'Idempotency-Key', required: false })
   @ApiBody({ type: CreatePurchaseDto })
   @ApiResponse({ status: 201, description: 'Purchase created successfully' })
   @ApiResponse({ status: 400, description: 'Bad request / invalid invoice format' })
@@ -68,8 +71,9 @@ export class PurchaseController {
     @CurrentUser() user: AuthenticatedUser,
     @Request() req: any,
     @Body() dto: CreatePurchaseDto,
+    @Headers('idempotency-key') idempotencyKey?: string,
   ) {
-    return this.purchaseService.create(user.tenantId, req.cashSession.id, dto);
+    return this.purchaseService.create(user.tenantId, req.cashSession.id, dto, idempotencyKey);
   }
 
   @Get()
@@ -136,7 +140,8 @@ export class PurchaseController {
     @Param('id') id: string,
     @CurrentUser('tenantId') tenantId: string,
     @Body() dto: CreatePurchaseDebtPaymentDto,
+    @Headers('idempotency-key') idempotencyKey?: string,
   ) {
-    return this.purchaseDebtService.registerPayment(tenantId, id, dto);
+    return this.purchaseDebtService.registerPayment(tenantId, id, dto, idempotencyKey);
   }
 }

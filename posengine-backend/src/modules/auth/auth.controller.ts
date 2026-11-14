@@ -103,12 +103,14 @@ export class AuthController {
   }
 
   @Post('logout')
-  @ApiBearerAuth('access-token')
+  @Public()
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Logout and revoke refresh token' })
+  @ApiOperation({ summary: 'Logout and revoke the refresh token chain for this session' })
+  @ApiBody({ type: RefreshTokenDto })
   @ApiResponse({ status: 200, description: 'Session closed' })
-  async logout(@CurrentUser() user: AuthenticatedUser) {
-    return this.authService.logout(user.id, user.sessionId);
+  async logout(@Body() dto: RefreshTokenDto) {
+    return this.authService.logout(dto);
   }
 
   @Post('logout-all')

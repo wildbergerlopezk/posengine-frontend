@@ -17,6 +17,7 @@ import dataTableStyles from "@/src/shared/components/DataTable/DataTable.module.
 import { formatCurrency } from "@/src/shared/hooks/useFormatCurrency"
 import { useCashSession } from "@/src/features/cash-session/hooks/useCashSession"
 import { API_BASE_URL } from "@/src/shared/config/api"
+import { clearIdempotencyKey, getOrCreateIdempotencyTimestamp, prepareIdempotencyKey } from "@/src/shared/api/idempotency"
 import styles from "./PurchasePage.module.css"
 import tableStyles from "@/src/features/products/pages/ProductsPage.module.css"
 import {
@@ -89,7 +90,7 @@ function formatQuantity(qty: number, unitType?: string) {
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export function PurchasePage() {
-    const { accessToken } = useAuthStore()
+    const { accessToken, user } = useAuthStore()
     const router = useRouter()
     const pathname = usePathname()
     const { session, loading: sessionLoading } = useCashSession()
@@ -471,12 +472,13 @@ export function PurchasePage() {
             // y reflejar la hora real de la transacción si es hoy.
             const now = new Date()
             const [year, month, day] = purchaseDate.split("-").map(Number)
-            const dateToSave = new Date(year, month - 1, day, now.getHours(), now.getMinutes(), now.getSeconds())
+            const proposedDate = new Date(year, month - 1, day, now.getHours(), now.getMinutes(), now.getSeconds()).toISOString()
+            const purchaseDateToSave = getOrCreateIdempotencyTimestamp("PURCHASE_CREATE", user?.id ?? "", user?.tenantId, proposedDate)
 
             const purchasePayload: any = {
                 supplierId,
                 invoiceNumber,
-                purchaseDate: dateToSave.toISOString(),
+                purchaseDate: purchaseDateToSave,
                 paymentType,
                 total,
                 notes: notes.trim() || undefined,
@@ -505,14 +507,18 @@ export function PurchasePage() {
                 }
             }
 
+            const idempotencyKey = await prepareIdempotencyKey("PURCHASE_CREATE", user?.id ?? "", user?.tenantId, purchasePayload)
             const purchaseRes = await fetch(`${API_BASE}/purchases`, {
                 method: "POST",
-                headers: authHeaders,
+                headers: { ...authHeaders, "Idempotency-Key": idempotencyKey },
                 body: JSON.stringify(purchasePayload),
             })
 
             if (!purchaseRes.ok) {
                 const body = await purchaseRes.json().catch(() => ({}))
+                if (purchaseRes.status >= 400 && purchaseRes.status < 500 && purchaseRes.status !== 409) {
+                    clearIdempotencyKey("PURCHASE_CREATE", user?.id ?? "", user?.tenantId)
+                }
                 throw new Error(readApiError(body))
             }
 
@@ -561,6 +567,7 @@ export function PurchasePage() {
             setSubmitStep(null)
             sessionStorage.removeItem(PURCHASE_STORAGE_KEY)
             setTimeout(() => {
+                clearIdempotencyKey("PURCHASE_CREATE", user?.id ?? "", user?.tenantId)
                 setItems([])
                 setSupplierId("")
                 setInvoiceNumber("")

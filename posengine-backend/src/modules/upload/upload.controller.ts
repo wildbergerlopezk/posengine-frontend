@@ -5,6 +5,8 @@ import {
   Param,
   UseInterceptors,
   UploadedFile,
+  HttpCode,
+  HttpStatus,
 } from '@nestjs/common'
 import { FileInterceptor } from '@nestjs/platform-express'
 import {
@@ -17,6 +19,9 @@ import {
   ApiBody,
 } from '@nestjs/swagger'
 import { UploadService } from './upload.service'
+import { CurrentUser } from '../../common/decorators/current-user.decorator'
+import { Roles } from '../../common/decorators/roles.decorator'
+import { UserRole } from '../../generated/prisma/enums'
 
 @ApiTags('Upload')
 @ApiBearerAuth('access-token')
@@ -25,6 +30,7 @@ export class UploadController {
   constructor(private readonly uploadService: UploadService) {}
 
   @Post()
+  @Roles(UserRole.ADMIN, UserRole.SUPERADMIN)
   @UseInterceptors(FileInterceptor('file'))
   @ApiOperation({
     summary: 'Upload a product image',
@@ -52,23 +58,31 @@ export class UploadController {
   })
   @ApiResponse({ status: 400, description: 'No file provided or invalid format' })
   @ApiResponse({ status: 500, description: 'Supabase storage error' })
-  async upload(@UploadedFile() file: Express.Multer.File) {
-    return this.uploadService.uploadFile(file)
+  async upload(
+    @CurrentUser('tenantId') tenantId: string,
+    @UploadedFile() file: Express.Multer.File,
+  ) {
+    return this.uploadService.uploadFile(tenantId, file)
   }
 
   @Delete(':filename')
+  @Roles(UserRole.ADMIN, UserRole.SUPERADMIN)
+  @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: 'Delete a product image',
-    description: 'Removes the file from Supabase Storage by filename (e.g. 1234567890.webp).',
+    description: 'Removes an image uploaded by the authenticated tenant.',
   })
   @ApiParam({
     name: 'filename',
     description: 'Filename returned by the upload endpoint',
-    example: '1714500000000-123456789.webp',
+    example: '123e4567-e89b-42d3-a456-426614174000.webp',
   })
   @ApiResponse({ status: 200, description: 'Image deleted successfully', schema: { example: { deleted: true } } })
   @ApiResponse({ status: 500, description: 'Supabase storage error' })
-  async remove(@Param('filename') filename: string) {
-    return this.uploadService.deleteFile(filename)
+  async remove(
+    @Param('filename') filename: string,
+    @CurrentUser('tenantId') tenantId: string,
+  ) {
+    return this.uploadService.deleteFile(tenantId, filename)
   }
 }

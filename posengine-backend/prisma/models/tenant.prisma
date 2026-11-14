@@ -35,4 +35,5 @@ model Tenant {
   purchaseLifecycleEvents          PurchaseLifecycleEvent[]
   purchaseReturnCreditApplications PurchaseReturnCreditApplication[]
   cashPaymentClassificationAudits  CashPaymentClassificationAudit[]
+  idempotencyRecords               IdempotencyRecord[]
 }

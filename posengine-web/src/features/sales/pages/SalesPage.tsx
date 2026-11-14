@@ -11,6 +11,7 @@ import { useRouter } from "next/navigation"
 import { useCashSession } from "@/src/features/cash-session/hooks/useCashSession"
 import { useAuthStore } from "@/src/features/auth/store/auth.store"
 import { API_BASE_URL } from "@/src/shared/config/api"
+import { clearIdempotencyKey, prepareIdempotencyKey } from "@/src/shared/api/idempotency"
 import styles from "./SalesPage.module.css"
 import tableStyles from "@/src/features/products/pages/ProductsPage.module.css"
 import { PriceTypeSelectorModal } from "../components/PriceTypeSelectorModal"
@@ -58,7 +59,7 @@ function readApiError(body: unknown): string {
 }
 
 export function SalesPage() {
-  const { accessToken } = useAuthStore()
+  const { accessToken, user } = useAuthStore()
   const router = useRouter()
   const { session, loading: sessionLoading } = useCashSession()
   const canOperate = !!session
@@ -283,17 +284,22 @@ export function SalesPage() {
           paymentMethod === "CREDIT" && amountPaid > 0 ? initialPaymentMethod : undefined,
       }
 
+      const idempotencyKey = await prepareIdempotencyKey("SALE_CREATE", user?.id ?? "", user?.tenantId, payload)
       const res = await fetch(`${API_BASE}/sales`, {
         method: "POST",
-        headers: authHeaders,
+        headers: { ...authHeaders, "Idempotency-Key": idempotencyKey },
         body: JSON.stringify(payload),
       })
 
       if (!res.ok) {
         const body = await res.json().catch(() => ({}))
+        if (res.status >= 400 && res.status < 500 && res.status !== 409) {
+          clearIdempotencyKey("SALE_CREATE", user?.id ?? "", user?.tenantId)
+        }
         throw new Error(readApiError(body))
       }
 
+      clearIdempotencyKey("SALE_CREATE", user?.id ?? "", user?.tenantId)
       setSuccess(true)
       setTimeout(() => {
         setItems([])

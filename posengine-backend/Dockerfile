@@ -1,42 +1,40 @@
 # =========================
 # STAGE 1 - BUILD
 # =========================
-FROM node:20-alpine AS builder
+FROM node:24-alpine AS builder
 
 WORKDIR /app
 
 # Dependencias (cache optimizado)
 COPY package*.json ./
-RUN npm ci
 
 # Prisma schema
 COPY prisma ./prisma
+COPY prisma.config.ts ./
 
-# Generar Prisma Client (tu output es src/generated)
-RUN npx prisma generate
+RUN npm ci
 
 # Código fuente
 COPY . .
 
-# Build NestJS
+# Build NestJS; the prebuild lifecycle generates Prisma Client once.
 RUN npm run build
 
 
 # =========================
 # STAGE 2 - PRODUCTION
 # =========================
-FROM node:20-alpine
+FROM node:24-alpine
 
 WORKDIR /app
 
 # Dependencias de producción + CLI de Prisma para migrate deploy en arranque
 COPY package*.json ./
-RUN npm ci --omit=dev \
-  && npm install prisma@7.7.0
 
 # Config y migraciones Prisma (Prisma 7 usa prisma.config.ts)
 COPY prisma ./prisma
 COPY prisma.config.ts ./
+RUN npm ci --omit=dev
 
 # Código compilado
 COPY --from=builder /app/dist ./dist
